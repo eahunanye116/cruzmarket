@@ -10,6 +10,22 @@ type UseCollectionOptions = {
   listen?: boolean;
 };
 
+// Custom hook to compare queries deeply.
+const useMemoizedQuery = (query: Query | null) => {
+  const [memoizedQuery, setMemoizedQuery] = useState(query);
+
+  useEffect(() => {
+    if (query && memoizedQuery && !queryEqual(query, memoizedQuery)) {
+      setMemoizedQuery(query);
+    } else if (query !== memoizedQuery) {
+       setMemoizedQuery(query);
+    }
+  }, [query, memoizedQuery]);
+
+  return memoizedQuery;
+}
+
+
 export function useCollection<T>(
   query: Query | null,
   options: UseCollectionOptions = { listen: true }
@@ -19,14 +35,23 @@ export function useCollection<T>(
   const [error, setError] = useState<FirestoreError | null>(null);
   const firestore = useFirestore();
 
-  const memoizedQuery = useMemo(() => query, [query ? query.path : null, query ? JSON.stringify(query) : null]);
+  const memoizedQuery = useMemoizedQuery(query);
 
   useEffect(() => {
     if (!memoizedQuery || !firestore) {
+      setData(null);
       setLoading(false);
       return;
     }
     setLoading(true);
+
+    const handlePermissionError = () => {
+        const permissionError = new FirestorePermissionError({
+          path: memoizedQuery.path,
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
 
     if (options.listen) {
       const unsubscribe = onSnapshot(memoizedQuery, (snapshot) => {
@@ -36,11 +61,7 @@ export function useCollection<T>(
       }, (err) => {
         setError(err);
         setLoading(false);
-        const permissionError = new FirestorePermissionError({
-          path: memoizedQuery.path,
-          operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        handlePermissionError();
       });
 
       return () => unsubscribe();
@@ -54,11 +75,7 @@ export function useCollection<T>(
         .catch(err => {
           setError(err);
           setLoading(false);
-          const permissionError = new FirestorePermissionError({
-            path: memoizedQuery.path,
-            operation: 'list',
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          handlePermissionError();
         });
     }
 
