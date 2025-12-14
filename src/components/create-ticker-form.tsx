@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,27 +46,6 @@ const formSchema = z.object({
 const CREATION_FEE = 2000;
 const INITIAL_MARKET_CAP = 10000;
 
-function generateChartData(basePrice: number) {
-  const data = [];
-  let currentPrice = basePrice;
-  const now = new Date();
-  for (let i = 90; i >= 0; i--) {
-    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const fluctuation = (Math.random() - 0.5) * 0.2; // -10% to +10%
-    currentPrice *= (1 + fluctuation);
-    currentPrice = Math.max(currentPrice, 0.00000001); // Ensure price doesn't go to zero
-    
-    const volume = Math.random() * 10000000 + 500000;
-
-    data.push({
-      time: date.toISOString().split('T')[0],
-      price: parseFloat(currentPrice.toFixed(8)),
-      volume: Math.floor(volume),
-    });
-  }
-  return data;
-}
-
 export function CreateTickerForm() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,7 +81,11 @@ export function CreateTickerForm() {
       supply: values.supply,
       icon: randomIcon.id,
       price: price,
-      chartData: generateChartData(price),
+      chartData: [{
+        time: new Date().toISOString(),
+        price: price,
+        volume: 0
+      }],
       createdAt: serverTimestamp(),
     };
 

@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -25,16 +26,26 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
 
   const calculatedChanges = useMemo(() => {
-    if (!ticker || !ticker.chartData || ticker.chartData.length === 0) {
+    if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
       return { '24h': 0, '30d': 0 };
     }
 
     const now = new Date();
     const currentPrice = ticker.price;
 
+    // Guard against new coins with no history
+    const tickerAgeInHours = differenceInHours(now, ticker.createdAt.toDate());
+    if (tickerAgeInHours < 24) {
+      return { '24h': 0, '30d': 0 };
+    }
+
     const findPastPrice = (targetHours: number) => {
+      // Filter for data points that are at least as old as the target
+      const pastData = ticker.chartData.filter(d => differenceInHours(now, new Date(d.time)) >= targetHours);
+      if (pastData.length === 0) return null;
+
       // Find the closest data point to the target time ago
-      let closestDataPoint = ticker.chartData.reduce((prev, curr) => {
+      let closestDataPoint = pastData.reduce((prev, curr) => {
         const currHoursDiff = Math.abs(differenceInHours(now, new Date(curr.time)) - targetHours);
         const prevHoursDiff = Math.abs(differenceInHours(now, new Date(prev.time)) - targetHours);
         return currHoursDiff < prevHoursDiff ? curr : prev;
@@ -42,14 +53,11 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       return closestDataPoint.price;
     };
     
-    // Find price from ~24 hours ago
     const price24hAgo = findPastPrice(24);
-
-    // Find price from ~30 days ago
     const price30dAgo = findPastPrice(30 * 24);
 
-    const change24h = price24hAgo > 0 ? ((currentPrice - price24hAgo) / price24hAgo) * 100 : 0;
-    const change30d = price30dAgo > 0 ? ((currentPrice - price30dAgo) / price30dAgo) * 100 : 0;
+    const change24h = price24hAgo ? ((currentPrice - price24hAgo) / price24hAgo) * 100 : 0;
+    const change30d = price30dAgo ? ((currentPrice - price30dAgo) / price30dAgo) * 100 : 0;
 
     return {
       '24h': change24h,
