@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useMemo } from 'react';
 
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
@@ -35,10 +36,14 @@ export default function TransactionsPage() {
   const user = useUser();
   const firestore = useFirestore();
 
-  const activitiesQuery = user ? query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc')) : null;
+  const activitiesQuery = useMemo(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+  }, [user, firestore]);
+  
   const { data: activities, loading } = useCollection<Activity>(activitiesQuery);
 
-  if (!user) {
+  if (!user && !loading) {
     return (
       <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-destructive/10 border-2 mx-auto">
@@ -52,55 +57,6 @@ export default function TransactionsPage() {
     );
   }
   
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center text-center mb-8">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-                <History className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-4xl font-bold font-headline">Transaction History</h1>
-        </div>
-        <Card className="overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-right">Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...Array(5)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-8 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-16" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!activities || activities.length === 0) {
-     return (
-       <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 text-center">
-         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2 mx-auto">
-            <History className="h-8 w-8 text-primary" />
-          </div>
-        <h1 className="text-4xl font-bold font-headline">No Transactions Yet</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Your transaction history will appear here once you start trading.
-        </p>
-       </div>
-     );
-  }
-
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center mb-8">
@@ -113,6 +69,28 @@ export default function TransactionsPage() {
       
       <Card className="overflow-hidden">
         <CardContent className="p-0">
+          {loading ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead className="text-right">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(5)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-8 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : activities && activities.length > 0 ? (
             <Table>
             <TableHeader>
                 <TableRow>
@@ -156,13 +134,24 @@ export default function TransactionsPage() {
                         {activity.type !== 'CREATE' ? `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
-                        {formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}
+                        {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
                     </TableCell>
                     </TableRow>
                 );
                 })}
             </TableBody>
             </Table>
+          ) : (
+            <div className="text-center py-12">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2 mx-auto">
+                  <History className="h-8 w-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold font-headline">No Transactions Yet</h2>
+              <p className="mt-2 text-muted-foreground">
+                Your transaction history will appear here once you start trading.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

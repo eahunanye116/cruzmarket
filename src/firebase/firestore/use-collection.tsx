@@ -65,6 +65,7 @@ export function useCollection<T>(
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
         setData(docs);
         setLoading(false);
+        setError(null);
       }, (err) => {
         handlePermissionError(err);
       });
@@ -76,6 +77,7 @@ export function useCollection<T>(
           const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
           setData(docs);
           setLoading(false);
+          setError(null);
         })
         .catch(err => {
           handlePermissionError(err);
