@@ -97,21 +97,31 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
   
-  const bondingCurveK = ticker.supply > 0 ? ticker.price / ticker.supply : 0;
+  const bondingCurveK = useMemo(() => {
+    if (ticker.supply === 0) return 0;
+    return ticker.price / ticker.supply;
+  }, [ticker.price, ticker.supply]);
+
 
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || bondingCurveK <= 0) return 0;
-    const newSupply = Math.sqrt(ticker.supply ** 2 + (2 / bondingCurveK) * ngnAmountToBuy);
+    // Integral of price = k * supply: Price(s) = (k * s^2) / 2
+    // Cost to go from s1 to s2 is (k/2)*(s2^2 - s1^2)
+    // ngnAmount = (k/2)*(s2^2 - s1^2)
+    // 2*ngnAmount/k = s2^2 - s1^2
+    // s2 = sqrt(s1^2 + 2*ngnAmount/k)
+    const newSupply = Math.sqrt(ticker.supply ** 2 + (2 * ngnAmountToBuy) / bondingCurveK);
     return newSupply - ticker.supply;
-  }, [ngnAmountToBuy, ticker, bondingCurveK]);
+  }, [ngnAmountToBuy, ticker.supply, bondingCurveK]);
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || bondingCurveK <= 0) return 0;
-     const newSupply = ticker.supply - tokenAmountToSell;
-     if (newSupply < 0) return 0;
-     const amountOut = (bondingCurveK / 2) * (ticker.supply ** 2 - newSupply ** 2);
-    return amountOut;
-  }, [tokenAmountToSell, ticker, bondingCurveK]);
+    const newSupply = ticker.supply - tokenAmountToSell;
+    if (newSupply < 0) return 0; // Cannot sell more than exists
+    // Proceeds from s1 to s2 is (k/2)*(s1^2 - s2^2)
+    const proceeds = (bondingCurveK / 2) * (ticker.supply ** 2 - newSupply ** 2);
+    return proceeds;
+  }, [tokenAmountToSell, ticker.supply, bondingCurveK]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
@@ -133,14 +143,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const currentSupply = currentTickerData.supply;
             const currentPrice = currentTickerData.price;
             
-            // --- DYNAMIC BONDING CURVE LOGIC (BUY) ---
             const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
             if (k <= 0) throw new Error("Invalid ticker state for trading.");
-
-            const newSupply = Math.sqrt(currentSupply ** 2 + (2 / k) * ngnAmount);
+            
+            const newSupply = Math.sqrt(currentSupply ** 2 + (2 * ngnAmount) / k);
             const boughtTokens = newSupply - currentSupply;
             const newPrice = newSupply * k;
-            // ---
+
 
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
@@ -227,15 +236,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const currentSupply = currentTickerData.supply;
             const currentPrice = currentTickerData.price;
            
-            // --- DYNAMIC BONDING CURVE LOGIC (SELL) ---
             const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
             if (k <= 0) throw new Error("Invalid ticker state for trading.");
 
             const newSupply = currentSupply - tokenAmount;
             if (newSupply < 0) throw new Error("Cannot sell more than the total supply.");
+            
             const ngnToGain = (k / 2) * (currentSupply ** 2 - newSupply ** 2);
             const newPrice = newSupply * k;
-            // ---
+            
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
             const holdingDoc = await transaction.get(holdingRef as DocumentReference<PortfolioHolding>);
@@ -392,6 +401,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+    
+
     
 
     
