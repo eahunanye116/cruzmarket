@@ -11,13 +11,8 @@ import type {AuthCredential} from 'firebase/auth';
 export function useAuth() {
   const auth = getAuth();
 
-  const signUp = async (email: string, password: string):Promise<void> => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error('Error signing up with email and password:', error);
-      throw error;
-    }
+  const signUp = (email: string, password: string) => {
+    return createUserWithEmailAndPassword(auth, email, password);
   };
 
   const signIn = async (email: string, password: string):Promise<void> => {
