@@ -26,10 +26,16 @@ async function TrendingTickers() {
 
   const trendingSummaries = await Promise.all(
     trendingTickersData.map(async (ticker) => {
+      if (!ticker.recentActivity) {
+        return {
+          ...ticker,
+          summary: 'No recent activity to summarize.',
+        };
+      }
       try {
         const result = await trendingMemeSummaries({
           tickerName: ticker.name,
-          recentActivity: ticker.recentActivity!,
+          recentActivity: ticker.recentActivity,
         });
         return { ...ticker, summary: result.summary };
       } catch (error) {
