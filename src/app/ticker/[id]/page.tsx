@@ -11,12 +11,14 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc } from 'firebase/firestore';
 import { Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { use } from 'react';
 
 export default function TickerPage({ params }: { params: { id: string } }) {
+  const resolvedParams = use(params);
   const firestore = useFirestore();
   // In a real app, you'd query by slug. Firestore doesn't support that out of the box
   // without custom indexing. For this demo, we'll assume the slug is the ID.
-  const tickerDocRef = firestore ? doc(firestore, 'tickers', params.id) : null;
+  const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
 
   if (loading) {
@@ -53,7 +55,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const stats = [
     { label: 'Market Cap', value: `₦${(ticker.marketCap / 1_000_000_000).toFixed(2)}B` },
-    { label: '24h Volume', value: `₦${(ticker.volume24h / 1_000_000_000).toFixed(2)}B` },
+    { label: '24h Volume', value: `₦${(ticker.volume24h / 1_000_000).toFixed(2)}M` },
     { label: 'Circulating Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
     { label: '24h Change', value: `${ticker.change24h.toFixed(2)}%`, color: ticker.change24h >= 0 ? 'text-accent-foreground' : 'text-destructive' },
   ];
