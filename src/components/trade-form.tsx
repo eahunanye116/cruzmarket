@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, writeBatch, addDoc, arrayUnion } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,10 @@ const sellSchema = z.object({
   tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
+// This constant defines the shape of the bonding curve.
+// price = k * supply. This gives us total_reserve = k * supply^2 / 2.
+const BONDING_CURVE_K = 2 / 1_000_000_000_000_000; // Calibrated for initial supply & market cap
+
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
@@ -41,7 +45,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
 
-  // Fetch user's profile to get balance
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
@@ -100,13 +103,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ticker.price <= 0) return 0;
-    return ngnAmountToBuy / ticker.price;
-  }, [ngnAmountToBuy, ticker.price]);
+     const newSupply = Math.sqrt(ticker.supply ** 2 + (2 / BONDING_CURVE_K) * ngnAmountToBuy);
+    return newSupply - ticker.supply;
+  }, [ngnAmountToBuy, ticker]);
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell) return 0;
-    return tokenAmountToSell * ticker.price;
-  }, [tokenAmountToSell, ticker.price]);
+     const newSupply = ticker.supply - tokenAmountToSell;
+     const amountOut = (BONDING_CURVE_K / 2) * (ticker.supply ** 2 - newSupply ** 2);
+    return amountOut;
+  }, [tokenAmountToSell, ticker]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
@@ -125,15 +131,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
-            const currentPrice = currentTickerData.price;
-            
-            // --- FAIR BONDING CURVE LOGIC (BUY) ---
-            const currentMarketCap = currentPrice * currentTickerData.supply;
-            const newMarketCap = currentMarketCap + ngnAmount;
-            const newPrice = newMarketCap / currentTickerData.supply;
-            // The user buys at the average price during their transaction
-            const avgPricePaid = (currentPrice + newPrice) / 2;
-            const tokensToBuy = ngnAmount / avgPricePaid;
+            const currentSupply = currentTickerData.supply;
+
+            // --- PUMP.FUN BONDING CURVE LOGIC (BUY) ---
+            const newSupply = Math.sqrt(currentSupply ** 2 + (2 / BONDING_CURVE_K) * ngnAmount);
+            const tokensToBuy = newSupply - currentSupply;
+            const newPrice = newSupply * BONDING_CURVE_K;
             // ---
 
             const newBalance = userDoc.data().balance - ngnAmount;
@@ -150,19 +153,20 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 const currentAmount = holdingDoc.data().amount;
                 const currentAvgPrice = holdingDoc.data().avgBuyPrice;
                 const newAmount = currentAmount + tokensToBuy;
-                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (avgPricePaid * tokensToBuy)) / newAmount;
+                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
                 holdingRef = doc(portfolioColRef);
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
                     amount: tokensToBuy,
-                    avgBuyPrice: avgPricePaid
+                    avgBuyPrice: ngnAmount / tokensToBuy
                 });
             }
 
-            // Update ticker price and chart
+            // Update ticker price, supply and chart
              transaction.update(tickerRef, { 
+                supply: newSupply,
                 price: newPrice,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
@@ -184,7 +188,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
         toast({ title: "Purchase Successful!", description: `You bought ${tokensToReceive.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
-        await fetchHolding(); // Refresh holding data
+        await fetchHolding();
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
@@ -216,15 +220,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
-            const currentPrice = currentTickerData.price;
+            const currentSupply = currentTickerData.supply;
            
-            // --- FAIR BONDING CURVE LOGIC (SELL) ---
-            const currentMarketCap = currentPrice * currentTickerData.supply;
-            const marketCapToSell = tokenAmount * currentPrice;
-            const newMarketCap = Math.max(100000, currentMarketCap - marketCapToSell); // Do not go below initial market cap
-            const newPrice = newMarketCap / currentTickerData.supply;
-            const avgPriceReceived = (currentPrice + newPrice) / 2;
-            const ngnToGain = tokenAmount * avgPriceReceived;
+            // --- PUMP.FUN BONDING CURVE LOGIC (SELL) ---
+            const newSupply = currentSupply - tokenAmount;
+            const ngnToGain = (BONDING_CURVE_K / 2) * (currentSupply ** 2 - newSupply ** 2);
+            const newPrice = newSupply * BONDING_CURVE_K;
             // ---
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
@@ -237,14 +238,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(userRef, { balance: newBalance });
 
             const newAmount = holdingDoc.data().amount - tokenAmount;
-            if (newAmount > 0.000001) { // Use a small epsilon for float comparison
+            if (newAmount > 0.000001) {
                 transaction.update(holdingRef, { amount: newAmount });
             } else {
-                transaction.delete(holdingRef); // Delete if all tokens are sold
+                transaction.delete(holdingRef);
             }
             
-            // Update ticker price and chart
+            // Update ticker price, supply and chart
             transaction.update(tickerRef, { 
+                supply: newSupply,
                 price: newPrice,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
@@ -259,14 +261,14 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             type: 'SELL',
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: tokenAmount * ticker.price, // Value based on price at time of sale for feed
+            value: ngnToReceive, // Value based on what user actually receives
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
 
         toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name.split(' ')[0]}` });
         sellForm.reset();
-        await fetchHolding(); // Refresh holding data
+        await fetchHolding();
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
@@ -380,5 +382,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+    
 
     
