@@ -13,11 +13,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use } from 'react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const DEFAULT_MARKET_CAP = 10000;
-const DEFAULT_CHANGE_24H = 0;
 const DEFAULT_VOLUME_24H = 0;
 
+// Simulated data for different timeframes
+const simulatedChanges = {
+    '10m': (Math.random() - 0.4) * 5,    // -2% to +3%
+    '1h': (Math.random() - 0.45) * 15,   // -6.75% to +8.25%
+    '24h': (Math.random() - 0.5) * 50,   // -25% to +25%
+    '30d': (Math.random() - 0.2) * 200, // -40% to +160%
+};
 
 export default function TickerPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
@@ -56,7 +63,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   // In a real app with trades, these would be calculated. For now, use defaults.
   const marketCap = DEFAULT_MARKET_CAP;
-  const change24h = DEFAULT_CHANGE_24H;
   const volume24h = DEFAULT_VOLUME_24H;
 
   const stats = [
@@ -85,16 +91,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         <CardDescription className="text-2xl font-semibold text-primary mb-3">
                             ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </CardDescription>
-                         <Badge variant="outline" className={cn(
-                            "border-2 text-base",
-                            change24h >= 0 ? "text-accent-foreground border-accent" : "text-destructive border-destructive"
-                        )}>
-                            {change24h >= 0 ?
-                            <ArrowUp className="h-4 w-4 mr-1" /> :
-                            <ArrowDown className="h-4 w-4 mr-1" />
-                            }
-                            24h: {change24h.toFixed(2)}%
-                        </Badge>
                     </div>
                 </div>
             </CardHeader>
@@ -109,10 +105,31 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Market Stats</CardTitle></CardHeader>
+           <Card>
+            <CardHeader>
+              <CardTitle>Market Stats</CardTitle>
+            </CardHeader>
             <CardContent>
-              <ul className="space-y-3">
+              <Tabs defaultValue="24h">
+                <TabsList className="grid w-full grid-cols-4 mb-4">
+                  <TabsTrigger value="10m">10m</TabsTrigger>
+                  <TabsTrigger value="1h">1H</TabsTrigger>
+                  <TabsTrigger value="24h">24H</TabsTrigger>
+                  <TabsTrigger value="30d">30D</TabsTrigger>
+                </TabsList>
+                {Object.entries(simulatedChanges).map(([key, change]) => (
+                  <TabsContent value={key} key={key}>
+                    <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
+                      <div className={cn("text-4xl font-bold flex items-center", change >= 0 ? "text-accent-foreground" : "text-destructive")}>
+                        {change >= 0 ? <ArrowUp className="h-8 w-8 mr-2" /> : <ArrowDown className="h-8 w-8 mr-2" />}
+                        {change.toFixed(2)}%
+                      </div>
+                      <p className="text-muted-foreground text-sm mt-1">Change</p>
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+               <ul className="space-y-3 mt-6">
                 {stats.map(stat => (
                   <li key={stat.label} className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">{stat.label}</span>
