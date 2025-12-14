@@ -119,7 +119,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     notFound();
   }
   
-  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate());
+  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate(), { includeSeconds: true, addSuffix: true }).replace('about ', '');
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   const stats = [
@@ -150,7 +150,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         <div className="flex items-center gap-3">
                           <CardTitle className="font-headline text-4xl">{ticker.name}</CardTitle>
                            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">
-                                🌱 {tokenAge} old
+                                🌱 {tokenAge}
                            </div>
                         </div>
                         <CardDescription className="text-2xl font-semibold text-primary mt-1 mb-3">
