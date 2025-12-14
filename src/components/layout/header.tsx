@@ -3,22 +3,23 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, TrendingUp } from 'lucide-react';
+import { Menu, TrendingUp, Repeat, Wallet, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { ReactNode } from 'react';
 
 export function Header() {
   const pathname = usePathname();
   const { signOut } = useAuth();
   const user = useUser();
 
-  const navItems = [
-    { href: '/', label: 'Trade' },
-    { href: '/portfolio', label: 'Portfolio' },
-    { href: '/create', label: 'Create' },
+  const navItems: { href: string; label: string, icon: ReactNode }[] = [
+    { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
+    { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
+    { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
   ];
 
   return (
@@ -37,10 +38,11 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "transition-colors hover:text-foreground/80",
+                  "transition-colors hover:text-foreground/80 flex items-center gap-2",
                   pathname === item.href ? "text-foreground font-bold" : "text-foreground/60"
                 )}
               >
+                {item.icon}
                 {item.label}
               </Link>
             ))}
@@ -70,10 +72,11 @@ export function Header() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "text-xl font-medium transition-colors hover:text-foreground",
+                      "text-xl font-medium transition-colors hover:text-foreground flex items-center gap-4",
                       pathname === item.href ? "text-foreground font-bold" : "text-foreground/60"
                     )}
                   >
+                    {item.icon}
                     {item.label}
                   </Link>
                 ))}
