@@ -124,13 +124,20 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
     
-    return ticker.poolTokens - ((ticker.poolNgn * ticker.poolTokens) / (ticker.poolNgn + ngnAmountToBuy));
+    // Correct formula: ∆y = y - k / (x + ∆x)
+    const k = ticker.poolNgn * ticker.poolTokens;
+    const newPoolTokens = k / (ticker.poolNgn + ngnAmountToBuy);
+    return ticker.poolTokens - newPoolTokens;
+
   }, [ngnAmountToBuy, ticker]);
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
     
-    return ticker.poolNgn - ((ticker.poolNgn * ticker.poolTokens) / (ticker.poolTokens + tokenAmountToSell));
+    // Correct formula: ∆x = x - k / (y + ∆y)
+    const k = ticker.poolNgn * ticker.poolTokens;
+    const newPoolNgn = k / (ticker.poolTokens + tokenAmountToSell);
+    return ticker.poolNgn - newPoolNgn;
 
   }, [tokenAmountToSell, ticker]);
   
@@ -161,7 +168,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const tokensOut = currentTickerData.poolTokens - ((currentTickerData.poolNgn * currentTickerData.poolTokens) / (currentTickerData.poolNgn + ngnAmount));
+            const k = currentTickerData.poolNgn * currentTickerData.poolTokens;
+            const tokensOut = currentTickerData.poolTokens - (k / (currentTickerData.poolNgn + ngnAmount));
+
             if (tokensOut <= 0) {
                 throw new Error("Cannot buy zero or negative tokens.");
             }
@@ -257,7 +266,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const ngnOut = currentTickerData.poolNgn - ((currentTickerData.poolNgn * currentTickerData.poolTokens) / (currentTickerData.poolTokens + tokenAmount));
+            const k = currentTickerData.poolNgn * currentTickerData.poolTokens;
+            const ngnOut = currentTickerData.poolNgn - (k / (currentTickerData.poolTokens + tokenAmount));
+
             if (ngnOut <= 0) {
                 throw new Error("Cannot receive zero or negative NGN.");
             }
