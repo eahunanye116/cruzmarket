@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInHours, differenceInMinutes } from 'date-fns';
+import { differenceInMinutes, sub } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 
 
@@ -31,18 +31,28 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     const now = new Date();
     const currentPrice = ticker.price;
     const tickerAgeInMinutes = differenceInMinutes(now, ticker.createdAt.toDate());
+    const earliestPrice = ticker.chartData[0].price;
 
     const findPastPrice = (targetMinutes: number) => {
-      if (tickerAgeInMinutes < targetMinutes) return null;
-
-      const pastData = ticker.chartData.filter(d => differenceInMinutes(now, new Date(d.time)) >= targetMinutes);
-      if (pastData.length === 0) return ticker.chartData[0].price; // Use earliest price if no other data point
+      // If the ticker is younger than the target timeframe, use the earliest price for comparison.
+      if (tickerAgeInMinutes < targetMinutes) {
+        return earliestPrice;
+      }
       
-      let closestDataPoint = pastData.reduce((prev, curr) => {
-        const currMinutesDiff = Math.abs(differenceInMinutes(now, new Date(curr.time)) - targetMinutes);
-        const prevMinutesDiff = Math.abs(differenceInMinutes(now, new Date(prev.time)) - targetMinutes);
-        return currMinutesDiff < prevMinutesDiff ? curr : prev;
+      const targetTime = sub(now, { minutes: targetMinutes });
+      
+      // Find the data point closest to the target time in the past.
+      let closestDataPoint = ticker.chartData.reduce((prev, curr) => {
+        const currDate = new Date(curr.time);
+        const prevDate = new Date(prev.time);
+        if (currDate > targetTime) return prev; // Only consider points in the past
+        
+        const currDiff = Math.abs(targetTime.getTime() - currDate.getTime());
+        const prevDiff = Math.abs(targetTime.getTime() - prevDate.getTime());
+        
+        return currDiff < prevDiff ? curr : prev;
       });
+
       return closestDataPoint.price;
     };
     
@@ -63,6 +73,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       '30d': calculateChange(price30dAgo),
     };
   }, [ticker]);
+  
+  const volume24h = useMemo(() => {
+    if (!ticker || !ticker.chartData) return 0;
+
+    const oneDayAgo = sub(new Date(), { days: 1 });
+    return ticker.chartData
+      .filter(data => new Date(data.time) >= oneDayAgo)
+      .reduce((acc, data) => acc + data.volume, 0);
+  }, [ticker]);
+
 
   if (loading) {
     return (
@@ -93,18 +113,17 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
-  // Volume would be calculated based on real trades
-  const volume24h = 0;
-
   const stats = [
     { label: 'Market Cap', value: `₦${(ticker.price * ticker.supply).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
-    { label: '24h Volume', value: `₦${(volume24h / 1_000_000).toFixed(2)}M` },
+    { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: 'Circulating Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
   ];
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+           <Card>
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
                     {icon && (
@@ -126,9 +145,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                 </div>
             </CardHeader>
         </Card>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-        <div className="lg:col-span-2 space-y-8">
+        
            <Card>
             <CardHeader>
               <CardTitle>Market Stats</CardTitle>
@@ -184,3 +201,5 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
+    
