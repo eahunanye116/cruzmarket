@@ -49,7 +49,7 @@ export function useCollection<T>(
     const handlePermissionError = () => {
         // Access the internal _query property to reliably get the path.
         // This is not ideal, but it's the most reliable way to get path for collection queries
-        const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
+        const path = (memoizedQuery as any)._query?.path?.canonicalId() || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: path,
           operation: 'list',
@@ -65,7 +65,12 @@ export function useCollection<T>(
       }, (err) => {
         setError(err);
         setLoading(false);
-        handlePermissionError();
+        const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
+        const permissionError = new FirestorePermissionError({
+          path: path,
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
 
       return () => unsubscribe();
@@ -79,7 +84,12 @@ export function useCollection<T>(
         .catch(err => {
           setError(err);
           setLoading(false);
-          handlePermissionError();
+          const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
+          const permissionError = new FirestorePermissionError({
+            path: path,
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
         });
     }
 
