@@ -20,7 +20,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
               alt={`${ticker.name} icon`}
               width={48}
               height={48}
-              className="rounded-full border"
+              className="rounded-md border"
               data-ai-hint={icon.imageHint}
             />
           )}

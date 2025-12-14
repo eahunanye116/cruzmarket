@@ -32,7 +32,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             alt={`${ticker.name} icon`}
             width={64}
             height={64}
-            className="rounded-full border-2 border-primary"
+            className="rounded-md border-2 border-primary"
             data-ai-hint={icon.imageHint}
           />
         )}

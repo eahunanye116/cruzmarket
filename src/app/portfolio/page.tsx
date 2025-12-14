@@ -62,7 +62,7 @@ export default function PortfolioPage() {
                           alt={holding.ticker.name}
                           width={32}
                           height={32}
-                          className="rounded-full"
+                          className="rounded-md"
                           data-ai-hint={icon.imageHint}
                         />
                       )}
