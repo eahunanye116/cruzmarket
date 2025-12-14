@@ -52,7 +52,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const [userHolding, setUserHolding] = useState<PortfolioHolding & { id: string } | null>(null);
+  const [userHolding, setUserHolding] = useState<(PortfolioHolding & { id: string }) | null>(null);
   const [holdingLoading, setHoldingLoading] = useState(true);
 
   const fetchHolding = useCallback(async () => {
@@ -566,3 +566,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
