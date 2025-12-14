@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +20,7 @@ import { useState } from "react";
 import { useAuth } from "@/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FirebaseError } from "firebase/app";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -53,10 +55,27 @@ export function SignUpForm() {
       });
       router.push("/");
     } catch (error) {
+      let description = "An unknown error occurred.";
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            description = "This email is already in use. Please try signing in.";
+            break;
+          case 'auth/weak-password':
+            description = "The password is too weak. Please use at least 6 characters.";
+            break;
+          case 'auth/invalid-email':
+            description = "Please enter a valid email address.";
+            break;
+          default:
+            description = "Could not create account. Please try again later.";
+            break;
+        }
+      }
       toast({
         variant: "destructive",
         title: "Oh no! Something went wrong.",
-        description: error instanceof Error ? "Could not create account. The email may already be in use." : "An unknown error occurred.",
+        description: description,
       });
     } finally {
       setIsSubmitting(false);

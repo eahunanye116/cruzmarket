@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +20,7 @@ import { useState } from "react";
 import { useAuth } from "@/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FirebaseError } from "firebase/app";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -49,10 +51,23 @@ export function LoginForm() {
       });
       router.push("/");
     } catch (error) {
+       let description = "An unknown error occurred.";
+       if (error instanceof FirebaseError) {
+         switch (error.code) {
+           case 'auth/user-not-found':
+           case 'auth/wrong-password':
+           case 'auth/invalid-credential':
+             description = "Invalid email or password.";
+             break;
+           default:
+             description = "Could not sign in. Please try again later.";
+             break;
+         }
+       }
       toast({
         variant: "destructive",
         title: "Oh no! Something went wrong.",
-        description: error instanceof Error ? "Invalid email or password." : "An unknown error occurred.",
+        description: description,
       });
     } finally {
       setIsSubmitting(false);
