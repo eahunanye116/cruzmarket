@@ -100,12 +100,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   // AMM (x*y=k) calculations
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
-    // x * y = k => (x + dx) * (y - dy) = k
-    // dy = y - k / (x + dx)
-    // dy = y - (x*y) / (x + dx)
-    // dy = (y(x+dx) - xy) / (x+dx)
-    // dy = (xy + y*dx - xy) / (x+dx)
-    // dy = y*dx / (x+dx)
     const k = ticker.poolNgn * ticker.poolTokens;
     if (k === 0) return 0;
     
@@ -114,9 +108,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
-    // x * y = k => (x - dx) * (y + dy) = k
-    // dx = x - k / (y + dy)
-    // dx = x - (x*y) / (y + dy)
     const k = ticker.poolNgn * ticker.poolTokens;
     if (k === 0) return 0;
     
@@ -305,6 +296,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     }
   }
 
+  const setSellAmountPercentage = (percentage: number) => {
+    if (userHolding) {
+      const amount = userHolding.amount * (percentage / 100);
+      sellForm.setValue('tokenAmount', amount, { shouldValidate: true });
+    }
+  };
+
   if (!user) {
     return <p className="text-sm text-muted-foreground text-center">Please sign in to trade.</p>;
   }
@@ -371,7 +369,14 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               name="tokenAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount to Sell</FormLabel>
+                  <div className="flex justify-between items-center mb-2">
+                    <FormLabel>Amount to Sell</FormLabel>
+                    <div className="flex items-center gap-2">
+                        {[10, 25, 50, 75].map(p => (
+                           <Button key={p} type="button" variant="outline" size="sm" className="text-xs h-6 px-2" onClick={() => setSellAmountPercentage(p)}>{p}%</Button>
+                        ))}
+                    </div>
+                  </div>
                   <FormControl>
                     <div className="relative">
                       <Input type="number" placeholder="0.00" {...field} className="pr-20" />
@@ -406,3 +411,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
