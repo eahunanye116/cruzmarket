@@ -19,11 +19,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference } from "firebase/firestore";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
+import type { UserProfile } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -40,6 +41,8 @@ const formSchema = z.object({
     message: "Initial supply must be a positive number.",
   }),
 });
+
+const CREATION_FEE = 2000;
 
 function generateChartData(basePrice: number) {
   const data = [];
@@ -104,37 +107,67 @@ export function CreateTickerForm() {
       createdAt: serverTimestamp(),
     };
 
-    const tickersCollection = collection(firestore, 'tickers');
-    addDoc(tickersCollection, newTickerData)
-      .then((docRef) => {
-        const activitiesCollection = collection(firestore, 'activities');
-        addDoc(activitiesCollection, {
-          type: 'CREATE',
-          tickerName: values.name,
-          tickerIcon: randomIcon.id,
-          value: 0,
-          createdAt: serverTimestamp(),
-        });
+    const userProfileRef = doc(firestore, "users", user.uid);
+    const tickersCollectionRef = collection(firestore, 'tickers');
+
+    try {
+      const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
+        const userProfileDoc = await transaction.get(userProfileRef as DocumentReference<UserProfile>);
+
+        if (!userProfileDoc.exists()) {
+          throw new Error("User profile not found.");
+        }
+
+        const userProfile = userProfileDoc.data();
+        if (userProfile.balance < CREATION_FEE) {
+          throw new Error(`Insufficient balance. You need at least ₦${CREATION_FEE.toLocaleString()} to create a ticker.`);
+        }
+
+        const newBalance = userProfile.balance - CREATION_FEE;
+        transaction.update(userProfileRef, { balance: newBalance });
+
+        const newTickerRef = doc(tickersCollectionRef);
+        transaction.set(newTickerRef, newTickerData);
         
+        return newTickerRef;
+      });
+
+      const activitiesCollection = collection(firestore, 'activities');
+      addDoc(activitiesCollection, {
+        type: 'CREATE',
+        tickerName: values.name,
+        tickerIcon: randomIcon.id,
+        value: 0,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      
+      toast({
+        title: "🚀 Ticker Created!",
+        description: `Your new meme ticker "${values.name}" is now live. ₦${CREATION_FEE.toLocaleString()} has been deducted from your account.`,
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+      form.reset();
+      router.push(`/ticker/${newTickerDocRef.id}`);
+
+    } catch (e: any) {
+      if (e instanceof Error && e.message.startsWith("Insufficient balance")) {
         toast({
-          title: "🚀 Ticker Created!",
-          description: `Your new meme ticker "${values.name}" is now live on CruiseMarket.`,
-          className: "bg-accent text-accent-foreground border-accent",
+          variant: "destructive",
+          title: "Creation Failed",
+          description: e.message,
         });
-        form.reset();
-        router.push(`/ticker/${docRef.id}`);
-      })
-      .catch((serverError) => {
+      } else {
         const permissionError = new FirestorePermissionError({
-          path: tickersCollection.path,
+          path: tickersCollectionRef.path,
           operation: 'create',
           requestResourceData: newTickerData,
         });
         errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+      }
+    } finally {
         setIsSubmitting(false);
-      });
+    }
   }
 
   return (
@@ -192,6 +225,10 @@ export function CreateTickerForm() {
             </FormItem>
           )}
         />
+        <div className="rounded-lg border bg-muted/50 p-4 text-center">
+            <p className="text-sm text-muted-foreground">A one-time fee to launch your ticker.</p>
+            <p className="font-bold text-lg">Creation Fee: ₦{CREATION_FEE.toLocaleString()}</p>
+        </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
           {isSubmitting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

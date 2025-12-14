@@ -40,7 +40,7 @@ export type Activity = {
 };
 
 export type UserProfile = {
-  id: string;
+  id?: string;
   email: string;
   displayName?: string;
   photoURL?: string;
