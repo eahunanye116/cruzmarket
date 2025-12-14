@@ -127,13 +127,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const currentTickerData = tickerDoc.data();
             const currentPrice = currentTickerData.price;
             
-            // --- Bonding Curve Logic ---
+            // --- FAIR BONDING CURVE LOGIC (BUY) ---
             const currentMarketCap = currentPrice * currentTickerData.supply;
             const newMarketCap = currentMarketCap + ngnAmount;
             const newPrice = newMarketCap / currentTickerData.supply;
-            // -------------------------
+            // The user buys at the average price during their transaction
+            const avgPricePaid = (currentPrice + newPrice) / 2;
+            const tokensToBuy = ngnAmount / avgPricePaid;
+            // ---
 
-            const tokensToBuy = ngnAmount / currentPrice; // Use price at time of tx
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
@@ -148,14 +150,14 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 const currentAmount = holdingDoc.data().amount;
                 const currentAvgPrice = holdingDoc.data().avgBuyPrice;
                 const newAmount = currentAmount + tokensToBuy;
-                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (currentPrice * tokensToBuy)) / newAmount;
+                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (avgPricePaid * tokensToBuy)) / newAmount;
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
                 holdingRef = doc(portfolioColRef);
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
                     amount: tokensToBuy,
-                    avgBuyPrice: currentPrice
+                    avgBuyPrice: avgPricePaid
                 });
             }
 
@@ -215,13 +217,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             const currentPrice = currentTickerData.price;
-            const ngnToGain = tokenAmount * currentPrice;
-
-            // --- Bonding Curve Logic ---
+           
+            // --- FAIR BONDING CURVE LOGIC (SELL) ---
             const currentMarketCap = currentPrice * currentTickerData.supply;
-            const newMarketCap = Math.max(0, currentMarketCap - ngnToGain); // Don't go below zero
+            const marketCapToSell = tokenAmount * currentPrice;
+            const newMarketCap = Math.max(100000, currentMarketCap - marketCapToSell); // Do not go below initial market cap
             const newPrice = newMarketCap / currentTickerData.supply;
-            // -------------------------
+            const avgPriceReceived = (currentPrice + newPrice) / 2;
+            const ngnToGain = tokenAmount * avgPriceReceived;
+            // ---
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
             const holdingDoc = await transaction.get(holdingRef as DocumentReference<PortfolioHolding>);
@@ -255,7 +259,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             type: 'SELL',
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: tokenAmount * ticker.price,
+            value: tokenAmount * ticker.price, // Value based on price at time of sale for feed
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
@@ -376,3 +380,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
