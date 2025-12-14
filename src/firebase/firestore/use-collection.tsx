@@ -21,7 +21,7 @@ const useMemoizedQuery = (query: Query | null) => {
     if ((query && !memoizedQuery) || (!query && memoizedQuery) || (query && memoizedQuery && !queryEqual(query, memoizedQuery))) {
       setMemoizedQuery(query);
     }
-  }, [query]);
+  }, [query, memoizedQuery]);
 
   return memoizedQuery;
 }
@@ -49,7 +49,7 @@ export function useCollection<T>(
     const handlePermissionError = () => {
         // Access the internal _query property to reliably get the path.
         // This is not ideal, but it's the most reliable way to get path for collection queries
-        const path = (memoizedQuery as any)._query?.path?.canonicalId() || 'unknown path';
+        const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: path,
           operation: 'list',
