@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -18,11 +18,13 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, writeBatch, addDoc } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -41,35 +43,45 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   // Fetch user's profile to get balance
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, loading: profileLoading, error: profileError } = useDoc<UserProfile>(userProfileRef);
 
-  // Fetch user's holdings for this specific ticker
-  const portfolioQuery = useMemo(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, `users/${user.uid}/portfolio`),
-      where('tickerId', '==', ticker.id)
-    );
-  }, [user, firestore, ticker.id]);
-
-  const [userHolding, setUserHolding] = useState<PortfolioHolding | null>(null);
+  const [userHolding, setUserHolding] = useState<PortfolioHolding & { id: string } | null>(null);
   const [holdingLoading, setHoldingLoading] = useState(true);
 
-  useEffect(() => {
-    if (!portfolioQuery) {
+  const fetchHolding = useCallback(async () => {
+    if (!user || !firestore) {
       setHoldingLoading(false);
       return;
     }
     setHoldingLoading(true);
-    getDocs(portfolioQuery).then(snapshot => {
+    const portfolioQuery = query(
+      collection(firestore, `users/${user.uid}/portfolio`),
+      where('tickerId', '==', ticker.id)
+    );
+    try {
+      const snapshot = await getDocs(portfolioQuery);
       if (!snapshot.empty) {
-        setUserHolding(snapshot.docs[0].data() as PortfolioHolding);
+        const doc = snapshot.docs[0];
+        setUserHolding({ id: doc.id, ...doc.data() } as PortfolioHolding & { id: string });
       } else {
         setUserHolding(null);
       }
-      setHoldingLoading(false);
-    });
-  }, [portfolioQuery]);
+    } catch(e) {
+        console.error("Error fetching portfolio holding:", e);
+        const permissionError = new FirestorePermissionError({
+            path: `users/${user.uid}/portfolio`,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setHoldingLoading(false);
+    }
+  }, [user, firestore, ticker.id]);
+
+  useEffect(() => {
+    fetchHolding();
+  }, [fetchHolding]);
+
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
     resolver: zodResolver(buySchema),
@@ -94,22 +106,132 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     return tokenAmountToSell * ticker.price;
   }, [tokenAmountToSell, ticker.price]);
 
-  function onBuySubmit(values: z.infer<typeof buySchema>) {
-    console.log('Buy:', values);
-    toast({ title: 'Buy action pending', description: 'Transaction logic not implemented yet.' });
+  async function onBuySubmit(values: z.infer<typeof buySchema>) {
+    if (!firestore || !user || !userProfile) return;
+    setIsSubmitting(true);
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const ngnAmount = values.ngnAmount;
+            const userRef = doc(firestore, 'users', user.uid);
+            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
+
+            if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
+                throw new Error('Insufficient balance.');
+            }
+
+            const tokensToBuy = ngnAmount / ticker.price;
+            const newBalance = userDoc.data().balance - ngnAmount;
+            transaction.update(userRef, { balance: newBalance });
+
+            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
+            let holdingRef: DocumentReference;
+            let newAmount: number;
+            let newAvgBuyPrice: number;
+
+            if (userHolding) {
+                holdingRef = doc(portfolioColRef, userHolding.id);
+                const currentAmount = userHolding.amount;
+                const currentAvgPrice = userHolding.avgBuyPrice;
+                newAmount = currentAmount + tokensToBuy;
+                newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ticker.price * tokensToBuy)) / newAmount;
+                transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
+            } else {
+                holdingRef = doc(portfolioColRef); // Create new holding doc
+                newAmount = tokensToBuy;
+                newAvgBuyPrice = ticker.price;
+                transaction.set(holdingRef, {
+                    tickerId: ticker.id,
+                    amount: newAmount,
+                    avgBuyPrice: newAvgBuyPrice
+                });
+            }
+        });
+
+        // Add to activity feed (outside transaction)
+        addDoc(collection(firestore, 'activities'), {
+            type: 'BUY',
+            tickerName: ticker.name,
+            tickerIcon: ticker.icon,
+            value: values.ngnAmount,
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({ title: "Purchase Successful!", description: `You bought ${tokensToReceive.toLocaleString()} ${ticker.name}`});
+        buyForm.reset();
+        await fetchHolding(); // Refresh holding data
+
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
+        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
-  function onSellSubmit(values: z.infer<typeof sellSchema>) {
-    if (userHolding && values.tokenAmount > userHolding.amount) {
+  async function onSellSubmit(values: z.infer<typeof sellSchema>) {
+    if (!firestore || !user || !userHolding) return;
+    const tokenAmount = values.tokenAmount;
+     if (tokenAmount > userHolding.amount) {
         sellForm.setError('tokenAmount', { type: 'manual', message: 'Insufficient tokens.'})
         return;
     }
-    console.log('Sell:', values);
-    toast({ title: 'Sell action pending', description: 'Transaction logic not implemented yet.' });
+    setIsSubmitting(true);
+
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const ngnToGain = tokenAmount * ticker.price;
+            const userRef = doc(firestore, 'users', user.uid);
+            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
+            if (!userDoc.exists()) throw new Error('User not found.');
+
+            const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
+            const holdingDoc = await transaction.get(holdingRef as DocumentReference<PortfolioHolding>);
+            if (!holdingDoc.exists() || holdingDoc.data().amount < tokenAmount) {
+                throw new Error('Insufficient tokens to sell.');
+            }
+
+            const newBalance = userDoc.data().balance + ngnToGain;
+            transaction.update(userRef, { balance: newBalance });
+
+            const newAmount = holdingDoc.data().amount - tokenAmount;
+            if (newAmount > 0) {
+                transaction.update(holdingRef, { amount: newAmount });
+            } else {
+                transaction.delete(holdingRef); // Delete if all tokens are sold
+            }
+        });
+
+         // Add to activity feed (outside transaction)
+        addDoc(collection(firestore, 'activities'), {
+            type: 'SELL',
+            tickerName: ticker.name,
+            tickerIcon: ticker.icon,
+            value: tokenAmount * ticker.price,
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name}` });
+        sellForm.reset();
+        await fetchHolding(); // Refresh holding data
+
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
+        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   if (!user) {
     return <p className="text-sm text-muted-foreground text-center">Please sign in to trade.</p>;
+  }
+  
+  if (profileLoading) {
+    return <Skeleton className="h-48 w-full" />
   }
 
   return (
@@ -122,7 +244,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         <Form {...buyForm}>
           <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
             <div className="text-right text-sm text-muted-foreground">
-              Balance: ₦{userProfile?.balance?.toLocaleString() ?? '0.00'}
+              Balance: ₦{userProfile?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
             </div>
             <FormField
               control={buyForm.control}

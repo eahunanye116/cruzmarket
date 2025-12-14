@@ -44,7 +44,7 @@ const formSchema = z.object({
 });
 
 const CREATION_FEE = 2000;
-const INITIAL_MARKET_CAP = 10000;
+const INITIAL_MARKET_CAP = 100000;
 
 export function CreateTickerForm() {
   const { toast } = useToast();
@@ -74,7 +74,7 @@ export function CreateTickerForm() {
     const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
     const price = INITIAL_MARKET_CAP / values.supply;
 
-    const newTickerData = {
+    const newTickerData: Omit<Ticker, 'id'> = {
       name: values.name,
       slug,
       description: values.description,
@@ -86,7 +86,7 @@ export function CreateTickerForm() {
         price: price,
         volume: 0
       }],
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp() as any, // Let server set the timestamp
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);

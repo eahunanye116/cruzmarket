@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "ticker": {
@@ -35,9 +36,10 @@
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
         "value": { "type": "number" },
+        "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["type", "tickerName", "tickerIcon", "value", "createdAt"]
+      "required": ["type", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
     },
     "userProfile": {
       "title": "User Profile",
