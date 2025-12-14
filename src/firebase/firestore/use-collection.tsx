@@ -21,7 +21,7 @@ const useMemoizedQuery = (query: Query | null) => {
     if ((query && !memoizedQuery) || (!query && memoizedQuery) || (query && memoizedQuery && !queryEqual(query, memoizedQuery))) {
       setMemoizedQuery(query);
     }
-  }, [query]); // remove memoizedQuery from dependencies
+  }, [query]);
 
   return memoizedQuery;
 }
@@ -47,8 +47,10 @@ export function useCollection<T>(
     setLoading(true);
 
     const handlePermissionError = () => {
+        // Access the internal _query property to reliably get the path.
+        const path = (memoizedQuery as any)._query?.path?.canonical ?? 'unknown';
         const permissionError = new FirestorePermissionError({
-          path: 'path' in memoizedQuery ? memoizedQuery.path : 'unknown',
+          path: path,
           operation: 'list',
         });
         errorEmitter.emit('permission-error', permissionError);
