@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInHours } from 'date-fns';
+import { differenceInHours, differenceInMinutes } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 
 
@@ -25,37 +25,42 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const calculatedChanges = useMemo(() => {
     if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
-      return { '24h': 0, '30d': 0 };
+      return { '10m': 0, '1h': 0, '24h': 0, '30d': 0 };
     }
 
     const now = new Date();
     const currentPrice = ticker.price;
+    const tickerAgeInMinutes = differenceInMinutes(now, ticker.createdAt.toDate());
 
-    const tickerAgeInHours = differenceInHours(now, ticker.createdAt.toDate());
-    
-    const findPastPrice = (targetHours: number) => {
-       if (tickerAgeInHours < targetHours) return null;
+    const findPastPrice = (targetMinutes: number) => {
+      if (tickerAgeInMinutes < targetMinutes) return null;
 
-      const pastData = ticker.chartData.filter(d => differenceInHours(now, new Date(d.time)) >= targetHours);
-      if (pastData.length === 0) return null;
-
+      const pastData = ticker.chartData.filter(d => differenceInMinutes(now, new Date(d.time)) >= targetMinutes);
+      if (pastData.length === 0) return ticker.chartData[0].price; // Use earliest price if no other data point
+      
       let closestDataPoint = pastData.reduce((prev, curr) => {
-        const currHoursDiff = Math.abs(differenceInHours(now, new Date(curr.time)) - targetHours);
-        const prevHoursDiff = Math.abs(differenceInHours(now, new Date(prev.time)) - targetHours);
-        return currHoursDiff < prevHoursDiff ? curr : prev;
+        const currMinutesDiff = Math.abs(differenceInMinutes(now, new Date(curr.time)) - targetMinutes);
+        const prevMinutesDiff = Math.abs(differenceInMinutes(now, new Date(prev.time)) - targetMinutes);
+        return currMinutesDiff < prevMinutesDiff ? curr : prev;
       });
       return closestDataPoint.price;
     };
     
-    const price24hAgo = findPastPrice(24);
-    const price30dAgo = findPastPrice(30 * 24);
-
-    const change24h = price24hAgo ? ((currentPrice - price24hAgo) / price24hAgo) * 100 : 0;
-    const change30d = price30dAgo ? ((currentPrice - price30dAgo) / price30dAgo) * 100 : 0;
+    const price10mAgo = findPastPrice(10);
+    const price1hAgo = findPastPrice(60);
+    const price24hAgo = findPastPrice(24 * 60);
+    const price30dAgo = findPastPrice(30 * 24 * 60);
+    
+    const calculateChange = (pastPrice: number | null) => {
+      if (pastPrice === null || pastPrice === 0) return 0;
+      return ((currentPrice - pastPrice) / pastPrice) * 100;
+    }
 
     return {
-      '24h': change24h,
-      '30d': change30d,
+      '10m': calculateChange(price10mAgo),
+      '1h': calculateChange(price1hAgo),
+      '24h': calculateChange(price24hAgo),
+      '30d': calculateChange(price30dAgo),
     };
   }, [ticker]);
 
@@ -88,12 +93,11 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
-  // In a real app with trades, these would be calculated. For now, use defaults.
-  const marketCap = 10000;
+  // Volume would be calculated based on real trades
   const volume24h = 0;
 
   const stats = [
-    { label: 'Market Cap', value: `₦${marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
+    { label: 'Market Cap', value: `₦${(ticker.price * ticker.supply).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: '24h Volume', value: `₦${(volume24h / 1_000_000).toFixed(2)}M` },
     { label: 'Circulating Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
   ];
@@ -131,7 +135,9 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="24h">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsList className="grid w-full grid-cols-4 mb-4">
+                  <TabsTrigger value="10m">10M</TabsTrigger>
+                  <TabsTrigger value="1h">1H</TabsTrigger>
                   <TabsTrigger value="24h">24H</TabsTrigger>
                   <TabsTrigger value="30d">30D</TabsTrigger>
                 </TabsList>
@@ -157,8 +163,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               </ul>
             </CardContent>
           </Card>
-
-          <Card>
+          
+           <Card>
             <CardHeader><CardTitle>About {ticker.name}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{ticker.description}</p>

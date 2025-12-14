@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, writeBatch, addDoc } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, writeBatch, addDoc, arrayUnion } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +43,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   // Fetch user's profile to get balance
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
-  const { data: userProfile, loading: profileLoading, error: profileError } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const [userHolding, setUserHolding] = useState<PortfolioHolding & { id: string } | null>(null);
   const [holdingLoading, setHoldingLoading] = useState(true);
@@ -79,8 +79,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   }, [user, firestore, ticker.id]);
 
   useEffect(() => {
-    fetchHolding();
-  }, [fetchHolding]);
+    if(user) {
+      fetchHolding();
+    }
+  }, [user, fetchHolding]);
 
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
@@ -119,32 +121,53 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 throw new Error('Insufficient balance.');
             }
 
-            const tokensToBuy = ngnAmount / ticker.price;
+            const tickerRef = doc(firestore, 'tickers', ticker.id);
+            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
+            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
+            const currentTickerData = tickerDoc.data();
+            const currentPrice = currentTickerData.price;
+            
+            // --- Bonding Curve Logic ---
+            const currentMarketCap = currentPrice * currentTickerData.supply;
+            const newMarketCap = currentMarketCap + ngnAmount;
+            const newPrice = newMarketCap / currentTickerData.supply;
+            // -------------------------
+
+            const tokensToBuy = ngnAmount / currentPrice; // Use price at time of tx
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
             const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
+            const portfolioQuery = query(portfolioColRef, where('tickerId', '==', ticker.id));
+            const portfolioSnapshot = await getDocs(portfolioQuery);
             let holdingRef: DocumentReference;
-            let newAmount: number;
-            let newAvgBuyPrice: number;
 
-            if (userHolding) {
-                holdingRef = doc(portfolioColRef, userHolding.id);
-                const currentAmount = userHolding.amount;
-                const currentAvgPrice = userHolding.avgBuyPrice;
-                newAmount = currentAmount + tokensToBuy;
-                newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ticker.price * tokensToBuy)) / newAmount;
+            if (!portfolioSnapshot.empty) {
+                const holdingDoc = portfolioSnapshot.docs[0];
+                holdingRef = holdingDoc.ref;
+                const currentAmount = holdingDoc.data().amount;
+                const currentAvgPrice = holdingDoc.data().avgBuyPrice;
+                const newAmount = currentAmount + tokensToBuy;
+                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (currentPrice * tokensToBuy)) / newAmount;
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
-                holdingRef = doc(portfolioColRef); // Create new holding doc
-                newAmount = tokensToBuy;
-                newAvgBuyPrice = ticker.price;
+                holdingRef = doc(portfolioColRef);
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
-                    amount: newAmount,
-                    avgBuyPrice: newAvgBuyPrice
+                    amount: tokensToBuy,
+                    avgBuyPrice: currentPrice
                 });
             }
+
+            // Update ticker price and chart
+             transaction.update(tickerRef, { 
+                price: newPrice,
+                chartData: arrayUnion({
+                    time: new Date().toISOString(),
+                    price: newPrice,
+                    volume: ngnAmount
+                })
+             });
         });
 
         // Add to activity feed (outside transaction)
@@ -157,14 +180,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             createdAt: serverTimestamp(),
         });
 
-        toast({ title: "Purchase Successful!", description: `You bought ${tokensToReceive.toLocaleString()} ${ticker.name}`});
+        toast({ title: "Purchase Successful!", description: `You bought ${tokensToReceive.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
         await fetchHolding(); // Refresh holding data
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
-        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
-        errorEmitter.emit('permission-error', permissionError);
+        if (!(e.message.includes('Insufficient balance'))) {
+            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
     } finally {
         setIsSubmitting(false);
     }
@@ -181,10 +206,22 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
     try {
         await runTransaction(firestore, async (transaction) => {
-            const ngnToGain = tokenAmount * ticker.price;
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
+
+            const tickerRef = doc(firestore, 'tickers', ticker.id);
+            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
+            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
+            const currentTickerData = tickerDoc.data();
+            const currentPrice = currentTickerData.price;
+            const ngnToGain = tokenAmount * currentPrice;
+
+            // --- Bonding Curve Logic ---
+            const currentMarketCap = currentPrice * currentTickerData.supply;
+            const newMarketCap = Math.max(0, currentMarketCap - ngnToGain); // Don't go below zero
+            const newPrice = newMarketCap / currentTickerData.supply;
+            // -------------------------
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
             const holdingDoc = await transaction.get(holdingRef as DocumentReference<PortfolioHolding>);
@@ -196,11 +233,21 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(userRef, { balance: newBalance });
 
             const newAmount = holdingDoc.data().amount - tokenAmount;
-            if (newAmount > 0) {
+            if (newAmount > 0.000001) { // Use a small epsilon for float comparison
                 transaction.update(holdingRef, { amount: newAmount });
             } else {
                 transaction.delete(holdingRef); // Delete if all tokens are sold
             }
+            
+            // Update ticker price and chart
+            transaction.update(tickerRef, { 
+                price: newPrice,
+                chartData: arrayUnion({
+                    time: new Date().toISOString(),
+                    price: newPrice,
+                    volume: ngnToGain
+                })
+            });
         });
 
          // Add to activity feed (outside transaction)
@@ -213,14 +260,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             createdAt: serverTimestamp(),
         });
 
-        toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name}` });
+        toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name.split(' ')[0]}` });
         sellForm.reset();
         await fetchHolding(); // Refresh holding data
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
-        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
-        errorEmitter.emit('permission-error', permissionError);
+        if (!(e.message.includes('Insufficient tokens'))) {
+            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
     } finally {
         setIsSubmitting(false);
     }
@@ -276,7 +325,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             </div>
             <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Buy {ticker.name}
+              Buy {ticker.name.split(' ')[0]}
             </Button>
           </form>
         </Form>
@@ -319,7 +368,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             </div>
             <Button type="submit" disabled={isSubmitting || !userHolding || userHolding.amount === 0} className="w-full">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sell {ticker.name}
+              Sell {ticker.name.split(' ')[0]}
             </Button>
           </form>
         </Form>
