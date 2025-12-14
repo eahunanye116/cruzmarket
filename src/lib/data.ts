@@ -1,4 +1,4 @@
-import type { Ticker, PortfolioHolding, EnrichedPortfolioHolding } from './types';
+import type { Ticker, PortfolioHolding, EnrichedPortfolioHolding, Activity } from './types';
 
 function generateChartData(basePrice: number) {
   const data = [];
@@ -124,6 +124,18 @@ const mockPortfolio: PortfolioHolding[] = [
   },
 ];
 
+const mockActivities: Activity[] = [
+  { id: '1', type: 'BUY', tickerName: 'DogeCoin', tickerIcon: 'doge-coin', value: 7800, timestamp: '2 minutes ago' },
+  { id: '2', type: 'SELL', tickerName: 'PepeCoin', tickerIcon: 'pepe-coin', value: 12000, timestamp: '5 minutes ago' },
+  { id: '3', type: 'CREATE', tickerName: 'GamerCoin', tickerIcon: 'rocket-coin', value: 0, timestamp: '10 minutes ago' },
+  { id: '4', type: 'BUY', tickerName: 'CatnipCoin', tickerIcon: 'cat-coin', value: 3500, timestamp: '12 minutes ago' },
+  { id: '5', type: 'BUY', tickerName: 'DiamondHand', tickerIcon: 'diamond-hands', value: 25000, timestamp: '20 minutes ago' },
+  { id: '6', type: 'SELL', tickerName: 'DogeCoin', tickerIcon: 'doge-coin', value: 1500, timestamp: '28 minutes ago' },
+  { id: '7', type: 'BUY', tickerName: 'ShibaInu', tickerIcon: 'shiba-inu', value: 9200, timestamp: '35 minutes ago' },
+  { id: '8', type: 'CREATE', tickerName: 'PixelPop', tickerIcon: 'rocket-coin', value: 0, timestamp: '45 minutes ago' },
+];
+
+
 export function getTickers(): Ticker[] {
   return mockTickers;
 }
@@ -157,4 +169,8 @@ export function getPortfolio(): EnrichedPortfolioHolding[] {
       profitOrLossPercentage,
     };
   });
+}
+
+export function getRecentActivity(): Activity[] {
+  return mockActivities;
 }

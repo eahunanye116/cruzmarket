@@ -25,3 +25,12 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
   profitOrLoss: number;
   profitOrLossPercentage: number;
 };
+
+export type Activity = {
+  id: string;
+  type: 'BUY' | 'SELL' | 'CREATE';
+  tickerName: string;
+  tickerIcon: string;
+  value: number;
+  timestamp: string;
+};
