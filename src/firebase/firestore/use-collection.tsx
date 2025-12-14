@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { onSnapshot, Query, DocumentData, FirestoreError, collection, getDocs, queryEqual } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { onSnapshot, Query, FirestoreError, getDocs, queryEqual } from 'firebase/firestore';
 import { useFirestore } from '..';
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
@@ -15,12 +15,13 @@ const useMemoizedQuery = (query: Query | null) => {
   const [memoizedQuery, setMemoizedQuery] = useState(query);
 
   useEffect(() => {
-    if (query && memoizedQuery && !queryEqual(query, memoizedQuery)) {
-      setMemoizedQuery(query);
-    } else if (query !== memoizedQuery) {
-       setMemoizedQuery(query);
+    if (!query && !memoizedQuery) {
+      return;
     }
-  }, [query, memoizedQuery]);
+    if ((query && !memoizedQuery) || (!query && memoizedQuery) || (query && memoizedQuery && !queryEqual(query, memoizedQuery))) {
+      setMemoizedQuery(query);
+    }
+  }, [query]); // remove memoizedQuery from dependencies
 
   return memoizedQuery;
 }
@@ -47,7 +48,7 @@ export function useCollection<T>(
 
     const handlePermissionError = () => {
         const permissionError = new FirestorePermissionError({
-          path: memoizedQuery.path,
+          path: 'path' in memoizedQuery ? memoizedQuery.path : 'unknown',
           operation: 'list',
         });
         errorEmitter.emit('permission-error', permissionError);
