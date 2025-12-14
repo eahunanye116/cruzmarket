@@ -130,10 +130,10 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-           <Card>
-            <CardHeader>
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <div className="lg:col-span-2">
+           <Card className="h-full">
+             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
                     {icon && (
                         <Image
@@ -153,9 +153,21 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                     </div>
                 </div>
             </CardHeader>
-        </Card>
-        
-           <Card>
+          </Card>
+        </div>
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader><CardTitle>Trade {ticker.name}</CardTitle></CardHeader>
+            <CardContent>
+              <TradeForm ticker={ticker} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <Card>
             <CardHeader>
               <CardTitle>Market Stats</CardTitle>
             </CardHeader>
@@ -213,12 +225,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="lg:col-span-1">
-          <Card>
-            <CardHeader><CardTitle>Trade {ticker.name}</CardTitle></CardHeader>
-            <CardContent>
-              <TradeForm ticker={ticker} />
-            </CardContent>
-          </Card>
+          {/* This column can be used for other content in the future */}
         </div>
       </div>
     </div>
