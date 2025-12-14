@@ -10,27 +10,52 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc } from 'firebase/firestore';
 import { Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { use } from 'react';
+import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { differenceInHours, differenceInDays } from 'date-fns';
 
 const DEFAULT_MARKET_CAP = 10000;
 const DEFAULT_VOLUME_24H = 0;
-
-// Simulated data for different timeframes
-const simulatedChanges = {
-    '10m': (Math.random() - 0.4) * 5,    // -2% to +3%
-    '1h': (Math.random() - 0.45) * 15,   // -6.75% to +8.25%
-    '24h': (Math.random() - 0.5) * 50,   // -25% to +25%
-    '30d': (Math.random() - 0.2) * 200, // -40% to +160%
-};
 
 export default function TickerPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
   const firestore = useFirestore();
   const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
+
+  const calculatedChanges = useMemo(() => {
+    if (!ticker || !ticker.chartData || ticker.chartData.length === 0) {
+      return { '24h': 0, '30d': 0 };
+    }
+
+    const now = new Date();
+    const currentPrice = ticker.price;
+
+    const findPastPrice = (targetHours: number) => {
+      // Find the closest data point to the target time ago
+      let closestDataPoint = ticker.chartData.reduce((prev, curr) => {
+        const currHoursDiff = Math.abs(differenceInHours(now, new Date(curr.time)) - targetHours);
+        const prevHoursDiff = Math.abs(differenceInHours(now, new Date(prev.time)) - targetHours);
+        return currHoursDiff < prevHoursDiff ? curr : prev;
+      });
+      return closestDataPoint.price;
+    };
+    
+    // Find price from ~24 hours ago
+    const price24hAgo = findPastPrice(24);
+
+    // Find price from ~30 days ago
+    const price30dAgo = findPastPrice(30 * 24);
+
+    const change24h = price24hAgo > 0 ? ((currentPrice - price24hAgo) / price24hAgo) * 100 : 0;
+    const change30d = price30dAgo > 0 ? ((currentPrice - price30dAgo) / price30dAgo) * 100 : 0;
+
+    return {
+      '24h': change24h,
+      '30d': change30d,
+    };
+  }, [ticker]);
 
   if (loading) {
     return (
@@ -111,13 +136,11 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="24h">
-                <TabsList className="grid w-full grid-cols-4 mb-4">
-                  <TabsTrigger value="10m">10m</TabsTrigger>
-                  <TabsTrigger value="1h">1H</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 mb-4">
                   <TabsTrigger value="24h">24H</TabsTrigger>
                   <TabsTrigger value="30d">30D</TabsTrigger>
                 </TabsList>
-                {Object.entries(simulatedChanges).map(([key, change]) => (
+                {Object.entries(calculatedChanges).map(([key, change]) => (
                   <TabsContent value={key} key={key}>
                     <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
                       <div className={cn("text-4xl font-bold flex items-center", change >= 0 ? "text-accent-foreground" : "text-destructive")}>
