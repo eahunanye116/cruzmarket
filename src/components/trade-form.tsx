@@ -22,6 +22,7 @@ import { doc, collection, query, where, getDocs } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
