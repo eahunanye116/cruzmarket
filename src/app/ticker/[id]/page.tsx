@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
@@ -14,10 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInHours, differenceInDays } from 'date-fns';
+import { differenceInHours } from 'date-fns';
+import { TradeForm } from '@/components/trade-form';
 
-const DEFAULT_MARKET_CAP = 10000;
-const DEFAULT_VOLUME_24H = 0;
 
 export default function TickerPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
@@ -33,18 +31,14 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     const now = new Date();
     const currentPrice = ticker.price;
 
-    // Guard against new coins with no history
     const tickerAgeInHours = differenceInHours(now, ticker.createdAt.toDate());
-    if (tickerAgeInHours < 24) {
-      return { '24h': 0, '30d': 0 };
-    }
-
+    
     const findPastPrice = (targetHours: number) => {
-      // Filter for data points that are at least as old as the target
+       if (tickerAgeInHours < targetHours) return null;
+
       const pastData = ticker.chartData.filter(d => differenceInHours(now, new Date(d.time)) >= targetHours);
       if (pastData.length === 0) return null;
 
-      // Find the closest data point to the target time ago
       let closestDataPoint = pastData.reduce((prev, curr) => {
         const currHoursDiff = Math.abs(differenceInHours(now, new Date(curr.time)) - targetHours);
         const prevHoursDiff = Math.abs(differenceInHours(now, new Date(prev.time)) - targetHours);
@@ -81,7 +75,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
              <Skeleton className="h-32 w-full mt-8" />
           </div>
           <div className="lg:col-span-1 space-y-6">
-            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-64 w-full" />
           </div>
         </div>
        </div>
@@ -95,8 +89,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   // In a real app with trades, these would be calculated. For now, use defaults.
-  const marketCap = DEFAULT_MARKET_CAP;
-  const volume24h = DEFAULT_VOLUME_24H;
+  const marketCap = 10000;
+  const volume24h = 0;
 
   const stats = [
     { label: 'Market Cap', value: `₦${marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
@@ -131,13 +125,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
         <div className="lg:col-span-2 space-y-8">
-          <Card>
-            <CardHeader><CardTitle>About {ticker.name}</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{ticker.description}</p>
-            </CardContent>
-          </Card>
-
            <Card>
             <CardHeader>
               <CardTitle>Market Stats</CardTitle>
@@ -170,18 +157,20 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               </ul>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader><CardTitle>About {ticker.name}</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{ticker.description}</p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="lg:col-span-1">
           <Card>
-            <CardHeader><CardTitle>Trade</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <Button size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                <ArrowUp className="mr-2 h-5 w-5" /> Buy {ticker.name}
-              </Button>
-              <Button variant="secondary" size="lg" className="w-full">
-                <ArrowDown className="mr-2 h-5 w-5" /> Sell {ticker.name}
-              </Button>
+            <CardHeader><CardTitle>Trade {ticker.name}</CardTitle></CardHeader>
+            <CardContent>
+              <TradeForm ticker={ticker} />
             </CardContent>
           </Card>
         </div>
