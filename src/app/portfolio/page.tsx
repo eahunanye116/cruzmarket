@@ -132,7 +132,7 @@ export default function PortfolioPage() {
         <h1 className="text-4xl font-bold font-headline mb-2">My Portfolio</h1>
         <div className="flex items-baseline gap-4">
             <p className="text-3xl font-semibold text-primary">₦{totals.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <div className={cn("flex items-center font-semibold", totalProfitOrLoss >= 0 ? "text-accent-foreground" : "text-destructive")}>
+            <div className={cn("flex items-center font-semibold", totalProfitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
               {totalProfitOrLoss >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
               <span>{totalProfitOrLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span className="ml-2">({totalProfitOrLossPercentage.toFixed(2)}%)</span>
@@ -187,7 +187,7 @@ export default function PortfolioPage() {
                   <TableCell className="text-right">
                     ₦{holding.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell className={cn("text-right font-medium", holding.profitOrLoss >= 0 ? "text-accent-foreground" : "text-destructive")}>
+                  <TableCell className={cn("text-right font-medium", holding.profitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
                     <div className="flex flex-col items-end">
                       <span>{holding.profitOrLoss >= 0 ? '+' : '-'}₦{Math.abs(holding.profitOrLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       <span className="text-sm">({holding.profitOrLossPercentage.toFixed(2)}%)</span>
