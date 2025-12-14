@@ -34,10 +34,6 @@ const sellSchema = z.object({
   tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
-// This constant defines the shape of the bonding curve.
-// price = k * supply. This gives us total_reserve = k * supply^2 / 2.
-const BONDING_CURVE_K = 2 / 1_000_000_000_000_000; // Calibrated for initial supply & market cap
-
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
@@ -100,25 +96,28 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
+  
+  const bondingCurveK = ticker.supply > 0 ? ticker.price / ticker.supply : 0;
 
   const tokensToReceive = useMemo(() => {
-    if (!ngnAmountToBuy || ticker.price <= 0) return 0;
-     const newSupply = Math.sqrt(ticker.supply ** 2 + (2 / BONDING_CURVE_K) * ngnAmountToBuy);
+    if (!ngnAmountToBuy || bondingCurveK <= 0) return 0;
+    const newSupply = Math.sqrt(ticker.supply ** 2 + (2 / bondingCurveK) * ngnAmountToBuy);
     return newSupply - ticker.supply;
-  }, [ngnAmountToBuy, ticker]);
+  }, [ngnAmountToBuy, ticker, bondingCurveK]);
 
   const ngnToReceive = useMemo(() => {
-    if (!tokenAmountToSell) return 0;
+    if (!tokenAmountToSell || bondingCurveK <= 0) return 0;
      const newSupply = ticker.supply - tokenAmountToSell;
-     const amountOut = (BONDING_CURVE_K / 2) * (ticker.supply ** 2 - newSupply ** 2);
+     if (newSupply < 0) return 0;
+     const amountOut = (bondingCurveK / 2) * (ticker.supply ** 2 - newSupply ** 2);
     return amountOut;
-  }, [tokenAmountToSell, ticker]);
+  }, [tokenAmountToSell, ticker, bondingCurveK]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
     setIsSubmitting(true);
     try {
-        await runTransaction(firestore, async (transaction) => {
+        const tokensToBuy = await runTransaction(firestore, async (transaction) => {
             const ngnAmount = values.ngnAmount;
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
@@ -132,35 +131,39 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             const currentSupply = currentTickerData.supply;
+            const currentPrice = currentTickerData.price;
+            
+            // --- DYNAMIC BONDING CURVE LOGIC (BUY) ---
+            const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
+            if (k <= 0) throw new Error("Invalid ticker state for trading.");
 
-            // --- PUMP.FUN BONDING CURVE LOGIC (BUY) ---
-            const newSupply = Math.sqrt(currentSupply ** 2 + (2 / BONDING_CURVE_K) * ngnAmount);
-            const tokensToBuy = newSupply - currentSupply;
-            const newPrice = newSupply * BONDING_CURVE_K;
+            const newSupply = Math.sqrt(currentSupply ** 2 + (2 / k) * ngnAmount);
+            const boughtTokens = newSupply - currentSupply;
+            const newPrice = newSupply * k;
             // ---
 
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
             const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
-            const portfolioQuery = query(portfolioColRef, where('tickerId', '==', ticker.id));
-            const portfolioSnapshot = await getDocs(portfolioQuery);
+            const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
+            const portfolioSnapshot = await getDocs(q);
+            
             let holdingRef: DocumentReference;
-
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
                 holdingRef = holdingDoc.ref;
                 const currentAmount = holdingDoc.data().amount;
                 const currentAvgPrice = holdingDoc.data().avgBuyPrice;
-                const newAmount = currentAmount + tokensToBuy;
+                const newAmount = currentAmount + boughtTokens;
                 const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
                 holdingRef = doc(portfolioColRef);
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
-                    amount: tokensToBuy,
-                    avgBuyPrice: ngnAmount / tokensToBuy
+                    amount: boughtTokens,
+                    avgBuyPrice: ngnAmount / boughtTokens
                 });
             }
 
@@ -174,6 +177,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     volume: ngnAmount
                 })
              });
+             return boughtTokens;
         });
 
         // Add to activity feed (outside transaction)
@@ -186,7 +190,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             createdAt: serverTimestamp(),
         });
 
-        toast({ title: "Purchase Successful!", description: `You bought ${tokensToReceive.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+        toast({ title: "Purchase Successful!", description: `You bought ${tokensToBuy.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
         await fetchHolding();
 
@@ -211,7 +215,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
 
     try {
-        await runTransaction(firestore, async (transaction) => {
+        const ngnToReceive = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -221,11 +225,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             const currentSupply = currentTickerData.supply;
+            const currentPrice = currentTickerData.price;
            
-            // --- PUMP.FUN BONDING CURVE LOGIC (SELL) ---
+            // --- DYNAMIC BONDING CURVE LOGIC (SELL) ---
+            const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
+            if (k <= 0) throw new Error("Invalid ticker state for trading.");
+
             const newSupply = currentSupply - tokenAmount;
-            const ngnToGain = (BONDING_CURVE_K / 2) * (currentSupply ** 2 - newSupply ** 2);
-            const newPrice = newSupply * BONDING_CURVE_K;
+            if (newSupply < 0) throw new Error("Cannot sell more than the total supply.");
+            const ngnToGain = (k / 2) * (currentSupply ** 2 - newSupply ** 2);
+            const newPrice = newSupply * k;
             // ---
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
@@ -238,7 +247,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(userRef, { balance: newBalance });
 
             const newAmount = holdingDoc.data().amount - tokenAmount;
-            if (newAmount > 0.000001) {
+            if (newAmount > 0.000001) { // Threshold to avoid dust
                 transaction.update(holdingRef, { amount: newAmount });
             } else {
                 transaction.delete(holdingRef);
@@ -254,6 +263,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     volume: ngnToGain
                 })
             });
+            return ngnToGain;
         });
 
          // Add to activity feed (outside transaction)
@@ -382,6 +392,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+    
+
     
 
     
