@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onSnapshot, Query, FirestoreError, getDocs, queryEqual } from 'firebase/firestore';
+import { onSnapshot, Query, FirestoreError, getDocs, queryEqual, collection } from 'firebase/firestore';
 import { useFirestore } from '..';
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
@@ -46,14 +46,17 @@ export function useCollection<T>(
     }
     setLoading(true);
 
-    const handlePermissionError = () => {
-        // Access the internal _query property to reliably get the path.
-        // This is not ideal, but it's the most reliable way to get path for collection queries
-        const path = (memoizedQuery as any)._query?.path?.canonicalId() || 'unknown path';
+    const handlePermissionError = (err: FirestoreError) => {
+        // The previous attempts to access internal properties were incorrect.
+        // The most reliable way to get the path for a collection query is by inspecting
+        // the internal _query property which is stable in the SDK version used.
+        const path = (memoizedQuery as any)._query.path.segments.join('/');
         const permissionError = new FirestorePermissionError({
-          path: path,
+          path: `/${path}`,
           operation: 'list',
         });
+        setError(err);
+        setLoading(false);
         errorEmitter.emit('permission-error', permissionError);
     }
 
@@ -63,14 +66,7 @@ export function useCollection<T>(
         setData(docs);
         setLoading(false);
       }, (err) => {
-        setError(err);
-        setLoading(false);
-        const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
-        const permissionError = new FirestorePermissionError({
-          path: path,
-          operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        handlePermissionError(err);
       });
 
       return () => unsubscribe();
@@ -82,14 +78,7 @@ export function useCollection<T>(
           setLoading(false);
         })
         .catch(err => {
-          setError(err);
-          setLoading(false);
-          const path = (memoizedQuery as any)._query?.path?.toString() || 'unknown path';
-          const permissionError = new FirestorePermissionError({
-            path: path,
-            operation: 'list',
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          handlePermissionError(err);
         });
     }
 
