@@ -3,9 +3,10 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { firebaseConfig } from './config';
 
-import { FirebaseProvider, useFirebase, useFirebaseApp, useFirestore, useAuth } from './provider';
+import { FirebaseProvider, useFirebase, useFirebaseApp, useFirestore, useAuth as useFirebaseAuthInstance } from './provider';
 import { FirebaseClientProvider } from './client-provider';
 import { useUser } from './auth/use-user';
+import { useAuth } from './auth/use-auth';
 
 
 function initializeFirebase() {
@@ -32,5 +33,6 @@ export {
   useFirebase,
   useFirebaseApp,
   useFirestore,
+  useFirebaseAuthInstance,
   useAuth,
 };
