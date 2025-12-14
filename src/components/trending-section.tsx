@@ -32,9 +32,6 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
                   ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3">{ticker.description}</p>
-              </CardContent>
             </Card>
           </Link>
         ))}
