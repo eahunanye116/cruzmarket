@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInMinutes, sub } from 'date-fns';
+import { differenceInMinutes, sub, formatDistanceToNow } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
@@ -118,7 +118,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   if (!ticker) {
     notFound();
   }
-
+  
+  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate());
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   const stats = [
@@ -146,8 +147,13 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         />
                     )}
                     <div className="flex-1">
-                        <CardTitle className="font-headline text-4xl mb-1">{ticker.name}</CardTitle>
-                        <CardDescription className="text-2xl font-semibold text-primary mb-3">
+                        <div className="flex items-center gap-3">
+                          <CardTitle className="font-headline text-4xl">{ticker.name}</CardTitle>
+                           <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">
+                                🌱 {tokenAge} old
+                           </div>
+                        </div>
+                        <CardDescription className="text-2xl font-semibold text-primary mt-1 mb-3">
                             ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </CardDescription>
                     </div>
