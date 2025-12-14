@@ -194,8 +194,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 const holdingRef = holdingDoc.ref;
                 const currentAmount = holdingDoc.data().amount;
                 const currentAvgPrice = holdingDoc.data().avgBuyPrice;
+                
                 const newAmount = currentAmount + tokensOut;
+                // Correct weighted average calculation
                 const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
+                
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
                 const holdingRef = doc(portfolioColRef);
@@ -435,7 +438,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
                     <p className="text-sm font-medium text-foreground transition-opacity duration-300">
                         {tokensToReceive.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                        <span className="ml-2 font-bold text-primary">{ticker.name.split(' ')[0]}</span>
+                        <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
                     </p>
                 </div>
             </div>
