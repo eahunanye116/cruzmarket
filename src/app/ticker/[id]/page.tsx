@@ -115,9 +115,10 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   const stats = [
-    { label: 'Market Cap', value: `₦${(ticker.price * ticker.supply).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
+    { label: 'Market Cap', value: `₦${(ticker.poolNgn).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
-    { label: 'Circulating Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
+    { label: 'Circulating Supply', value: `${((ticker.supply - ticker.poolTokens) / 1_000_000_000).toFixed(2)}B` },
+    { label: 'Total Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
   ];
 
   return (
@@ -202,5 +203,3 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
-    

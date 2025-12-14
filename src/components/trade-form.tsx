@@ -86,48 +86,49 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
     resolver: zodResolver(buySchema),
-    defaultValues: { ngnAmount: '' as any },
+    defaultValues: { ngnAmount: '' },
   });
 
   const sellForm = useForm<z.infer<typeof sellSchema>>({
     resolver: zodResolver(sellSchema),
-    defaultValues: { tokenAmount: '' as any },
+    defaultValues: { tokenAmount: '' },
   });
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
-  
-  const bondingCurveK = useMemo(() => {
-    if (ticker.supply === 0) return 0;
-    return ticker.price / ticker.supply;
-  }, [ticker.price, ticker.supply]);
 
-
+  // AMM (x*y=k) calculations
   const tokensToReceive = useMemo(() => {
-    if (!ngnAmountToBuy || bondingCurveK <= 0) return 0;
-    // Integral of price = k * supply: Price(s) = (k * s^2) / 2
-    // Cost to go from s1 to s2 is (k/2)*(s2^2 - s1^2)
-    // ngnAmount = (k/2)*(s2^2 - s1^2)
-    // 2*ngnAmount/k = s2^2 - s1^2
-    // s2 = sqrt(s1^2 + 2*ngnAmount/k)
-    const newSupply = Math.sqrt(ticker.supply ** 2 + (2 * ngnAmountToBuy) / bondingCurveK);
-    return newSupply - ticker.supply;
-  }, [ngnAmountToBuy, ticker.supply, bondingCurveK]);
+    if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
+    // x * y = k => (x + dx) * (y - dy) = k
+    // dy = y - k / (x + dx)
+    // dy = y - (x*y) / (x + dx)
+    // dy = (y(x+dx) - xy) / (x+dx)
+    // dy = (xy + y*dx - xy) / (x+dx)
+    // dy = y*dx / (x+dx)
+    const k = ticker.poolNgn * ticker.poolTokens;
+    if (k === 0) return 0;
+    
+    return ticker.poolTokens - (k / (ticker.poolNgn + ngnAmountToBuy));
+  }, [ngnAmountToBuy, ticker]);
 
   const ngnToReceive = useMemo(() => {
-    if (!tokenAmountToSell || bondingCurveK <= 0) return 0;
-    const newSupply = ticker.supply - tokenAmountToSell;
-    if (newSupply < 0) return 0; // Cannot sell more than exists
-    // Proceeds from s1 to s2 is (k/2)*(s1^2 - s2^2)
-    const proceeds = (bondingCurveK / 2) * (ticker.supply ** 2 - newSupply ** 2);
-    return proceeds;
-  }, [tokenAmountToSell, ticker.supply, bondingCurveK]);
+    if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
+    // x * y = k => (x - dx) * (y + dy) = k
+    // dx = x - k / (y + dy)
+    // dx = x - (x*y) / (y + dy)
+    const k = ticker.poolNgn * ticker.poolTokens;
+    if (k === 0) return 0;
+    
+    return ticker.poolNgn - (k / (ticker.poolTokens + tokenAmountToSell));
+
+  }, [tokenAmountToSell, ticker]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
     setIsSubmitting(true);
     try {
-        const tokensToBuy = await runTransaction(firestore, async (transaction) => {
+        const boughtTokens = await runTransaction(firestore, async (transaction) => {
             const ngnAmount = values.ngnAmount;
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
@@ -140,16 +141,18 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
-            const currentSupply = currentTickerData.supply;
-            const currentPrice = currentTickerData.price;
             
-            const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
-            if (k <= 0) throw new Error("Invalid ticker state for trading.");
-            
-            const newSupply = Math.sqrt(currentSupply ** 2 + (2 * ngnAmount) / k);
-            const boughtTokens = newSupply - currentSupply;
-            const newPrice = newSupply * k;
+            const tokensOut = currentTickerData.poolTokens - ((currentTickerData.poolNgn * currentTickerData.poolTokens) / (currentTickerData.poolNgn + ngnAmount));
+            if (tokensOut <= 0) {
+                throw new Error("Cannot buy zero or negative tokens.");
+            }
+            if (tokensOut > currentTickerData.poolTokens) {
+                throw new Error("Not enough token liquidity in the pool.");
+            }
 
+            const newPoolNgn = currentTickerData.poolNgn + ngnAmount;
+            const newPoolTokens = currentTickerData.poolTokens - tokensOut;
+            const newPrice = newPoolNgn / newPoolTokens;
 
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
@@ -158,27 +161,27 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
-            let holdingRef: DocumentReference;
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
-                holdingRef = holdingDoc.ref;
+                const holdingRef = holdingDoc.ref;
                 const currentAmount = holdingDoc.data().amount;
                 const currentAvgPrice = holdingDoc.data().avgBuyPrice;
-                const newAmount = currentAmount + boughtTokens;
+                const newAmount = currentAmount + tokensOut;
                 const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
-                holdingRef = doc(portfolioColRef);
+                const holdingRef = doc(portfolioColRef);
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
-                    amount: boughtTokens,
-                    avgBuyPrice: ngnAmount / boughtTokens
+                    amount: tokensOut,
+                    avgBuyPrice: ngnAmount / tokensOut
                 });
             }
 
-            // Update ticker price, supply and chart
+            // Update ticker pools and price
              transaction.update(tickerRef, { 
-                supply: newSupply,
+                poolNgn: newPoolNgn,
+                poolTokens: newPoolTokens,
                 price: newPrice,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
@@ -186,7 +189,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     volume: ngnAmount
                 })
              });
-             return boughtTokens;
+             return tokensOut;
         });
 
         // Add to activity feed (outside transaction)
@@ -199,7 +202,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             createdAt: serverTimestamp(),
         });
 
-        toast({ title: "Purchase Successful!", description: `You bought ${tokensToBuy.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+        toast({ title: "Purchase Successful!", description: `You bought ${boughtTokens.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
         await fetchHolding();
 
@@ -224,7 +227,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
 
     try {
-        const ngnToReceive = await runTransaction(firestore, async (transaction) => {
+        const ngnToGain = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -233,17 +236,18 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
-            const currentSupply = currentTickerData.supply;
-            const currentPrice = currentTickerData.price;
-           
-            const k = currentSupply > 0 ? currentPrice / currentSupply : 0;
-            if (k <= 0) throw new Error("Invalid ticker state for trading.");
-
-            const newSupply = currentSupply - tokenAmount;
-            if (newSupply < 0) throw new Error("Cannot sell more than the total supply.");
             
-            const ngnToGain = (k / 2) * (currentSupply ** 2 - newSupply ** 2);
-            const newPrice = newSupply * k;
+            const ngnOut = currentTickerData.poolNgn - ((currentTickerData.poolNgn * currentTickerData.poolTokens) / (currentTickerData.poolTokens + tokenAmount));
+            if (ngnOut <= 0) {
+                throw new Error("Cannot receive zero or negative NGN.");
+            }
+            if (ngnOut > currentTickerData.poolNgn) {
+                throw new Error("Not enough NGN liquidity in the pool.");
+            }
+           
+            const newPoolNgn = currentTickerData.poolNgn - ngnOut;
+            const newPoolTokens = currentTickerData.poolTokens + tokenAmount;
+            const newPrice = newPoolNgn > 0 && newPoolTokens > 0 ? newPoolNgn / newPoolTokens : 0;
             
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
@@ -252,7 +256,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 throw new Error('Insufficient tokens to sell.');
             }
 
-            const newBalance = userDoc.data().balance + ngnToGain;
+            const newBalance = userDoc.data().balance + ngnOut;
             transaction.update(userRef, { balance: newBalance });
 
             const newAmount = holdingDoc.data().amount - tokenAmount;
@@ -262,17 +266,18 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 transaction.delete(holdingRef);
             }
             
-            // Update ticker price, supply and chart
+            // Update ticker pools and price
             transaction.update(tickerRef, { 
-                supply: newSupply,
+                poolNgn: newPoolNgn,
+                poolTokens: newPoolTokens,
                 price: newPrice,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
-                    volume: ngnToGain
+                    volume: ngnOut
                 })
             });
-            return ngnToGain;
+            return ngnOut;
         });
 
          // Add to activity feed (outside transaction)
@@ -280,7 +285,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             type: 'SELL',
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: ngnToReceive, // Value based on what user actually receives
+            value: ngnToGain,
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
@@ -401,10 +406,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-    
-
-    
-
-    
-
-    

@@ -72,21 +72,24 @@ export function CreateTickerForm() {
     
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+    
+    // The price is based on the initial pool ratio
     const price = INITIAL_MARKET_CAP / values.supply;
 
-    const newTickerData: Omit<Ticker, 'id'> = {
+    const newTickerData: Omit<Ticker, 'id' | 'createdAt'> = {
       name: values.name,
       slug,
       description: values.description,
-      supply: values.supply,
-      icon: randomIcon.id,
+      supply: values.supply, // Total fixed supply
+      poolNgn: INITIAL_MARKET_CAP, // Initial NGN liquidity
+      poolTokens: values.supply, // Entire supply starts in the liquidity pool
       price: price,
+      icon: randomIcon.id,
       chartData: [{
         time: new Date().toISOString(),
         price: price,
         volume: 0
       }],
-      createdAt: serverTimestamp() as any, // Let server set the timestamp
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);
@@ -109,7 +112,11 @@ export function CreateTickerForm() {
         transaction.update(userProfileRef, { balance: newBalance });
 
         const newTickerRef = doc(tickersCollectionRef);
-        transaction.set(newTickerRef, newTickerData);
+        // Set the full object including the server timestamp
+        transaction.set(newTickerRef, {
+            ...newTickerData,
+            createdAt: serverTimestamp()
+        });
         
         return newTickerRef;
       });
@@ -195,12 +202,12 @@ export function CreateTickerForm() {
           name="supply"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Initial Supply</FormLabel>
+              <FormLabel>Total Supply</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="1000000000" {...field} />
               </FormControl>
               <FormDescription>
-                The total number of tokens that will ever exist.
+                The total number of tokens that will ever exist. This cannot be changed.
               </FormDescription>
               <FormMessage />
             </FormItem>
