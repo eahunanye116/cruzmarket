@@ -16,23 +16,23 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b-2 border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center">
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="hidden font-bold sm:inline-block font-headline">
+            <span className="hidden font-bold sm:inline-block font-headline text-lg">
               CruiseMarket
             </span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm">
+          <nav className="flex items-center gap-6 text-base">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
                   "transition-colors hover:text-foreground/80",
-                  pathname === item.href ? "text-foreground" : "text-foreground/60"
+                  pathname === item.href ? "text-foreground font-bold" : "text-foreground/60"
                 )}
               >
                 {item.label}
@@ -49,25 +49,26 @@ export function Header() {
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left">
-              <SheetHeader>
-                <SheetTitle>Menu</SheetTitle>
+            <SheetContent side="left" className="border-r-2">
+              <SheetHeader className="border-b-2 pb-4">
+                <SheetTitle>
+                   <Link href="/" className="flex items-center space-x-2">
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                    <span className="font-bold font-headline text-2xl">CruiseMarket</span>
+                  </Link>
+                </SheetTitle>
                 <SheetDescription>
-                  Navigate through the premier market for meme tickers.
+                  The premier market for meme tickers.
                 </SheetDescription>
               </SheetHeader>
               <nav className="flex flex-col gap-4 mt-6">
-                 <Link href="/" className="flex items-center space-x-2 mb-4">
-                    <TrendingUp className="h-6 w-6 text-primary" />
-                    <span className="font-bold font-headline">CruiseMarket</span>
-                  </Link>
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "text-lg font-medium transition-colors hover:text-foreground",
-                      pathname === item.href ? "text-foreground" : "text-foreground/60"
+                      "text-xl font-medium transition-colors hover:text-foreground",
+                      pathname === item.href ? "text-foreground font-bold" : "text-foreground/60"
                     )}
                   >
                     {item.label}

@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 export default function PortfolioPage() {
   const portfolio = getPortfolio();
@@ -38,7 +39,7 @@ export default function PortfolioPage() {
         </div>
       </div>
       
-      <div className="rounded-lg border overflow-hidden">
+      <Card className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -62,7 +63,7 @@ export default function PortfolioPage() {
                           alt={holding.ticker.name}
                           width={32}
                           height={32}
-                          className="rounded-md"
+                          className="rounded-none border-2"
                           data-ai-hint={icon.imageHint}
                         />
                       )}
@@ -95,7 +96,7 @@ export default function PortfolioPage() {
             })}
           </TableBody>
         </Table>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -12,12 +12,13 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
       <p className="text-muted-foreground mb-6">Top moving meme tickers in the market.</p>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {trendingTickers.map((ticker) => (
-          <Link href={`/ticker/${ticker.slug}`} key={ticker.id} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg">
-            <Card className="flex flex-col h-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <Link href={`/ticker/${ticker.slug}`} key={ticker.id} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
+            <Card className="flex flex-col h-full hover:shadow-hard-lg hover:-translate-y-1 hover:-translate-x-1 transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="font-headline">{ticker.name}</CardTitle>
                   <Badge variant="outline" className={cn(
+                    "border-2",
                     ticker.change24h >= 0 ? "text-accent-foreground border-accent" : "text-destructive border-destructive"
                   )}>
                     {ticker.change24h >= 0 ?
