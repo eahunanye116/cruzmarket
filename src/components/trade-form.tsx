@@ -569,3 +569,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
