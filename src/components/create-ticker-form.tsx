@@ -43,6 +43,7 @@ const formSchema = z.object({
 });
 
 const CREATION_FEE = 2000;
+const INITIAL_MARKET_CAP = 10000;
 
 function generateChartData(basePrice: number) {
   const data = [];
@@ -52,7 +53,7 @@ function generateChartData(basePrice: number) {
     const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const fluctuation = (Math.random() - 0.5) * 0.2; // -10% to +10%
     currentPrice *= (1 + fluctuation);
-    currentPrice = Math.max(currentPrice, 0.0000001);
+    currentPrice = Math.max(currentPrice, 0.00000001); // Ensure price doesn't go to zero
     
     const volume = Math.random() * 10000000 + 5000000;
 
@@ -91,7 +92,7 @@ export function CreateTickerForm() {
     
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
-    const price = Math.random() * 0.1;
+    const price = INITIAL_MARKET_CAP / values.supply;
 
     const newTickerData = {
       name: values.name,
@@ -99,10 +100,10 @@ export function CreateTickerForm() {
       description: values.description,
       supply: values.supply,
       icon: randomIcon.id,
-      marketCap: price * values.supply,
+      marketCap: INITIAL_MARKET_CAP,
       price: price,
-      volume24h: Math.random() * 100000000,
-      change24h: (Math.random() - 0.5) * 20,
+      volume24h: 0,
+      change24h: 0,
       chartData: generateChartData(price),
       createdAt: serverTimestamp(),
     };
