@@ -211,7 +211,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
           <Card>
             <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
+                <CardTitle>Trades</CardTitle>
                 <CardDescription>All buy and sell activity for {ticker.name}.</CardDescription>
             </CardHeader>
             <CardContent>

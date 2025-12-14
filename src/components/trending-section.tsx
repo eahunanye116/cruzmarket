@@ -21,7 +21,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
                         ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                       </p>
                     </div>
-                    <TickerChangeBadge ticker={ticker} period="10m" />
+                    <TickerChangeBadge ticker={ticker} period="24h" />
                   </div>
                 </CardContent>
               </Card>
