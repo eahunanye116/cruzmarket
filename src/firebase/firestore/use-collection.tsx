@@ -47,10 +47,8 @@ export function useCollection<T>(
     setLoading(true);
 
     const handlePermissionError = (err: FirestoreError) => {
-        // The previous attempts to access internal properties were incorrect.
-        // The most reliable way to get the path for a collection query is by inspecting
-        // the internal _query property which is stable in the SDK version used.
-        const path = (memoizedQuery as any)._query.path.segments.join('/');
+        // Access the internal _query property to reliably get the path.
+        const path = (memoizedQuery as any)._query?.path?.segments.join('/') || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: `/${path}`,
           operation: 'list',
