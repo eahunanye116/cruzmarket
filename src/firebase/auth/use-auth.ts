@@ -15,13 +15,8 @@ export function useAuth() {
     return createUserWithEmailAndPassword(auth, email, password);
   };
 
-  const signIn = async (email: string, password: string):Promise<void> => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error('Error signing in with email and password:', error);
-      throw error;
-    }
+  const signIn = (email: string, password: string) => {
+    return signInWithEmailAndPassword(auth, email, password);
   };
 
   const signOut = async () => {
