@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { cn } from '@/lib/utils';
+import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { Separator } from './ui/separator';
 
 const buySchema = z.object({
@@ -125,6 +125,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
     
     const k = ticker.poolNgn * ticker.poolTokens;
+    if (k === 0 || (ticker.poolNgn + ngnAmountToBuy) === 0) return 0;
+
     const newPoolTokens = k / (ticker.poolNgn + ngnAmountToBuy);
     return ticker.poolTokens - newPoolTokens;
 
@@ -132,16 +134,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
-    
-    const k = ticker.poolNgn * ticker.poolTokens;
-    const newPoolNgn = k / (ticker.poolTokens + tokenAmountToSell);
-    return ticker.poolNgn - newPoolNgn;
-
+    return calculateReclaimableValue(tokenAmountToSell, ticker);
   }, [tokenAmountToSell, ticker]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
-    const currentValue = userHolding.amount * ticker.price;
+
+    const currentValue = calculateReclaimableValue(userHolding.amount, ticker);
     const initialCost = userHolding.amount * userHolding.avgBuyPrice;
     const pnl = currentValue - initialCost;
     const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
@@ -269,8 +268,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const k = currentTickerData.poolNgn * currentTickerData.poolTokens;
-            const ngnOut = currentTickerData.poolNgn - (k / (currentTickerData.poolTokens + tokenAmount));
+            const ngnOut = calculateReclaimableValue(tokenAmount, currentTickerData);
 
             if (ngnOut <= 0) {
                 throw new Error("Cannot receive zero or negative NGN.");
