@@ -14,10 +14,12 @@ import { Ticker, Activity } from '@/lib/types';
 export default function Home() {
   const firestore = useFirestore();
 
-  const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('marketCap', 'desc')) : null;
+  const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
   
-  const trendingTickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('change24h', 'desc'), limit(3)) : null;
+  // Note: Since 'change24h' is removed, we sort trending by creation date for now.
+  // This should be updated when dynamic stats are calculated.
+  const trendingTickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc'), limit(3)) : null;
   const { data: trendingTickers, loading: trendingLoading } = useCollection<Ticker>(trendingTickersQuery);
   
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;

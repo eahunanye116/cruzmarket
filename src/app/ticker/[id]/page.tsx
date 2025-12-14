@@ -14,11 +14,14 @@ import { use } from 'react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
+const DEFAULT_MARKET_CAP = 10000;
+const DEFAULT_CHANGE_24H = 0;
+const DEFAULT_VOLUME_24H = 0;
+
+
 export default function TickerPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
   const firestore = useFirestore();
-  // In a real app, you'd query by slug. Firestore doesn't support that out of the box
-  // without custom indexing. For this demo, we'll assume the slug is the ID.
   const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
 
@@ -51,9 +54,14 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
+  // In a real app with trades, these would be calculated. For now, use defaults.
+  const marketCap = DEFAULT_MARKET_CAP;
+  const change24h = DEFAULT_CHANGE_24H;
+  const volume24h = DEFAULT_VOLUME_24H;
+
   const stats = [
-    { label: 'Market Cap', value: `₦${ticker.marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
-    { label: '24h Volume', value: `₦${(ticker.volume24h / 1_000_000).toFixed(2)}M` },
+    { label: 'Market Cap', value: `₦${marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
+    { label: '24h Volume', value: `₦${(volume24h / 1_000_000).toFixed(2)}M` },
     { label: 'Circulating Supply', value: `${(ticker.supply / 1_000_000_000).toFixed(2)}B` },
   ];
 
@@ -79,13 +87,13 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         </CardDescription>
                          <Badge variant="outline" className={cn(
                             "border-2 text-base",
-                            ticker.change24h >= 0 ? "text-accent-foreground border-accent" : "text-destructive border-destructive"
+                            change24h >= 0 ? "text-accent-foreground border-accent" : "text-destructive border-destructive"
                         )}>
-                            {ticker.change24h >= 0 ?
+                            {change24h >= 0 ?
                             <ArrowUp className="h-4 w-4 mr-1" /> :
                             <ArrowDown className="h-4 w-4 mr-1" />
                             }
-                            24h: {ticker.change24h.toFixed(2)}%
+                            24h: {change24h.toFixed(2)}%
                         </Badge>
                     </div>
                 </div>
@@ -108,7 +116,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                 {stats.map(stat => (
                   <li key={stat.label} className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">{stat.label}</span>
-                    <span className={`font-semibold ${stat.color || ''}`}>{stat.value}</span>
+                    <span className={`font-semibold`}>{stat.value}</span>
                   </li>
                 ))}
               </ul>

@@ -55,7 +55,7 @@ function generateChartData(basePrice: number) {
     currentPrice *= (1 + fluctuation);
     currentPrice = Math.max(currentPrice, 0.00000001); // Ensure price doesn't go to zero
     
-    const volume = Math.random() * 10000000 + 5000000;
+    const volume = Math.random() * 10000000 + 500000;
 
     data.push({
       time: date.toISOString().split('T')[0],
@@ -100,10 +100,7 @@ export function CreateTickerForm() {
       description: values.description,
       supply: values.supply,
       icon: randomIcon.id,
-      marketCap: INITIAL_MARKET_CAP,
       price: price,
-      volume24h: 0,
-      change24h: 0,
       chartData: generateChartData(price),
       createdAt: serverTimestamp(),
     };

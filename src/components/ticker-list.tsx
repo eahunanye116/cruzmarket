@@ -7,11 +7,11 @@ import { TickerCard } from '@/components/ticker-card';
 import type { Ticker } from '@/lib/types';
 import { Search } from 'lucide-react';
 
-type SortKey = 'marketCap' | 'price' | 'change24h';
+type SortKey = 'createdAt' | 'price' ;
 
 export function TickerList({ tickers }: { tickers: Ticker[] }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('marketCap');
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -30,8 +30,11 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
     }
 
     return [...filtered].sort((a, b) => {
-      if (sortKey === 'marketCap' || sortKey === 'price' || sortKey === 'change24h') {
+      if (sortKey === 'price') {
         return b[sortKey] - a[sortKey];
+      }
+      if (sortKey === 'createdAt') {
+        return b.createdAt.toMillis() - a.createdAt.toMillis();
       }
       return 0;
     });
@@ -55,9 +58,8 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="marketCap">Market Cap</SelectItem>
+            <SelectItem value="createdAt">Recently Added</SelectItem>
             <SelectItem value="price">Price</SelectItem>
-            <SelectItem value="change24h">24h Change</SelectItem>
           </SelectContent>
         </Select>
       </div>

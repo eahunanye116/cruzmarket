@@ -6,11 +6,8 @@ export type Ticker = {
   slug: string;
   description: string;
   icon: string;
-  marketCap: number;
   price: number;
   supply: number;
-  volume24h: number;
-  change24h: number;
   chartData: { time: string; price: number, volume: number }[];
   recentActivity?: string;
   createdAt: Timestamp;

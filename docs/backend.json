@@ -9,11 +9,8 @@
         "slug": { "type": "string" },
         "description": { "type": "string" },
         "icon": { "type": "string" },
-        "marketCap": { "type": "number" },
         "price": { "type": "number" },
         "supply": { "type": "number" },
-        "volume24h": { "type": "number" },
-        "change24h": { "type": "number" },
         "chartData": { 
           "type": "array",
           "items": {
@@ -27,7 +24,7 @@
         },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "marketCap", "createdAt"]
+      "required": ["name", "slug", "description", "supply", "price", "createdAt"]
     },
     "activity": {
       "title": "Activity",
