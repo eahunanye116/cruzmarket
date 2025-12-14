@@ -124,7 +124,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
     
-    // Correct formula: ∆y = y - k / (x + ∆x)
     const k = ticker.poolNgn * ticker.poolTokens;
     const newPoolTokens = k / (ticker.poolNgn + ngnAmountToBuy);
     return ticker.poolTokens - newPoolTokens;
@@ -134,7 +133,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
     
-    // Correct formula: ∆x = x - k / (y + ∆y)
     const k = ticker.poolNgn * ticker.poolTokens;
     const newPoolNgn = k / (ticker.poolTokens + tokenAmountToSell);
     return ticker.poolNgn - newPoolNgn;
@@ -189,6 +187,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
+            const effectivePricePerToken = ngnAmount / tokensOut;
+
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
                 const holdingRef = holdingDoc.ref;
@@ -202,7 +202,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
                     amount: tokensOut,
-                    avgBuyPrice: ngnAmount / tokensOut
+                    avgBuyPrice: effectivePricePerToken
                 });
             }
 
@@ -441,7 +441,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             </div>
             <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Buy {ticker.name.split(' ')[0]}
+              Buy ${ticker.name.split(' ')[0]}
             </Button>
           </form>
         </Form>
@@ -450,7 +450,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         <Form {...sellForm}>
           <form onSubmit={sellForm.handleSubmit(onSellSubmit)} className="space-y-4">
              <div className="text-right text-sm text-muted-foreground">
-              You Own: {holdingLoading ? <Skeleton className="h-4 w-20 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} {ticker.name.split(' ')[0]}</span>}
+              You Own: {holdingLoading ? <Skeleton className="h-4 w-20 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]}</span>}
             </div>
             <FormField
               control={sellForm.control}
@@ -470,7 +470,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                       <Input type="number" placeholder="0.00" {...field} className="pr-20" />
                       <div className="absolute inset-y-0 right-2 flex items-center gap-1">
                          <Button type="button" variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => sellForm.setValue('tokenAmount', userHolding?.amount ?? 0)}>Max</Button>
-                         <span className="text-sm font-bold text-muted-foreground">{ticker.name.split(' ')[0]}</span>
+                         <span className="text-sm font-bold text-muted-foreground">${ticker.name.split(' ')[0]}</span>
                       </div>
                     </div>
                   </FormControl>
@@ -491,7 +491,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             </div>
             <Button type="submit" disabled={isSubmitting || !userHolding || userHolding.amount === 0} className="w-full">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sell {ticker.name.split(' ')[0]}
+              Sell ${ticker.name.split(' ')[0]}
             </Button>
           </form>
         </Form>
@@ -502,7 +502,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 <div className="rounded-lg border bg-background/50 p-4 space-y-2">
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Amount Held</span>
-                        <span className="font-semibold">{userHolding.amount.toLocaleString()} {ticker.name.split(' ')[0]}</span>
+                        <span className="font-semibold">{userHolding.amount.toLocaleString()} ${ticker.name.split(' ')[0]}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Avg. Buy Price</span>
@@ -566,5 +566,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-
-    
