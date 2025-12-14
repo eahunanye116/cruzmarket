@@ -1,20 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import type { Ticker } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { Badge } from './ui/badge';
+import { TickerChangeBadge } from './ticker-change-badge';
 
-const DEFAULT_CHANGE = 0; // No real data yet
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
-
-  // In a real app, this would be calculated based on activity.
-  const change24h = DEFAULT_CHANGE;
-  const marketCap = ticker.price * ticker.supply;
+  const marketCap = ticker.poolNgn;
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
@@ -40,16 +34,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
         <CardContent>
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">24h Change</span>
-            <span className={cn(
-              "font-semibold flex items-center",
-              change24h >= 0 ? "text-accent" : "text-destructive"
-            )}>
-              {change24h >= 0 ? 
-                <ArrowUpRight className="h-4 w-4 mr-1" /> :
-                <ArrowDownRight className="h-4 w-4 mr-1" />
-              }
-              {change24h.toFixed(2)}%
-            </span>
+            <TickerChangeBadge ticker={ticker} period="24h" />
           </div>
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted-foreground">Market Cap</span>
