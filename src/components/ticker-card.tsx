@@ -38,7 +38,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
           </div>
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted-foreground">Market Cap</span>
-            <span className="font-semibold">₦{(marketCap).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            <span className="font-semibold">₦{(marketCap || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
           </div>
         </CardContent>
       </Card>
