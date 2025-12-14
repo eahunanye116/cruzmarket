@@ -20,7 +20,7 @@ import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowDown, ArrowUp, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -48,6 +48,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLimitsSubmitting, setIsLimitsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
+  const [isEditingLimits, setIsEditingLimits] = useState(false);
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -147,108 +148,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     return { pnl, pnlPercent, currentValue };
   }, [userHolding, ticker]);
 
-  async function onBuySubmit(values: z.infer<typeof buySchema>) {
-    if (!firestore || !user || !userProfile) return;
-    setIsSubmitting(true);
-    try {
-        const boughtTokens = await runTransaction(firestore, async (transaction) => {
-            const ngnAmount = values.ngnAmount;
-            const userRef = doc(firestore, 'users', user.uid);
-            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
-
-            if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
-                throw new Error('Insufficient balance.');
-            }
-
-            const tickerRef = doc(firestore, 'tickers', ticker.id);
-            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
-            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
-            const currentTickerData = tickerDoc.data();
-            
-            const k = currentTickerData.poolNgn * currentTickerData.poolTokens;
-            const tokensOut = currentTickerData.poolTokens - (k / (currentTickerData.poolNgn + ngnAmount));
-
-            if (tokensOut <= 0) {
-                throw new Error("Cannot buy zero or negative tokens.");
-            }
-            if (tokensOut > currentTickerData.poolTokens) {
-                throw new Error("Not enough token liquidity in the pool.");
-            }
-
-            const newPoolNgn = currentTickerData.poolNgn + ngnAmount;
-            const newPoolTokens = currentTickerData.poolTokens - tokensOut;
-            const newPrice = newPoolNgn / newPoolTokens;
-
-            const newBalance = userDoc.data().balance - ngnAmount;
-            transaction.update(userRef, { balance: newBalance });
-
-            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
-            const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
-            const portfolioSnapshot = await getDocs(q);
-            
-            const effectivePricePerToken = ngnAmount / tokensOut;
-
-            if (!portfolioSnapshot.empty) {
-                const holdingDoc = portfolioSnapshot.docs[0];
-                const holdingRef = holdingDoc.ref;
-                const currentAmount = holdingDoc.data().amount;
-                const currentAvgPrice = holdingDoc.data().avgBuyPrice;
-                
-                const newAmount = currentAmount + tokensOut;
-                // Correct weighted average calculation
-                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
-                
-                transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
-            } else {
-                const holdingRef = doc(portfolioColRef);
-                transaction.set(holdingRef, {
-                    tickerId: ticker.id,
-                    amount: tokensOut,
-                    avgBuyPrice: effectivePricePerToken
-                });
-            }
-
-            // Update ticker pools and price
-             transaction.update(tickerRef, { 
-                poolNgn: newPoolNgn,
-                poolTokens: newPoolTokens,
-                price: newPrice,
-                chartData: arrayUnion({
-                    time: new Date().toISOString(),
-                    price: newPrice,
-                    volume: ngnAmount
-                })
-             });
-             return tokensOut;
-        });
-
-        // Add to activity feed (outside transaction)
-        addDoc(collection(firestore, 'activities'), {
-            type: 'BUY',
-            tickerId: ticker.id,
-            tickerName: ticker.name,
-            tickerIcon: ticker.icon,
-            value: values.ngnAmount,
-            userId: user.uid,
-            createdAt: serverTimestamp(),
-        });
-
-        toast({ title: "Purchase Successful!", description: `You bought ${boughtTokens.toLocaleString()} ${ticker.name.split(' ')[0]}`});
-        buyForm.reset();
-        await fetchHolding();
-
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
-        if (!(e.message.includes('Insufficient balance'))) {
-            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
-            errorEmitter.emit('permission-error', permissionError);
-        }
-    } finally {
-        setIsSubmitting(false);
-    }
-  }
-
-  async function onSellSubmit(values: z.infer<typeof sellSchema>) {
+  const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
     if (!firestore || !user || !userHolding) return;
     const tokenAmount = values.tokenAmount;
      if (tokenAmount > userHolding.amount) {
@@ -336,6 +236,129 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     } finally {
         setIsSubmitting(false);
     }
+  }, [firestore, user, userHolding, ticker, toast, sellForm, fetchHolding]);
+
+
+  // Effect to check for SL/TP execution
+  useEffect(() => {
+    if (!userHolding || isSubmitting) return;
+
+    const { takeProfitPrice, stopLossPrice, amount } = userHolding;
+    const currentPrice = ticker.price;
+
+    if (takeProfitPrice && currentPrice >= takeProfitPrice) {
+      toast({
+        title: 'Take Profit Triggered!',
+        description: `Selling ${amount.toLocaleString()} ${ticker.name.split(' ')[0]} at ₦${currentPrice.toLocaleString()}`,
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+      onSellSubmit({ tokenAmount: amount });
+    } else if (stopLossPrice && currentPrice <= stopLossPrice) {
+      toast({
+        variant: 'destructive',
+        title: 'Stop Loss Triggered!',
+        description: `Selling ${amount.toLocaleString()} ${ticker.name.split(' ')[0]} at ₦${currentPrice.toLocaleString()}`,
+      });
+      onSellSubmit({ tokenAmount: amount });
+    }
+  }, [ticker.price, userHolding, isSubmitting, toast, onSellSubmit, ticker.name]);
+
+  async function onBuySubmit(values: z.infer<typeof buySchema>) {
+    if (!firestore || !user || !userProfile) return;
+    setIsSubmitting(true);
+    try {
+        const boughtTokens = await runTransaction(firestore, async (transaction) => {
+            const ngnAmount = values.ngnAmount;
+            const userRef = doc(firestore, 'users', user.uid);
+            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
+
+            if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
+                throw new Error('Insufficient balance.');
+            }
+
+            const tickerRef = doc(firestore, 'tickers', ticker.id);
+            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
+            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
+            const currentTickerData = tickerDoc.data();
+            
+            const k = currentTickerData.poolNgn * currentTickerData.poolTokens;
+            const tokensOut = currentTickerData.poolTokens - (k / (currentTickerData.poolNgn + ngnAmount));
+
+            if (tokensOut <= 0) {
+                throw new Error("Cannot buy zero or negative tokens.");
+            }
+            if (tokensOut > currentTickerData.poolTokens) {
+                throw new Error("Not enough token liquidity in the pool.");
+            }
+
+            const newPoolNgn = currentTickerData.poolNgn + ngnAmount;
+            const newPoolTokens = currentTickerData.poolTokens - tokensOut;
+            const newPrice = newPoolNgn / newPoolTokens;
+
+            const newBalance = userDoc.data().balance - ngnAmount;
+            transaction.update(userRef, { balance: newBalance });
+
+            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
+            const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
+            const portfolioSnapshot = await getDocs(q);
+            
+            const effectivePricePerToken = ngnAmount / tokensOut;
+
+            if (!portfolioSnapshot.empty) {
+                const holdingDoc = portfolioSnapshot.docs[0];
+                const holdingRef = holdingDoc.ref;
+                const currentAmount = holdingDoc.data().amount;
+                const currentAvgPrice = holdingDoc.data().avgBuyPrice;
+                
+                const newAmount = currentAmount + tokensOut;
+                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
+                
+                transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
+            } else {
+                const holdingRef = doc(portfolioColRef);
+                transaction.set(holdingRef, {
+                    tickerId: ticker.id,
+                    amount: tokensOut,
+                    avgBuyPrice: effectivePricePerToken
+                });
+            }
+
+             transaction.update(tickerRef, { 
+                poolNgn: newPoolNgn,
+                poolTokens: newPoolTokens,
+                price: newPrice,
+                chartData: arrayUnion({
+                    time: new Date().toISOString(),
+                    price: newPrice,
+                    volume: ngnAmount
+                })
+             });
+             return tokensOut;
+        });
+
+        addDoc(collection(firestore, 'activities'), {
+            type: 'BUY',
+            tickerId: ticker.id,
+            tickerName: ticker.name,
+            tickerIcon: ticker.icon,
+            value: values.ngnAmount,
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({ title: "Purchase Successful!", description: `You bought ${boughtTokens.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+        buyForm.reset();
+        await fetchHolding();
+
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
+        if (!(e.message.includes('Insufficient balance'))) {
+            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   async function onSetLimitsSubmit(values: z.infer<typeof limitsSchema>) {
@@ -367,6 +390,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
         toast({ title: 'Limits Updated', description: 'Your Take Profit and Stop Loss prices have been saved.' });
         await fetchHolding();
+        setIsEditingLimits(false);
     } catch(e: any) {
         toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not save your price limits.' });
         const permissionError = new FirestorePermissionError({ path: `users/${user.uid}/portfolio/${userHolding.id}`, operation: 'update' });
@@ -525,42 +549,69 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
                 <Separator />
                 
-                <Form {...limitsForm}>
-                    <form onSubmit={limitsForm.handleSubmit(onSetLimitsSubmit)} className="space-y-4">
-                        <p className="text-sm font-medium">Set Price Limits</p>
-                        <FormField 
-                            control={limitsForm.control}
-                            name="takeProfitPrice"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Take Profit Price</FormLabel>
-                                    <FormControl>
-                                         <Input type="number" placeholder={`e.g., ${(ticker.price * 1.2).toFixed(6)}`} {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField 
-                            control={limitsForm.control}
-                            name="stopLossPrice"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Stop Loss Price</FormLabel>
-                                    <FormControl>
-                                         <Input type="number" placeholder={`e.g., ${(ticker.price * 0.8).toFixed(6)}`} {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <Button type="submit" disabled={isLimitsSubmitting} className="w-full">
-                            {isLimitsSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Set Limits
-                        </Button>
-                    </form>
-                </Form>
-
+                {isEditingLimits ? (
+                    <Form {...limitsForm}>
+                        <form onSubmit={limitsForm.handleSubmit(onSetLimitsSubmit)} className="space-y-4">
+                            <p className="text-sm font-medium">Set Price Limits</p>
+                            <FormField 
+                                control={limitsForm.control}
+                                name="takeProfitPrice"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Take Profit Price</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder={`e.g., ${(ticker.price * 1.2).toFixed(6)}`} {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField 
+                                control={limitsForm.control}
+                                name="stopLossPrice"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Stop Loss Price</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder={`e.g., ${(ticker.price * 0.8).toFixed(6)}`} {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" className="w-full" onClick={() => setIsEditingLimits(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isLimitsSubmitting} className="w-full">
+                                    {isLimitsSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Set Limits
+                                </Button>
+                            </div>
+                        </form>
+                    </Form>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-sm font-medium">Price Limits</h3>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsEditingLimits(true)}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <div className="rounded-lg border bg-background/50 p-4 space-y-2 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Take Profit</span>
+                                <span className={cn("font-semibold", userHolding.takeProfitPrice ? "text-accent" : "text-muted-foreground")}>
+                                    {userHolding.takeProfitPrice ? `₦${userHolding.takeProfitPrice.toLocaleString()}` : 'Not Set'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Stop Loss</span>
+                                 <span className={cn("font-semibold", userHolding.stopLossPrice ? "text-destructive" : "text-muted-foreground")}>
+                                    {userHolding.stopLossPrice ? `₦${userHolding.stopLossPrice.toLocaleString()}` : 'Not Set'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </TabsContent>
       )}
