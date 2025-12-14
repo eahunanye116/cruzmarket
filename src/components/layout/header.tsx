@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
@@ -50,11 +50,18 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left">
-              <Link href="/" className="flex items-center space-x-2 mb-6">
-                <TrendingUp className="h-6 w-6 text-primary" />
-                <span className="font-bold font-headline">NairaMemeTrader</span>
-              </Link>
-              <nav className="flex flex-col gap-4">
+              <SheetHeader>
+                <SheetTitle>
+                  <Link href="/" className="flex items-center space-x-2">
+                    <TrendingUp className="h-6 w-6 text-primary" />
+                    <span className="font-bold font-headline">NairaMemeTrader</span>
+                  </Link>
+                </SheetTitle>
+                <SheetDescription>
+                  Navigate through the premier market for meme tickers in Naira.
+                </SheetDescription>
+              </SheetHeader>
+              <nav className="flex flex-col gap-4 mt-6">
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
