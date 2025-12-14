@@ -1,3 +1,40 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "doge-coin",
+      "description": "An icon representing a dog-themed meme coin",
+      "imageUrl": "https://images.unsplash.com/photo-1621932802533-e7894a493640?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8ZG9nJTIwY29pbnxlbnwwfHx8fDE3NjU3MTUxNzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dog coin"
+    },
+    {
+      "id": "pepe-coin",
+      "description": "An icon representing a frog-themed meme coin",
+      "imageUrl": "https://images.unsplash.com/photo-1755978595406-02221624b9de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxmcm9nJTIwbWVtZXxlbnwwfHx8fDE3NjU3MTUxNzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "frog meme"
+    },
+    {
+      "id": "cat-coin",
+      "description": "An icon representing a cat-themed meme coin",
+      "imageUrl": "https://images.unsplash.com/photo-1518478793609-e762ed795b6d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxjYXQlMjBmdW5ueXxlbnwwfHx8fDE3NjU3MTA4OTJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cat funny"
+    },
+    {
+      "id": "rocket-coin",
+      "description": "An icon representing a coin that is going to the moon",
+      "imageUrl": "https://images.unsplash.com/photo-1648822232933-95800d6faed4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cm9ja2V0JTIwc3BhY2V8ZW58MHx8fHwxNzY1NzE1MTc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rocket space"
+    },
+    {
+      "id": "diamond-hands",
+      "description": "An icon representing holding a coin for a long time",
+      "imageUrl": "https://images.unsplash.com/photo-1649346630578-863c169e95f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxkaWFtb25kJTIwaGFuZHN8ZW58MHx8fHwxNzY1NzE1MTc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "diamond hands"
+    },
+    {
+      "id": "shiba-inu",
+      "description": "An icon for a Shiba Inu themed coin",
+      "imageUrl": "https://images.unsplash.com/photo-1676551494386-50763077884c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzaGliYSUyMGRvZ3xlbnwwfHx8fDE3NjU3MTUxNzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "shiba dog"
+    }
+  ]
 }
