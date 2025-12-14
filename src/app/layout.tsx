@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'NairaMemeTrader',
-  description: 'The premier market for meme tickers in Naira.',
+  title: 'CruiseMarket',
+  description: 'The premier market for meme tickers.',
 };
 
 export default function RootLayout({

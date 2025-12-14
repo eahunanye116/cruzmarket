@@ -1,6 +1,6 @@
 import { CreateTickerForm } from '@/components/create-ticker-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export default function CreateTickerPage() {
   return (
@@ -11,7 +11,7 @@ export default function CreateTickerPage() {
         </div>
         <h1 className="text-4xl font-bold font-headline">Create a New Meme Ticker</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Unleash the next big meme. Fill out the details to launch your ticker on NairaMemeTrader.
+          Unleash the next big meme. Fill out the details to launch your ticker on CruiseMarket.
         </p>
       </div>
       <Card className="shadow-lg">

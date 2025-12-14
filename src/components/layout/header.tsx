@@ -22,7 +22,7 @@ export function Header() {
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <TrendingUp className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block font-headline">
-              NairaMemeTrader
+              CruiseMarket
             </span>
           </Link>
           <nav className="flex items-center gap-6 text-sm">
@@ -51,17 +51,16 @@ export function Header() {
             </SheetTrigger>
             <SheetContent side="left">
               <SheetHeader>
-                <SheetTitle>
-                  <Link href="/" className="flex items-center space-x-2">
-                    <TrendingUp className="h-6 w-6 text-primary" />
-                    <span className="font-bold font-headline">NairaMemeTrader</span>
-                  </Link>
-                </SheetTitle>
+                <SheetTitle>Menu</SheetTitle>
                 <SheetDescription>
-                  Navigate through the premier market for meme tickers in Naira.
+                  Navigate through the premier market for meme tickers.
                 </SheetDescription>
               </SheetHeader>
               <nav className="flex flex-col gap-4 mt-6">
+                 <Link href="/" className="flex items-center space-x-2 mb-4">
+                    <TrendingUp className="h-6 w-6 text-primary" />
+                    <span className="font-bold font-headline">CruiseMarket</span>
+                  </Link>
                 {navItems.map((item) => (
                   <Link
                     key={item.href}

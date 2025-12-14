@@ -71,7 +71,7 @@ export function CreateTickerForm() {
       if (result.success) {
         toast({
           title: "🚀 Ticker Created!",
-          description: `Your new meme ticker "${result.name}" is now live on NairaMemeTrader.`,
+          description: `Your new meme ticker "${result.name}" is now live on CruiseMarket.`,
           className: "bg-accent text-accent-foreground border-accent",
         });
         form.reset();
