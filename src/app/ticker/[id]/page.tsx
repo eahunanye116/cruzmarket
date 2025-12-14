@@ -1,4 +1,5 @@
 
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -151,7 +152,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               <CardTitle>Market Stats</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="24h">
+              <Tabs defaultValue="10m">
                 <TabsList className="grid w-full grid-cols-4 mb-4">
                   <TabsTrigger value="10m">10M</TabsTrigger>
                   <TabsTrigger value="1h">1H</TabsTrigger>
@@ -161,7 +162,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                 {Object.entries(calculatedChanges).map(([key, change]) => (
                   <TabsContent value={key} key={key}>
                     <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
-                      <div className={cn("text-4xl font-bold flex items-center", change >= 0 ? "text-accent-foreground" : "text-destructive")}>
+                      <div className={cn("text-4xl font-bold flex items-center", change >= 0 ? "text-accent" : "text-destructive")}>
                         {change >= 0 ? <ArrowUp className="h-8 w-8 mr-2" /> : <ArrowDown className="h-8 w-8 mr-2" />}
                         {change.toFixed(2)}%
                       </div>

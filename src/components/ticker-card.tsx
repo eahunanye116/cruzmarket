@@ -7,7 +7,6 @@ import type { Ticker } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 
-const DEFAULT_MARKET_CAP = 10000;
 const DEFAULT_CHANGE = 0; // No real data yet
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
@@ -15,6 +14,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
 
   // In a real app, this would be calculated based on activity.
   const change24h = DEFAULT_CHANGE;
+  const marketCap = ticker.price * ticker.supply;
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
@@ -42,7 +42,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
             <span className="text-muted-foreground">24h Change</span>
             <span className={cn(
               "font-semibold flex items-center",
-              change24h >= 0 ? "text-accent-foreground" : "text-destructive"
+              change24h >= 0 ? "text-accent" : "text-destructive"
             )}>
               {change24h >= 0 ? 
                 <ArrowUpRight className="h-4 w-4 mr-1" /> :
@@ -53,7 +53,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
           </div>
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted-foreground">Market Cap</span>
-            <span className="font-semibold">₦{(DEFAULT_MARKET_CAP).toLocaleString()}</span>
+            <span className="font-semibold">₦{(marketCap).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
           </div>
         </CardContent>
       </Card>
