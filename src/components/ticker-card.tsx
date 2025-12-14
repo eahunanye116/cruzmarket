@@ -25,7 +25,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
             />
           )}
           <div className="flex-1">
-            <CardTitle className="font-headline text-lg">{ticker.name}</CardTitle>
+            <CardTitle className="font-headline text-lg">${ticker.name}</CardTitle>
             <CardDescription className="text-primary font-semibold">
               ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
             </CardDescription>

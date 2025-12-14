@@ -16,7 +16,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-headline font-bold">{ticker.name}</p>
+                      <p className="font-headline font-bold">${ticker.name}</p>
                       <p className="text-sm text-primary font-semibold">
                         ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                       </p>

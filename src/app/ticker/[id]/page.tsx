@@ -148,7 +148,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                     )}
                     <div className="flex-1">
                         <div className="flex items-center gap-3">
-                          <CardTitle className="font-headline text-4xl">{ticker.name}</CardTitle>
+                          <CardTitle className="font-headline text-4xl">${ticker.name}</CardTitle>
                            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">
                                 🌱 {tokenAge}
                            </div>
@@ -163,7 +163,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         </div>
         <div className="lg:col-span-1">
           <Card>
-            <CardHeader><CardTitle>Trade {ticker.name}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Trade ${ticker.name}</CardTitle></CardHeader>
             <CardContent>
               <TradeForm ticker={ticker} />
             </CardContent>
@@ -209,7 +209,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           </Card>
           
            <Card>
-            <CardHeader><CardTitle>About {ticker.name}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>About ${ticker.name}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{ticker.description}</p>
             </CardContent>
@@ -218,7 +218,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           <Card>
             <CardHeader>
                 <CardTitle>Trades</CardTitle>
-                <CardDescription>All buy and sell activity for {ticker.name}.</CardDescription>
+                <CardDescription>All buy and sell activity for ${ticker.name}.</CardDescription>
             </CardHeader>
             <CardContent>
                 {activitiesLoading ? (
