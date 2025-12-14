@@ -20,7 +20,7 @@ import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowDown, ArrowUp, Pencil } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -36,19 +36,12 @@ const sellSchema = z.object({
   tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
-const limitsSchema = z.object({
-  takeProfitPrice: z.coerce.number().positive().optional().or(z.literal('')),
-  stopLossPrice: z.coerce.number().nonnegative().optional().or(z.literal('')),
-});
-
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
   const firestore = useFirestore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLimitsSubmitting, setIsLimitsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
-  const [isEditingLimits, setIsEditingLimits] = useState(false);
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -102,21 +95,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     resolver: zodResolver(sellSchema),
     defaultValues: { tokenAmount: '' },
   });
-
-  const limitsForm = useForm<z.infer<typeof limitsSchema>>({
-    resolver: zodResolver(limitsSchema),
-    defaultValues: {
-      takeProfitPrice: userHolding?.takeProfitPrice || '',
-      stopLossPrice: userHolding?.stopLossPrice || '',
-    },
-  });
-
-  useEffect(() => {
-    limitsForm.reset({
-        takeProfitPrice: userHolding?.takeProfitPrice || '',
-        stopLossPrice: userHolding?.stopLossPrice || '',
-    })
-  }, [userHolding, limitsForm]);
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
@@ -238,31 +216,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     }
   }, [firestore, user, userHolding, ticker, toast, sellForm, fetchHolding]);
 
-
-  // Effect to check for SL/TP execution
-  useEffect(() => {
-    if (!userHolding || isSubmitting) return;
-
-    const { takeProfitPrice, stopLossPrice, amount } = userHolding;
-    const currentPrice = ticker.price;
-
-    if (takeProfitPrice && currentPrice >= takeProfitPrice) {
-      toast({
-        title: 'Take Profit Triggered!',
-        description: `Selling ${amount.toLocaleString()} ${ticker.name.split(' ')[0]} at ₦${currentPrice.toLocaleString()}`,
-        className: "bg-accent text-accent-foreground border-accent",
-      });
-      onSellSubmit({ tokenAmount: amount });
-    } else if (stopLossPrice && currentPrice <= stopLossPrice) {
-      toast({
-        variant: 'destructive',
-        title: 'Stop Loss Triggered!',
-        description: `Selling ${amount.toLocaleString()} ${ticker.name.split(' ')[0]} at ₦${currentPrice.toLocaleString()}`,
-      });
-      onSellSubmit({ tokenAmount: amount });
-    }
-  }, [ticker.price, userHolding, isSubmitting, toast, onSellSubmit, ticker.name]);
-
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
     setIsSubmitting(true);
@@ -360,46 +313,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         setIsSubmitting(false);
     }
   }
-
-  async function onSetLimitsSubmit(values: z.infer<typeof limitsSchema>) {
-    if (!firestore || !user || !userHolding) return;
-
-    const { takeProfitPrice, stopLossPrice } = values;
-
-    if (stopLossPrice && takeProfitPrice && stopLossPrice >= takeProfitPrice) {
-      limitsForm.setError('stopLossPrice', { message: 'Stop Loss must be below Take Profit.' });
-      return;
-    }
-    if (stopLossPrice && stopLossPrice >= ticker.price) {
-        limitsForm.setError('stopLossPrice', { message: 'Stop Loss must be below current price.' });
-        return;
-    }
-    if (takeProfitPrice && takeProfitPrice <= ticker.price) {
-        limitsForm.setError('takeProfitPrice', { message: 'Take Profit must be above current price.' });
-        return;
-    }
-
-    setIsLimitsSubmitting(true);
-    try {
-        const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
-        
-        await updateDoc(holdingRef, {
-            takeProfitPrice: takeProfitPrice || null,
-            stopLossPrice: stopLossPrice || null,
-        });
-
-        toast({ title: 'Limits Updated', description: 'Your Take Profit and Stop Loss prices have been saved.' });
-        await fetchHolding();
-        setIsEditingLimits(false);
-    } catch(e: any) {
-        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not save your price limits.' });
-        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}/portfolio/${userHolding.id}`, operation: 'update' });
-        errorEmitter.emit('permission-error', permissionError);
-    } finally {
-        setIsLimitsSubmitting(false);
-    }
-  }
-
 
   const setSellAmountPercentage = (percentage: number) => {
     if (userHolding) {
@@ -546,72 +459,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                         </div>
                     </div>
                 </div>
-
-                <Separator />
-                
-                {isEditingLimits ? (
-                    <Form {...limitsForm}>
-                        <form onSubmit={limitsForm.handleSubmit(onSetLimitsSubmit)} className="space-y-4">
-                            <p className="text-sm font-medium">Set Price Limits</p>
-                            <FormField 
-                                control={limitsForm.control}
-                                name="takeProfitPrice"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Take Profit Price</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder={`e.g., ${(ticker.price * 1.2).toFixed(6)}`} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField 
-                                control={limitsForm.control}
-                                name="stopLossPrice"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Stop Loss Price</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder={`e.g., ${(ticker.price * 0.8).toFixed(6)}`} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <div className="flex gap-2">
-                                <Button type="button" variant="outline" className="w-full" onClick={() => setIsEditingLimits(false)}>Cancel</Button>
-                                <Button type="submit" disabled={isLimitsSubmitting} className="w-full">
-                                    {isLimitsSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Set Limits
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
-                ) : (
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-medium">Price Limits</h3>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsEditingLimits(true)}>
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <div className="rounded-lg border bg-background/50 p-4 space-y-2 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Take Profit</span>
-                                <span className={cn("font-semibold", userHolding.takeProfitPrice ? "text-accent" : "text-muted-foreground")}>
-                                    {userHolding.takeProfitPrice ? `₦${userHolding.takeProfitPrice.toLocaleString()}` : 'Not Set'}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Stop Loss</span>
-                                 <span className={cn("font-semibold", userHolding.stopLossPrice ? "text-destructive" : "text-muted-foreground")}>
-                                    {userHolding.stopLossPrice ? `₦${userHolding.stopLossPrice.toLocaleString()}` : 'Not Set'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </TabsContent>
       )}

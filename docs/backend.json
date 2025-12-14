@@ -62,9 +62,7 @@
       "properties": {
         "tickerId": { "type": "string" },
         "amount": { "type": "number" },
-        "avgBuyPrice": { "type": "number" },
-        "takeProfitPrice": { "type": "number" },
-        "stopLossPrice": { "type": "number" }
+        "avgBuyPrice": { "type": "number" }
       },
       "required": ["tickerId", "amount", "avgBuyPrice"]
     }
