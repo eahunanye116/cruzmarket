@@ -73,12 +73,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
     resolver: zodResolver(buySchema),
-    defaultValues: { ngnAmount: undefined },
+    defaultValues: { ngnAmount: '' as any },
   });
 
   const sellForm = useForm<z.infer<typeof sellSchema>>({
     resolver: zodResolver(sellSchema),
-    defaultValues: { tokenAmount: undefined },
+    defaultValues: { tokenAmount: '' as any },
   });
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
