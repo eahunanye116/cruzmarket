@@ -25,9 +25,9 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
 
   const activitiesQuery = useMemo(() => {
-    if (!firestore || !ticker) return null;
-    return query(collection(firestore, 'activities'), where('tickerId', '==', ticker.id), orderBy('createdAt', 'desc'));
-  }, [firestore, ticker]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'activities'), where('tickerId', '==', resolvedParams.id), orderBy('createdAt', 'desc'));
+  }, [firestore, resolvedParams.id]);
 
   const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
@@ -119,7 +119,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     notFound();
   }
   
-  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate(), { includeSeconds: true, addSuffix: true }).replace('about ', '');
+  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate(), { addSuffix: true }).replace('about ', '');
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   const stats = [
