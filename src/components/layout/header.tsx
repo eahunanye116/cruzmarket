@@ -6,9 +6,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { Menu, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/firebase/auth/use-auth';
+import { useUser } from '@/firebase';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 
 export function Header() {
   const pathname = usePathname();
+  const { signInWithGoogle, signOut } = useAuth();
+  const user = useUser();
+
   const navItems = [
     { href: '/', label: 'Trade' },
     { href: '/portfolio', label: 'Portfolio' },
@@ -51,16 +58,13 @@ export function Header() {
             </SheetTrigger>
             <SheetContent side="left" className="border-r-2">
               <SheetHeader className="border-b-2 pb-4">
-                <SheetTitle>
-                   <Link href="/" className="flex items-center space-x-2">
-                    <TrendingUp className="h-8 w-8 text-primary" />
-                    <span className="font-bold font-headline text-2xl">CruiseMarket</span>
-                  </Link>
-                </SheetTitle>
-                <SheetDescription>
-                  The premier market for meme tickers.
-                </SheetDescription>
-              </SheetHeader>
+                 <SheetTitle>
+                   Menu
+                 </SheetTitle>
+                 <SheetDescription>
+                   Navigate through the premier market for meme tickers.
+                 </SheetDescription>
+               </SheetHeader>
               <nav className="flex flex-col gap-4 mt-6">
                 {navItems.map((item) => (
                   <Link
@@ -79,7 +83,34 @@ export function Header() {
           </Sheet>
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
-          <Button>Connect Wallet</Button>
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.photoURL ?? ''} alt={user.displayName ?? 'User'} />
+                    <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button onClick={signInWithGoogle}>Sign In</Button>
+          )}
         </div>
       </div>
     </header>
