@@ -27,6 +27,14 @@ export function useDoc<T>(
       return;
     }
     setLoading(true);
+    
+    const handlePermissionError = () => {
+      const permissionError = new FirestorePermissionError({
+        path: memoizedDocRef.path,
+        operation: 'get',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
 
     if (options.listen) {
       const unsubscribe = onSnapshot(memoizedDocRef, (doc) => {
@@ -39,11 +47,7 @@ export function useDoc<T>(
       }, (err) => {
         setError(err);
         setLoading(false);
-         const permissionError = new FirestorePermissionError({
-           path: memoizedDocRef.path,
-           operation: 'get',
-         });
-         errorEmitter.emit('permission-error', permissionError);
+        handlePermissionError();
       });
 
       return () => unsubscribe();
@@ -60,11 +64,7 @@ export function useDoc<T>(
         .catch(err => {
           setError(err);
           setLoading(false);
-          const permissionError = new FirestorePermissionError({
-            path: memoizedDocRef.path,
-            operation: 'get',
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          handlePermissionError();
         });
     }
 

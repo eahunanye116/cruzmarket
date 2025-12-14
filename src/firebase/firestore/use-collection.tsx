@@ -48,7 +48,8 @@ export function useCollection<T>(
 
     const handlePermissionError = () => {
         // Access the internal _query property to reliably get the path.
-        const path = (memoizedQuery as any)._query?.path?.canonical ?? 'unknown';
+        // This is not ideal, but it's the most reliable way to get path for collection queries
+        const path = (memoizedQuery as any)._query?.path?.canonicalId() || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: path,
           operation: 'list',
