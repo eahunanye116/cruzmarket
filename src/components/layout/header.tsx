@@ -6,10 +6,35 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { Menu, TrendingUp, Repeat, Wallet, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { ReactNode } from 'react';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { doc } from 'firebase/firestore';
+import type { UserProfile } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
+
+function UserBalance() {
+  const user = useUser();
+  const firestore = useFirestore();
+  const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
+  const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
+
+  if (loading) {
+    return <Skeleton className="h-6 w-24" />;
+  }
+
+  if (!userProfile) {
+    return null;
+  }
+
+  return (
+    <div className="font-semibold text-primary">
+      ₦{userProfile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+    </div>
+  )
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -84,8 +109,10 @@ export function Header() {
             </SheetContent>
           </Sheet>
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="flex flex-1 items-center justify-end space-x-4">
           {user ? (
+            <>
+            <UserBalance />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -110,6 +137,7 @@ export function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </>
           ) : (
             <>
               <Button variant="ghost" asChild>

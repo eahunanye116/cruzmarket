@@ -49,9 +49,10 @@
       "properties": {
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
-        "photoURL": { "type": "string", "format": "uri" }
+        "photoURL": { "type": "string", "format": "uri" },
+        "balance": { "type": "number" }
       },
-      "required": ["email"]
+      "required": ["email", "balance"]
     },
     "portfolioHolding": {
       "title": "Portfolio Holding",

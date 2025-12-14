@@ -44,4 +44,5 @@ export type UserProfile = {
   email: string;
   displayName?: string;
   photoURL?: string;
+  balance: number;
 };

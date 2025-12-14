@@ -8,6 +8,9 @@ import {
   UserCredential,
   FirebaseError
 } from 'firebase/auth';
+import { doc, setDoc, getFirestore } from 'firebase/firestore';
+import { errorEmitter } from '../error-emitter';
+import { FirestorePermissionError } from '../errors';
 
 type AuthResult = {
   userCredential?: UserCredential;
@@ -16,10 +19,31 @@ type AuthResult = {
 
 export function useAuth() {
   const auth = getAuth();
+  const firestore = getFirestore();
 
   const signUp = async (email: string, password: string): Promise<AuthResult> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      const userProfileRef = doc(firestore, 'users', user.uid);
+      const newUserProfile = {
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        balance: 1000000,
+      };
+
+      setDoc(userProfileRef, newUserProfile)
+        .catch((serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: userProfileRef.path,
+            operation: 'create',
+            requestResourceData: newUserProfile,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+
       return { userCredential };
     } catch (error) {
       return { error: error as FirebaseError };
