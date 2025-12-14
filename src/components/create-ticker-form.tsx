@@ -20,12 +20,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch } from "firebase/firestore";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
-import type { UserProfile, Ticker } from "@/lib/types";
+import type { UserProfile, Ticker, PortfolioHolding } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -41,6 +41,7 @@ const formSchema = z.object({
   supply: z.coerce.number().positive({
     message: "Initial supply must be a positive number.",
   }),
+  initialBuyNgn: z.coerce.number().nonnegative().optional(),
 });
 
 const CREATION_FEE = 2000;
@@ -59,8 +60,12 @@ export function CreateTickerForm() {
       name: "",
       description: "",
       supply: 1000000000,
+      initialBuyNgn: 0,
     },
   });
+  
+  const initialBuyValue = form.watch('initialBuyNgn') || 0;
+  const totalCost = CREATION_FEE + initialBuyValue;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore || !user) {
@@ -73,27 +78,27 @@ export function CreateTickerForm() {
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
     
-    // The price is based on the initial pool ratio
-    const price = INITIAL_MARKET_CAP / values.supply;
+    const initialPrice = INITIAL_MARKET_CAP / values.supply;
 
     const newTickerData: Omit<Ticker, 'id' | 'createdAt'> = {
       name: values.name,
       slug,
       description: values.description,
-      supply: values.supply, // Total fixed supply
-      poolNgn: INITIAL_MARKET_CAP, // Initial NGN liquidity
-      poolTokens: values.supply, // Entire supply starts in the liquidity pool
-      price: price,
+      supply: values.supply,
+      poolNgn: INITIAL_MARKET_CAP,
+      poolTokens: values.supply,
+      price: initialPrice,
       icon: randomIcon.id,
       chartData: [{
         time: new Date().toISOString(),
-        price: price,
+        price: initialPrice,
         volume: 0
       }],
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);
     const tickersCollectionRef = collection(firestore, 'tickers');
+    const initialBuyNgn = values.initialBuyNgn || 0;
 
     try {
       const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
@@ -104,25 +109,65 @@ export function CreateTickerForm() {
         }
 
         const userProfile = userProfileDoc.data();
-        if (userProfile.balance < CREATION_FEE) {
-          throw new Error(`Insufficient balance. You need at least ₦${CREATION_FEE.toLocaleString()} to create a ticker.`);
+        if (userProfile.balance < totalCost) {
+          throw new Error(`Insufficient balance. You need at least ₦${totalCost.toLocaleString()} for this transaction.`);
         }
 
-        const newBalance = userProfile.balance - CREATION_FEE;
+        const newBalance = userProfile.balance - totalCost;
         transaction.update(userProfileRef, { balance: newBalance });
 
         const newTickerRef = doc(tickersCollectionRef);
-        // Set the full object including the server timestamp
+        // Set the initial ticker data
         transaction.set(newTickerRef, {
             ...newTickerData,
             createdAt: serverTimestamp()
         });
+
+        // If there's an initial buy, perform the buy logic within the same transaction
+        if (initialBuyNgn > 0) {
+            const initialPoolNgn = newTickerData.poolNgn;
+            const initialPoolTokens = newTickerData.poolTokens;
+
+            const tokensOut = initialPoolTokens - ((initialPoolNgn * initialPoolTokens) / (initialPoolNgn + initialBuyNgn));
+            
+            if (tokensOut <= 0) {
+                throw new Error("Initial buy amount is too small.");
+            }
+
+            const updatedPoolNgn = initialPoolNgn + initialBuyNgn;
+            const updatedPoolTokens = initialPoolTokens - tokensOut;
+            const updatedPrice = updatedPoolNgn / updatedPoolTokens;
+
+            // Update ticker pools and price from the initial buy
+            transaction.update(newTickerRef, { 
+                poolNgn: updatedPoolNgn,
+                poolTokens: updatedPoolTokens,
+                price: updatedPrice,
+                chartData: [
+                  { time: new Date().toISOString(), price: initialPrice, volume: 0 },
+                  { time: new Date().toISOString(), price: updatedPrice, volume: initialBuyNgn }
+                ],
+            });
+
+            // Create portfolio holding for the user
+            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
+            const holdingRef = doc(portfolioColRef);
+            transaction.set(holdingRef, {
+                tickerId: newTickerRef.id,
+                amount: tokensOut,
+                avgBuyPrice: initialBuyNgn / tokensOut
+            });
+        }
         
         return newTickerRef;
       });
 
+      // Log activities using a write batch (outside the main transaction)
+      const batch = writeBatch(firestore);
       const activitiesCollection = collection(firestore, 'activities');
-      addDoc(activitiesCollection, {
+      
+      // Log CREATE activity
+      batch.set(doc(activitiesCollection), {
         type: 'CREATE',
         tickerName: values.name,
         tickerIcon: randomIcon.id,
@@ -130,23 +175,44 @@ export function CreateTickerForm() {
         userId: user.uid,
         createdAt: serverTimestamp(),
       });
+
+      // Log BUY activity if initial buy was made
+      if (initialBuyNgn > 0) {
+        batch.set(doc(activitiesCollection), {
+          type: 'BUY',
+          tickerName: values.name,
+          tickerIcon: randomIcon.id,
+          value: initialBuyNgn,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+        });
+      }
+      
+      await batch.commit();
       
       toast({
         title: "🚀 Ticker Created!",
-        description: `Your new meme ticker "${values.name}" is now live. ₦${CREATION_FEE.toLocaleString()} has been deducted from your account.`,
+        description: `Your new meme ticker "${values.name}" is now live. ₦${CREATION_FEE.toLocaleString()} fee paid.`,
         className: "bg-accent text-accent-foreground border-accent",
       });
+
+       if (initialBuyNgn > 0) {
+        toast({
+          title: "First Purchase Made!",
+          description: `You automatically purchased ₦${initialBuyNgn.toLocaleString()} worth of ${values.name}.`,
+        });
+      }
+
       form.reset();
       router.push(`/ticker/${newTickerDocRef.id}`);
 
     } catch (e: any) {
-      if (e instanceof Error && e.message.startsWith("Insufficient balance")) {
-        toast({
-          variant: "destructive",
-          title: "Creation Failed",
-          description: e.message,
-        });
-      } else {
+      toast({
+        variant: "destructive",
+        title: "Creation Failed",
+        description: e.message || "An unexpected error occurred.",
+      });
+      if (!e.message.includes("Insufficient balance")) {
         const permissionError = new FirestorePermissionError({
             path: userProfileRef.path,
             operation: 'update',
@@ -213,9 +279,26 @@ export function CreateTickerForm() {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="initialBuyNgn"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Initial Buy (Optional)</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
+              </FormControl>
+              <FormDescription>
+                Amount in NGN to automatically buy upon creation, making you the first buyer.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="rounded-lg border bg-muted/50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">A one-time fee to launch your ticker.</p>
-            <p className="font-bold text-lg">Creation Fee: ₦{CREATION_FEE.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Creation Fee: ₦{CREATION_FEE.toLocaleString()}</p>
+            {initialBuyValue > 0 && <p className="text-sm text-muted-foreground">Initial Buy: ₦{initialBuyValue.toLocaleString()}</p>}
+            <p className="font-bold text-lg mt-1">Total Cost: ₦{totalCost.toLocaleString()}</p>
         </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
           {isSubmitting ? (
@@ -229,3 +312,5 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    
