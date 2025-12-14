@@ -169,6 +169,7 @@ export function CreateTickerForm() {
       // Log CREATE activity
       batch.set(doc(activitiesCollection), {
         type: 'CREATE',
+        tickerId: newTickerDocRef.id,
         tickerName: values.name,
         tickerIcon: randomIcon.id,
         value: 0,
@@ -180,6 +181,7 @@ export function CreateTickerForm() {
       if (initialBuyNgn > 0) {
         batch.set(doc(activitiesCollection), {
           type: 'BUY',
+          tickerId: newTickerDocRef.id,
           tickerName: values.name,
           tickerIcon: randomIcon.id,
           value: initialBuyNgn,
@@ -312,5 +314,3 @@ export function CreateTickerForm() {
     </Form>
   );
 }
-
-    

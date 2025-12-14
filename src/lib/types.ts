@@ -31,6 +31,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 export type Activity = {
   id: string;
   type: 'BUY' | 'SELL' | 'CREATE';
+  tickerId: string;
   tickerName: string;
   tickerIcon: string;
   value: number;

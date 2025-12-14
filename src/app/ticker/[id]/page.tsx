@@ -8,14 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc } from 'firebase/firestore';
-import { Ticker } from '@/lib/types';
+import { doc, collection, query, where, orderBy } from 'firebase/firestore';
+import { Ticker, Activity } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { differenceInMinutes, sub } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { TickerTransactions } from '@/components/ticker-transactions';
 
 
 export default function TickerPage({ params }: { params: { id: string } }) {
@@ -23,6 +25,13 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const firestore = useFirestore();
   const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
+
+  const activitiesQuery = useMemo(() => {
+    if (!firestore || !ticker) return null;
+    return query(collection(firestore, 'activities'), where('tickerId', '==', ticker.id), orderBy('createdAt', 'desc'));
+  }, [firestore, ticker]);
+
+  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
   const calculatedChanges = useMemo(() => {
     if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
@@ -187,6 +196,20 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             <CardHeader><CardTitle>About {ticker.name}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{ticker.description}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>All buy and sell activity for {ticker.name}.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {activitiesLoading ? (
+                    <Skeleton className="h-64 w-full" />
+                ) : (
+                    <TickerTransactions activities={activities || []} />
+                )}
             </CardContent>
           </Card>
         </div>

@@ -186,6 +186,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         // Add to activity feed (outside transaction)
         addDoc(collection(firestore, 'activities'), {
             type: 'BUY',
+            tickerId: ticker.id,
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
             value: values.ngnAmount,
@@ -274,6 +275,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
          // Add to activity feed (outside transaction)
         addDoc(collection(firestore, 'activities'), {
             type: 'SELL',
+            tickerId: ticker.id,
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
             value: ngnToGain,
@@ -411,5 +413,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-
-    
