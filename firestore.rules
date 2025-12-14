@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Tickers: Allow anyone to read, only signed-in users to create.
+    match /tickers/{tickerId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Tickers are immutable for now
+    }
+
+    // Activities: Allow anyone to read, only signed-in users to create.
+    match /activities/{activityId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Activities are immutable
+    }
+
+    // User Profiles: Allow anyone to read, only owner to create/update.
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // User Portfolio: Only owner can read/write.
+    match /users/{userId}/portfolio/{holdingId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

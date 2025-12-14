@@ -18,6 +18,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
+import { useFirestore, useUser } from "@/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -35,25 +41,33 @@ const formSchema = z.object({
   }),
 });
 
-async function createTickerAction(data: z.infer<typeof formSchema>) {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // In a real app, you would save this to a database
-  console.log("Creating new ticker:", data);
-  
-  // Simulate potential failure
-  if (Math.random() > 0.9) {
-    throw new Error("Failed to deploy contract. Please try again.");
-  }
-  
-  return { success: true, name: data.name };
-}
+function generateChartData(basePrice: number) {
+  const data = [];
+  let currentPrice = basePrice;
+  const now = new Date();
+  for (let i = 90; i >= 0; i--) {
+    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const fluctuation = (Math.random() - 0.5) * 0.2; // -10% to +10%
+    currentPrice *= (1 + fluctuation);
+    currentPrice = Math.max(currentPrice, 0.0000001);
+    
+    const volume = Math.random() * 10000000 + 5000000;
 
+    data.push({
+      time: date.toISOString().split('T')[0],
+      price: parseFloat(currentPrice.toFixed(8)),
+      volume: Math.floor(volume),
+    });
+  }
+  return data;
+}
 
 export function CreateTickerForm() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const firestore = useFirestore();
+  const user = useUser();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,26 +79,62 @@ export function CreateTickerForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore || !user) {
+      toast({ variant: "destructive", title: "Error", description: "You must be signed in to create a ticker." });
+      return;
+    }
+
     setIsSubmitting(true);
-    try {
-      const result = await createTickerAction(values);
-      if (result.success) {
+    
+    const slug = values.name.toLowerCase().replace(/\s+/g, '-');
+    const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+    const price = Math.random() * 0.1;
+
+    const newTickerData = {
+      name: values.name,
+      slug,
+      description: values.description,
+      supply: values.supply,
+      icon: randomIcon.id,
+      marketCap: price * values.supply,
+      price: price,
+      volume24h: Math.random() * 100000000,
+      change24h: (Math.random() - 0.5) * 20,
+      chartData: generateChartData(price),
+      createdAt: serverTimestamp(),
+    };
+
+    const tickersCollection = collection(firestore, 'tickers');
+    addDoc(tickersCollection, newTickerData)
+      .then((docRef) => {
+        const activitiesCollection = collection(firestore, 'activities');
+        addDoc(activitiesCollection, {
+          type: 'CREATE',
+          tickerName: values.name,
+          tickerIcon: randomIcon.id,
+          value: 0,
+          createdAt: serverTimestamp(),
+        });
+        
         toast({
           title: "🚀 Ticker Created!",
-          description: `Your new meme ticker "${result.name}" is now live on CruiseMarket.`,
+          description: `Your new meme ticker "${values.name}" is now live on CruiseMarket.`,
           className: "bg-accent text-accent-foreground border-accent",
         });
         form.reset();
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Oh no! Something went wrong.",
-        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        router.push(`/ticker/${docRef.id}`);
+      })
+      .catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: tickersCollection.path,
+          operation: 'create',
+          requestResourceData: newTickerData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-    } finally {
-      setIsSubmitting(false);
-    }
   }
 
   return (

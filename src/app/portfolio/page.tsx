@@ -1,4 +1,5 @@
-import { getPortfolio } from '@/lib/data';
+'use client';
+import { useUser, useFirestore } from '@/firebase';
 import {
   Table,
   TableBody,
@@ -10,20 +11,120 @@ import {
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { collection, query } from 'firebase/firestore';
+import { PortfolioHolding, Ticker } from '@/lib/types';
+import { useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 export default function PortfolioPage() {
-  const portfolio = getPortfolio();
+  const user = useUser();
+  const firestore = useFirestore();
 
-  const totals = portfolio.reduce((acc, holding) => {
-    acc.currentValue += holding.currentValue;
-    acc.initialCost += holding.amount * holding.avgBuyPrice;
-    return acc;
-  }, { currentValue: 0, initialCost: 0 });
+  const portfolioQuery = user ? query(collection(firestore, `users/${user.uid}/portfolio`)) : null;
+  const { data: portfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
+
+  const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
+  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
+
+  const enrichedPortfolio = useMemo(() => {
+    if (!portfolio || !tickers) return [];
+    return portfolio.map(holding => {
+      const ticker = tickers.find(t => t.id === holding.tickerId);
+      if (!ticker) return null;
+
+      const currentValue = holding.amount * ticker.price;
+      const initialCost = holding.amount * holding.avgBuyPrice;
+      const profitOrLoss = currentValue - initialCost;
+      const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
+
+      return {
+        ...holding,
+        ticker,
+        currentValue,
+        profitOrLoss,
+        profitOrLossPercentage,
+      };
+    }).filter(Boolean);
+  }, [portfolio, tickers]);
+
+  const totals = useMemo(() => {
+    return enrichedPortfolio.reduce((acc, holding) => {
+      if(holding) {
+        acc.currentValue += holding.currentValue;
+        acc.initialCost += holding.amount * holding.avgBuyPrice;
+      }
+      return acc;
+    }, { currentValue: 0, initialCost: 0 });
+  }, [enrichedPortfolio]);
   
   const totalProfitOrLoss = totals.currentValue - totals.initialCost;
-  const totalProfitOrLossPercentage = (totalProfitOrLoss / totals.initialCost) * 100;
+  const totalProfitOrLossPercentage = totals.initialCost > 0 ? (totalProfitOrLoss / totals.initialCost) * 100 : 0;
+
+  if (!user) {
+    return (
+      <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-destructive/10 border-2 mx-auto">
+          <Ban className="h-8 w-8 text-destructive" />
+        </div>
+        <h1 className="text-4xl font-bold font-headline">Access Denied</h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+          You must be <Link href="/login" className="underline text-primary hover:text-primary/80">signed in</Link> to view your portfolio.
+        </p>
+      </div>
+    );
+  }
+  
+  const isLoading = portfolioLoading || tickersLoading;
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <Skeleton className="h-16 w-1/2 mb-8" />
+        <Card className="overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Asset</TableHead>
+                <TableHead className="text-right">Holdings</TableHead>
+                <TableHead className="text-right">Avg. Buy Price</TableHead>
+                <TableHead className="text-right">Current Value</TableHead>
+                <TableHead className="text-right">Profit/Loss</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...Array(3)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-8 w-32" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 float-right" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    );
+  }
+
+  if (enrichedPortfolio.length === 0) {
+     return (
+       <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 text-center">
+         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2 mx-auto">
+            <Wallet className="h-8 w-8 text-primary" />
+          </div>
+        <h1 className="text-4xl font-bold font-headline">Your Portfolio is Empty</h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+          Start trading tickers to see your holdings here.
+        </p>
+       </div>
+     );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -51,7 +152,8 @@ export default function PortfolioPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {portfolio.map((holding) => {
+            {enrichedPortfolio.map((holding) => {
+              if (!holding) return null;
               const icon = PlaceHolderImages.find((img) => img.id === holding.ticker.icon);
               return (
                 <TableRow key={holding.tickerId}>

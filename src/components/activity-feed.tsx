@@ -2,9 +2,9 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import type { Activity } from '@/lib/types';
-import { ArrowDown, ArrowUp, Sparkles, HandCoins, Minus, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Sparkles, Minus, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow } from 'date-fns';
 
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
@@ -80,7 +80,7 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                        <ActivityIcon type={activity.type}/>
                        <span className="ml-1">{activity.type}</span>
                      </Badge>
-                     <p className="text-xs text-muted-foreground">{activity.timestamp}</p>
+                     <p className="text-xs text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</p>
                    </div>
                   <ActivityText activity={activity} />
                 </div>

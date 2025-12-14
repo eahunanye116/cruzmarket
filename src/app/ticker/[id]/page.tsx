@@ -1,14 +1,49 @@
+'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { getTickerBySlug } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { PriceChart } from '@/components/price-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { useFirestore } from '@/firebase';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { doc } from 'firebase/firestore';
+import { Ticker } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TickerPage({ params }: { params: { id: string } }) {
-  const ticker = getTickerBySlug(params.id);
+  const firestore = useFirestore();
+  // In a real app, you'd query by slug. Firestore doesn't support that out of the box
+  // without custom indexing. For this demo, we'll assume the slug is the ID.
+  const tickerDocRef = firestore ? doc(firestore, 'tickers', params.id) : null;
+  const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
+
+  if (loading) {
+    return (
+       <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4 mb-6">
+          <Skeleton className="h-16 w-16 rounded-none border-2" />
+          <div>
+            <Skeleton className="h-10 w-48 mb-2" />
+            <Skeleton className="h-8 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <Card className="h-[450px]">
+              <Skeleton className="h-full w-full" />
+            </Card>
+          </div>
+          <div className="lg:col-span-1 space-y-6">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </div>
+        <Skeleton className="h-32 w-full mt-8" />
+       </div>
+    );
+  }
 
   if (!ticker) {
     notFound();

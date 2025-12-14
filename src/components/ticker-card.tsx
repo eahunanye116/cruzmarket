@@ -11,7 +11,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   return (
-    <Link href={`/ticker/${ticker.slug}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
+    <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
       <Card className="h-full overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
         <CardHeader className="flex flex-row items-start gap-4">
           {icon && (

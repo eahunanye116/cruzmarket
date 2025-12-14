@@ -12,7 +12,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
       <p className="text-muted-foreground mb-6">Top moving meme tickers in the market.</p>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {trendingTickers.map((ticker) => (
-          <Link href={`/ticker/${ticker.slug}`} key={ticker.id} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
+          <Link href={`/ticker/${ticker.id}`} key={ticker.id} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
             <Card className="h-full hover:shadow-hard-lg hover:-translate-y-1 hover:-translate-x-1 transition-all duration-300">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">

@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export type Ticker = {
   id: string;
   name: string;
@@ -11,6 +13,7 @@ export type Ticker = {
   change24h: number;
   chartData: { time: string; price: number, volume: number }[];
   recentActivity?: string;
+  createdAt: Timestamp;
 };
 
 export type PortfolioHolding = {
@@ -33,4 +36,12 @@ export type Activity = {
   tickerIcon: string;
   value: number;
   timestamp: string;
+  createdAt: Timestamp;
+};
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
 };
