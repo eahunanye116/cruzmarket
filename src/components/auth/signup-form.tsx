@@ -47,39 +47,39 @@ export function SignUpForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    try {
-      await signUp(values.email, values.password);
+    
+    const { userCredential, error } = await signUp(values.email, values.password);
+
+    if (userCredential) {
       toast({
         title: "Account Created!",
         description: "Welcome to CruiseMarket. You're now signed in.",
       });
       router.push("/");
-    } catch (error) {
+    } else if (error) {
       let description = "An unknown error occurred.";
-      if (error instanceof FirebaseError) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            description = "This email is already in use. Please try signing in.";
-            break;
-          case 'auth/weak-password':
-            description = "The password is too weak. Please use at least 6 characters.";
-            break;
-          case 'auth/invalid-email':
-            description = "Please enter a valid email address.";
-            break;
-          default:
-            description = "Could not create account. Please try again later.";
-            break;
-        }
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          description = "This email is already in use. Please try signing in.";
+          break;
+        case 'auth/weak-password':
+          description = "The password is too weak. Please use at least 6 characters.";
+          break;
+        case 'auth/invalid-email':
+          description = "Please enter a valid email address.";
+          break;
+        default:
+          description = "Could not create account. Please try again later.";
+          break;
       }
       toast({
         variant: "destructive",
         title: "Oh no! Something went wrong.",
         description: description,
       });
-    } finally {
-      setIsSubmitting(false);
     }
+    
+    setIsSubmitting(false);
   }
 
   return (
