@@ -18,13 +18,15 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { cn } from '@/lib/utils';
+import { Separator } from './ui/separator';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -34,11 +36,17 @@ const sellSchema = z.object({
   tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
+const limitsSchema = z.object({
+  takeProfitPrice: z.coerce.number().positive().optional().or(z.literal('')),
+  stopLossPrice: z.coerce.number().nonnegative().optional().or(z.literal('')),
+});
+
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
   const firestore = useFirestore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLimitsSubmitting, setIsLimitsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
@@ -94,26 +102,46 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     defaultValues: { tokenAmount: '' },
   });
 
+  const limitsForm = useForm<z.infer<typeof limitsSchema>>({
+    resolver: zodResolver(limitsSchema),
+    defaultValues: {
+      takeProfitPrice: userHolding?.takeProfitPrice || '',
+      stopLossPrice: userHolding?.stopLossPrice || '',
+    },
+  });
+
+  useEffect(() => {
+    limitsForm.reset({
+        takeProfitPrice: userHolding?.takeProfitPrice || '',
+        stopLossPrice: userHolding?.stopLossPrice || '',
+    })
+  }, [userHolding, limitsForm]);
+
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
 
   // AMM (x*y=k) calculations
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker) return 0;
-    const k = ticker.poolNgn * ticker.poolTokens;
-    if (k === 0) return 0;
     
-    return ticker.poolTokens - (k / (ticker.poolNgn + ngnAmountToBuy));
+    return ticker.poolTokens - ((ticker.poolNgn * ticker.poolTokens) / (ticker.poolNgn + ngnAmountToBuy));
   }, [ngnAmountToBuy, ticker]);
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker) return 0;
-    const k = ticker.poolNgn * ticker.poolTokens;
-    if (k === 0) return 0;
     
-    return ticker.poolNgn - (k / (ticker.poolTokens + tokenAmountToSell));
+    return ticker.poolNgn - ((ticker.poolNgn * ticker.poolTokens) / (ticker.poolTokens + tokenAmountToSell));
 
   }, [tokenAmountToSell, ticker]);
+  
+  const positionPnl = useMemo(() => {
+    if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
+    const currentValue = userHolding.amount * ticker.price;
+    const initialCost = userHolding.amount * userHolding.avgBuyPrice;
+    const pnl = currentValue - initialCost;
+    const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
+    return { pnl, pnlPercent, currentValue };
+  }, [userHolding, ticker]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
@@ -298,6 +326,45 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     }
   }
 
+  async function onSetLimitsSubmit(values: z.infer<typeof limitsSchema>) {
+    if (!firestore || !user || !userHolding) return;
+
+    const { takeProfitPrice, stopLossPrice } = values;
+
+    if (stopLossPrice && takeProfitPrice && stopLossPrice >= takeProfitPrice) {
+      limitsForm.setError('stopLossPrice', { message: 'Stop Loss must be below Take Profit.' });
+      return;
+    }
+    if (stopLossPrice && stopLossPrice >= ticker.price) {
+        limitsForm.setError('stopLossPrice', { message: 'Stop Loss must be below current price.' });
+        return;
+    }
+    if (takeProfitPrice && takeProfitPrice <= ticker.price) {
+        limitsForm.setError('takeProfitPrice', { message: 'Take Profit must be above current price.' });
+        return;
+    }
+
+    setIsLimitsSubmitting(true);
+    try {
+        const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
+        
+        await updateDoc(holdingRef, {
+            takeProfitPrice: takeProfitPrice || null,
+            stopLossPrice: stopLossPrice || null,
+        });
+
+        toast({ title: 'Limits Updated', description: 'Your Take Profit and Stop Loss prices have been saved.' });
+        await fetchHolding();
+    } catch(e: any) {
+        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not save your price limits.' });
+        const permissionError = new FirestorePermissionError({ path: `users/${user.uid}/portfolio/${userHolding.id}`, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsLimitsSubmitting(false);
+    }
+  }
+
+
   const setSellAmountPercentage = (percentage: number) => {
     if (userHolding) {
       const amount = userHolding.amount * (percentage / 100);
@@ -305,19 +372,27 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     }
   };
 
+  const isLoading = profileLoading || holdingLoading;
+  const hasPosition = userHolding && userHolding.amount > 0;
+
+  const tabs = ['buy', 'sell'];
+  if (hasPosition) tabs.push('position');
+
+
   if (!user) {
     return <p className="text-sm text-muted-foreground text-center">Please sign in to trade.</p>;
   }
   
-  if (profileLoading) {
-    return <Skeleton className="h-48 w-full" />
+  if (isLoading) {
+    return <Skeleton className="h-96 w-full" />
   }
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className={cn("grid w-full", hasPosition ? "grid-cols-3" : "grid-cols-2")}>
         <TabsTrigger value="buy">Buy</TabsTrigger>
         <TabsTrigger value="sell">Sell</TabsTrigger>
+        {hasPosition && <TabsTrigger value="position">Position</TabsTrigger>}
       </TabsList>
       <TabsContent value="buy">
         <Form {...buyForm}>
@@ -410,6 +485,73 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
           </form>
         </Form>
       </TabsContent>
+      {hasPosition && userHolding && (
+        <TabsContent value="position">
+            <div className="space-y-4">
+                <div className="rounded-lg border bg-background/50 p-4 space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Amount Held</span>
+                        <span className="font-semibold">{userHolding.amount.toLocaleString()} {ticker.name.split(' ')[0]}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Avg. Buy Price</span>
+                        <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Current Value</span>
+                        <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                     <div className="flex justify-between items-center text-sm font-bold">
+                        <span className="text-muted-foreground">Unrealized P/L</span>
+                        <div className={cn("flex items-center", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
+                          {positionPnl.pnl >= 0 ? <ArrowUp className="h-4 w-4 mr-1" /> : <ArrowDown className="h-4 w-4 mr-1" />}
+                          <span>{positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="ml-2">({positionPnl.pnlPercent.toFixed(2)}%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <Separator />
+                
+                <Form {...limitsForm}>
+                    <form onSubmit={limitsForm.handleSubmit(onSetLimitsSubmit)} className="space-y-4">
+                        <p className="text-sm font-medium">Set Price Limits</p>
+                        <FormField 
+                            control={limitsForm.control}
+                            name="takeProfitPrice"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Take Profit Price</FormLabel>
+                                    <FormControl>
+                                         <Input type="number" placeholder={`e.g., ${(ticker.price * 1.2).toFixed(6)}`} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField 
+                            control={limitsForm.control}
+                            name="stopLossPrice"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Stop Loss Price</FormLabel>
+                                    <FormControl>
+                                         <Input type="number" placeholder={`e.g., ${(ticker.price * 0.8).toFixed(6)}`} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <Button type="submit" disabled={isLimitsSubmitting} className="w-full">
+                            {isLimitsSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Set Limits
+                        </Button>
+                    </form>
+                </Form>
+
+            </div>
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

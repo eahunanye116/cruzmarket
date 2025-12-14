@@ -19,6 +19,8 @@ export type PortfolioHolding = {
   tickerId: string;
   amount: number;
   avgBuyPrice: number;
+  takeProfitPrice?: number;
+  stopLossPrice?: number;
 };
 
 export type EnrichedPortfolioHolding = PortfolioHolding & {

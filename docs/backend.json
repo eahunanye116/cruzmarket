@@ -12,6 +12,8 @@
         "icon": { "type": "string" },
         "price": { "type": "number" },
         "supply": { "type": "number" },
+        "poolNgn": { "type": "number" },
+        "poolTokens": { "type": "number" },
         "chartData": { 
           "type": "array",
           "items": {
@@ -25,7 +27,7 @@
         },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "createdAt"]
+      "required": ["name", "slug", "description", "supply", "price", "createdAt", "poolNgn", "poolTokens"]
     },
     "activity": {
       "title": "Activity",
@@ -60,7 +62,9 @@
       "properties": {
         "tickerId": { "type": "string" },
         "amount": { "type": "number" },
-        "avgBuyPrice": { "type": "number" }
+        "avgBuyPrice": { "type": "number" },
+        "takeProfitPrice": { "type": "number" },
+        "stopLossPrice": { "type": "number" }
       },
       "required": ["tickerId", "amount", "avgBuyPrice"]
     }
