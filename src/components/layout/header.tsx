@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, TrendingUp, Repeat, Wallet, Sparkles } from 'lucide-react';
+import { Menu, TrendingUp, Repeat, Wallet, Sparkles, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore } from '@/firebase';
@@ -44,6 +44,7 @@ export function Header() {
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
     { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
+    { href: '/transactions', label: 'Transactions', icon: <History className="h-5 w-5" /> },
     { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
   ];
 

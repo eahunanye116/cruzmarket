@@ -35,7 +35,7 @@ export type Activity = {
   tickerName: string;
   tickerIcon: string;
   value: number;
-  timestamp: string;
+  userId?: string;
   createdAt: Timestamp;
 };
 
