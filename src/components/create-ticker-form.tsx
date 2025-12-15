@@ -25,7 +25,7 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
-import type { UserProfile, Ticker, PortfolioHolding } from "@/lib/types";
+import type { UserProfile, Ticker } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, {
