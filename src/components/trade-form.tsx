@@ -36,6 +36,8 @@ const sellSchema = z.object({
   tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
+const TRANSACTION_FEE_PERCENTAGE = 0.002; // 0.2%
+
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
@@ -98,22 +100,38 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
+  
+  const buyFee = useMemo(() => {
+    return (ngnAmountToBuy || 0) * TRANSACTION_FEE_PERCENTAGE;
+  }, [ngnAmountToBuy]);
+  
+  const ngnAmountForCurve = useMemo(() => {
+     return (ngnAmountToBuy || 0) - buyFee;
+  },[ngnAmountToBuy, buyFee])
 
   // Bonding Curve Calculations
   const tokensToReceive = useMemo(() => {
-    if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker || ticker.marketCap <= 0) return 0;
+    if (!ngnAmountForCurve || ngnAmountForCurve <= 0 || !ticker || ticker.marketCap <= 0) return 0;
     
-    const newMarketCap = ticker.marketCap + ngnAmountToBuy;
+    const newMarketCap = ticker.marketCap + ngnAmountForCurve;
     const newPrice = newMarketCap / ticker.supply; // Price after buy
     const avgPrice = (ticker.price + newPrice) / 2;
 
-    return ngnAmountToBuy / avgPrice;
-  }, [ngnAmountToBuy, ticker]);
+    return ngnAmountForCurve / avgPrice;
+  }, [ngnAmountForCurve, ticker]);
 
-  const ngnToReceive = useMemo(() => {
+  const ngnToReceiveBeforeFee = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.marketCap <= 0) return 0;
     return calculateReclaimableValue(tokenAmountToSell, ticker);
   }, [tokenAmountToSell, ticker]);
+  
+  const sellFee = useMemo(() => {
+    return ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+  }, [ngnToReceiveBeforeFee]);
+
+  const ngnToReceiveAfterFee = useMemo(() => {
+    return ngnToReceiveBeforeFee - sellFee;
+  }, [ngnToReceiveBeforeFee, sellFee]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
@@ -135,7 +153,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
 
     try {
-        const ngnToGain = await runTransaction(firestore, async (transaction) => {
+        const { ngnToUser } = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -145,14 +163,17 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const ngnOut = calculateReclaimableValue(tokenAmount, currentTickerData);
-            if (ngnOut <= 0) throw new Error("Cannot receive zero or negative NGN.");
+            const ngnOutBeforeFee = calculateReclaimableValue(tokenAmount, currentTickerData);
+            if (ngnOutBeforeFee <= 0) throw new Error("Cannot receive zero or negative NGN.");
+            
+            const fee = ngnOutBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+            const ngnToUser = ngnOutBeforeFee - fee;
 
-            const newMarketCap = currentTickerData.marketCap - ngnOut;
+            const newMarketCap = currentTickerData.marketCap - ngnOutBeforeFee;
             const newSupply = currentTickerData.supply + tokenAmount;
-            const newPrice = newMarketCap / newSupply;
+            const newPrice = newMarketCap > 0 && newSupply > 0 ? newMarketCap / newSupply : 0;
            
-            const newBalance = userDoc.data().balance + ngnOut;
+            const newBalance = userDoc.data().balance + ngnToUser;
             transaction.update(userRef, { balance: newBalance });
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
@@ -170,10 +191,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
-                    volume: ngnOut
+                    volume: ngnOutBeforeFee
                 })
             });
-            return ngnOut;
+            return { ngnToUser, ngnOutBeforeFee };
         });
         
         const batch = writeBatch(firestore);
@@ -184,7 +205,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             tickerId: ticker.id,
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: ngnToGain,
+            value: ngnToUser, // Log the value the user actually received
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
@@ -212,6 +233,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     try {
         const boughtTokens = await runTransaction(firestore, async (transaction) => {
             const ngnAmount = values.ngnAmount;
+            const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
+            const ngnForCurve = ngnAmount - fee;
+
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
 
@@ -226,16 +250,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
 
-            const newMarketCap = currentTickerData.marketCap + ngnAmount;
+            const newMarketCap = currentTickerData.marketCap + ngnForCurve;
             const newPrice = newMarketCap / currentTickerData.supply;
             const avgPriceDuringBuy = (currentTickerData.price + newPrice) / 2;
-            const tokensOut = ngnAmount / avgPriceDuringBuy;
+            const tokensOut = ngnForCurve / avgPriceDuringBuy;
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
             if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
             
             const newSupply = currentTickerData.supply - tokensOut;
-            const finalPrice = newMarketCap / newSupply;
+            const finalPrice = newSupply > 0 ? newMarketCap / newSupply : 0;
 
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
@@ -244,7 +268,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
-             const effectivePricePerToken = ngnAmount / tokensOut;
+             const effectivePricePerToken = ngnForCurve / tokensOut;
 
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
@@ -252,7 +276,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 const currentHolding = holdingDoc.data();
                 
                 const newAmount = currentHolding.amount + tokensOut;
-                const newAvgBuyPrice = ((currentHolding.avgBuyPrice * currentHolding.amount) + (ngnAmount)) / newAmount;
+                const newAvgBuyPrice = ((currentHolding.avgBuyPrice * currentHolding.amount) + (ngnForCurve)) / newAmount;
                 
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
@@ -272,7 +296,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: finalPrice,
-                    volume: ngnAmount
+                    volume: ngnForCurve
                 })
              });
              return tokensOut;
@@ -354,10 +378,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 </FormItem>
               )}
             />
+            
             <div className="flex items-center justify-center text-muted-foreground">
                 <ArrowRight className="h-5 w-5 animate-pulse" />
             </div>
-             <div>
+
+            <div>
                 <FormLabel>You will receive approx.</FormLabel>
                 <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
                     <p className="text-sm font-medium text-foreground transition-opacity duration-300">
@@ -366,6 +392,18 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     </p>
                 </div>
             </div>
+
+            <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fee (0.2%)</span>
+                    <span>₦{buyFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                    <span>Total Cost</span>
+                    <span>₦{(ngnAmountToBuy || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+            </div>
+
             <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Buy ${ticker.name.split(' ')[0]}
@@ -408,14 +446,22 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             <div className="flex items-center justify-center text-muted-foreground">
                 <ArrowRight className="h-5 w-5 animate-pulse" />
             </div>
-             <div>
-                <FormLabel>You will receive approx.</FormLabel>
-                <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
-                    <p className="text-sm font-medium text-foreground transition-opacity duration-300">
-                        ₦{ngnToReceive.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
+
+            <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Receive (before fee)</span>
+                    <span>₦{ngnToReceiveBeforeFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                 <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fee (0.2%)</span>
+                    <span className="text-destructive">- ₦{sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                    <span>You will receive approx.</span>
+                    <span>₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
             </div>
+
             <Button type="submit" disabled={isSubmitting || !userHolding || userHolding.amount === 0} className="w-full">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sell ${ticker.name.split(' ')[0]}
@@ -454,5 +500,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-
-    
