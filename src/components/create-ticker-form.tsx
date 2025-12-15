@@ -20,18 +20,20 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch, arrayUnion } from "firebase/firestore";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Label } from "./ui/label";
 
 const marketCapOptions = {
-  '100000': { fee: 2000, label: '₦100,000' },
-  '1000000': { fee: 10000, label: '₦1,000,000' },
-  '10000000': { fee: 50000, label: '₦10,000,000' },
+  '100000': { fee: 1000, label: '₦100,000' },
+  '1000000': { fee: 4000, label: '₦1,000,000' },
+  '5000000': { fee: 7000, label: '₦5,000,000' },
+  '10000000': { fee: 9990, label: '₦10,000,000' },
 };
 
 const formSchema = z.object({
@@ -291,7 +293,7 @@ export function CreateTickerForm() {
                 <RadioGroup
                   onValueChange={field.onChange}
                   defaultValue={field.value}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 >
                   {Object.entries(marketCapOptions).map(([value, { label, fee }]) => (
                     <FormItem key={value}>
@@ -363,5 +365,3 @@ export function CreateTickerForm() {
     </Form>
   );
 }
-
-    
