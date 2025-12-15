@@ -25,13 +25,11 @@ function UserBalance() {
     return <Skeleton className="h-6 w-24" />;
   }
 
-  if (!userProfile) {
-    return null;
-  }
+  const balance = userProfile?.balance ?? 0;
 
   return (
     <div className="font-semibold text-primary">
-      ₦{userProfile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      ₦{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
     </div>
   )
 }
