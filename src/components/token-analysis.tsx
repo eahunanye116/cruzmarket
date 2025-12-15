@@ -27,6 +27,8 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
       devHoldings: 0,
       devHoldingsPercentage: 0,
       topHoldersPercentage: 0,
+      circulatingSupply: 0,
+      totalSupply: ticker.supply,
     };
 
     if (!holdings || holdings.length === 0 || !ticker) {
@@ -37,23 +39,25 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
     
     const totalHolders = sortedHoldings.length;
     const totalHeldSupply = sortedHoldings.reduce((acc, h) => acc + h.amount, 0);
-    const circulatingSupply = ticker.supply + totalHeldSupply;
+    const totalSupply = ticker.supply + totalHeldSupply;
 
-    if (circulatingSupply === 0) return emptyAnalysis;
+    if (totalSupply === 0) return emptyAnalysis;
 
     const devHolding = sortedHoldings.find(h => h.userId === ticker.creatorId);
     const devHoldingsAmount = devHolding?.amount || 0;
-    const devHoldingsPercentage = (devHoldingsAmount / circulatingSupply) * 100;
+    const devHoldingsPercentage = (devHoldingsAmount / totalSupply) * 100;
 
     const top10Holdings = sortedHoldings.slice(0, 10);
     const top10Total = top10Holdings.reduce((acc, h) => acc + h.amount, 0);
-    const topHoldersPercentage = (top10Total / circulatingSupply) * 100;
+    const topHoldersPercentage = (top10Total / totalSupply) * 100;
 
     return {
       totalHolders,
       devHoldings: devHoldingsAmount,
       devHoldingsPercentage,
       topHoldersPercentage,
+      circulatingSupply: totalHeldSupply,
+      totalSupply: totalSupply,
     };
   }, [holdings, ticker]);
 
@@ -69,6 +73,8 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
 
   const stats = [
     { label: 'Total Holders', value: analysis.totalHolders.toLocaleString() },
+    { label: 'Total Supply', value: analysis.totalSupply.toLocaleString('en-US', { maximumFractionDigits: 0 }) },
+    { label: 'Circulating Supply', value: `${analysis.circulatingSupply.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: 'Creator Holdings', value: `${analysis.devHoldings.toLocaleString('en-US', { maximumFractionDigits: 2 })} (${analysis.devHoldingsPercentage.toFixed(2)}%)` },
   ];
 
