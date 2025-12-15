@@ -112,23 +112,33 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   }, [ngnAmountToBuy, ticker]);
 
   const ngnToReceive = useMemo(() => {
-    if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.marketCap <=0) return 0;
-    
-    const valueOfTokens = tokenAmountToSell * ticker.price;
-    const newMarketCap = ticker.marketCap - valueOfTokens;
-    if (newMarketCap <= 0) return ticker.marketCap; // Can't get more than what's in the market
+    if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.marketCap <= 0) return 0;
+    if (tokenAmountToSell > ticker.supply) return 0; // Avoids incorrect calculation if selling more than exists
 
+    const percentOfSupply = tokenAmountToSell / ticker.supply;
+    const valueToExtract = ticker.marketCap * percentOfSupply;
+    
+    const newMarketCap = ticker.marketCap - valueToExtract;
     const priceChangeFactor = newMarketCap / ticker.marketCap;
     const newPrice = ticker.price * priceChangeFactor;
     const avgPrice = (ticker.price + newPrice) / 2;
     
     return tokenAmountToSell * avgPrice;
-  }, [tokenAmountToSell, ticker]);
+}, [tokenAmountToSell, ticker.marketCap, ticker.price, ticker.supply]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
     
-    const currentValue = userHolding.amount * ticker.price;
+    // Use the linear model to calculate the real value if sold
+    const tokenAmount = userHolding.amount;
+    const percentOfSupply = tokenAmount / ticker.supply;
+    const valueToExtract = ticker.marketCap * percentOfSupply;
+    const newMarketCap = ticker.marketCap - valueToExtract;
+    const priceChangeFactor = newMarketCap / ticker.marketCap;
+    const newPrice = ticker.price * priceChangeFactor;
+    const avgPrice = (ticker.price + newPrice) / 2;
+    const currentValue = tokenAmount * avgPrice;
+
     const initialCost = userHolding.amount * userHolding.avgBuyPrice;
     const pnl = currentValue - initialCost;
     const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
@@ -155,16 +165,20 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const valueOfTokensToSell = tokenAmount * currentTickerData.price;
-            if (currentTickerData.marketCap <= 0 || valueOfTokensToSell > currentTickerData.marketCap) {
-                throw new Error("Sell amount exceeds market cap.");
-            }
+            if (currentTickerData.supply <= 0) throw new Error("No tokens in supply.");
+            if (tokenAmount > currentTickerData.supply) throw new Error("Sell amount exceeds total supply.");
 
-            const newMarketCap = currentTickerData.marketCap - valueOfTokensToSell;
-            const priceChangeFactor = newMarketCap / currentTickerData.marketCap;
-            const newPrice = currentTickerData.price * priceChangeFactor;
-            const avgPrice = (currentTickerData.price + newPrice) / 2;
-            const ngnOut = tokenAmount * avgPrice;
+            const percentOfSupply = tokenAmount / currentTickerData.supply;
+            const valueToExtract = currentTickerData.marketCap * percentOfSupply;
+            
+            if (valueToExtract > currentTickerData.marketCap) throw new Error("Sell amount exceeds market cap.");
+            
+            const newMarketCap = currentTickerData.marketCap - valueToExtract;
+            const newSupply = currentTickerData.supply + tokenAmount; // Tokens return to supply
+            const newPrice = newSupply > 0 ? newMarketCap / newSupply : 0;
+
+            const avgPriceDuringSell = (currentTickerData.price + newPrice) / 2;
+            const ngnOut = tokenAmount * avgPriceDuringSell;
 
             if (ngnOut <= 0) throw new Error("Cannot receive zero or negative NGN.");
            
@@ -182,7 +196,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(tickerRef, { 
                 price: newPrice,
                 marketCap: newMarketCap,
-                supply: currentTickerData.supply + tokenAmount, // Tokens return to supply
+                supply: newSupply,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
@@ -238,8 +252,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
 
             const newMarketCap = currentTickerData.marketCap + ngnAmount;
-            const priceChangeFactor = newMarketCap / currentTickerData.marketCap;
-            const newPrice = currentTickerData.price * priceChangeFactor;
+            const newPrice = newMarketCap / currentTickerData.supply;
             const avgPriceDuringBuy = (currentTickerData.price + newPrice) / 2;
             const tokensOut = ngnAmount / avgPriceDuringBuy;
 
@@ -253,14 +266,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
+             const effectivePricePerToken = ngnAmount / tokensOut;
+
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
                 const holdingRef = holdingDoc.ref;
-                const currentAmount = holdingDoc.data().amount;
-                const currentAvgPrice = holdingDoc.data().avgBuyPrice;
+                const currentHolding = holdingDoc.data();
                 
-                const newAmount = currentAmount + tokensOut;
-                const newAvgBuyPrice = ((currentAvgPrice * currentAmount) + (ngnAmount)) / newAmount;
+                const newAmount = currentHolding.amount + tokensOut;
+                const newAvgBuyPrice = ((currentHolding.avgBuyPrice * currentHolding.amount) + (ngnAmount)) / newAmount;
                 
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
@@ -268,14 +282,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 transaction.set(holdingRef, {
                     tickerId: ticker.id,
                     amount: tokensOut,
-                    avgBuyPrice: avgPriceDuringBuy
+                    avgBuyPrice: effectivePricePerToken,
                 });
             }
 
              transaction.update(tickerRef, { 
                 price: newPrice,
                 marketCap: newMarketCap,
-                supply: currentTickerData.supply - tokensOut,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,

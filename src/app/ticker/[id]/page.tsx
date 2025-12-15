@@ -44,6 +44,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     const findPastPrice = (targetMinutes: number) => {
       // If the ticker is younger than the target timeframe, use the earliest price for comparison.
       if (tickerAgeInMinutes < targetMinutes) {
+        if (earliestPrice === 0) return null; // Avoid division by zero
         return earliestPrice;
       }
       
@@ -61,6 +62,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         return currDiff < prevDiff ? curr : prev;
       });
 
+      if (closestDataPoint.price === 0) return null; // Avoid division by zero
       return closestDataPoint.price;
     };
     
