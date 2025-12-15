@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirestore } from '@/firebase';
@@ -23,22 +22,24 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
   const { data: holdings, loading } = useCollection<PortfolioHolding>(holdingsQuery);
 
   const analysis = useMemo(() => {
+    const emptyAnalysis = {
+      totalHolders: 0,
+      devHoldings: 0,
+      devHoldingsPercentage: 0,
+      topHoldersPercentage: 0,
+    };
+
     if (!holdings || holdings.length === 0 || !ticker) {
-      return {
-        totalHolders: 0,
-        devHoldings: 0,
-        devHoldingsPercentage: 0,
-        topHoldersPercentage: 0,
-        top10Holders: [],
-      };
+      return emptyAnalysis;
     }
 
-    // Sort holdings by amount descending
     const sortedHoldings = [...holdings].sort((a, b) => b.amount - a.amount);
     
     const totalHolders = sortedHoldings.length;
-    const totalHeld = sortedHoldings.reduce((acc, h) => acc + h.amount, 0);
-    const circulatingSupply = ticker.supply + totalHeld; // Original supply
+    const totalHeldSupply = sortedHoldings.reduce((acc, h) => acc + h.amount, 0);
+    const circulatingSupply = ticker.supply + totalHeldSupply;
+
+    if (circulatingSupply === 0) return emptyAnalysis;
 
     const devHolding = sortedHoldings.find(h => h.userId === ticker.creatorId);
     const devHoldingsAmount = devHolding?.amount || 0;
@@ -53,7 +54,6 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
       devHoldings: devHoldingsAmount,
       devHoldingsPercentage,
       topHoldersPercentage,
-      top10Holders,
     };
   }, [holdings, ticker]);
 
