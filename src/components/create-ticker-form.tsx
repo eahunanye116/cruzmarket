@@ -117,11 +117,8 @@ export function CreateTickerForm() {
         transaction.update(userProfileRef, { balance: newBalance });
 
         const newTickerRef = doc(tickersCollectionRef);
-        // Set the initial ticker data
-        transaction.set(newTickerRef, {
-            ...newTickerData,
-            createdAt: serverTimestamp()
-        });
+        
+        let finalTickerData = { ...newTickerData };
 
         // If there's an initial buy, perform the buy logic within the same transaction
         if (initialBuyNgn > 0) {
@@ -139,26 +136,33 @@ export function CreateTickerForm() {
             const updatedPrice = updatedPoolNgn / updatedPoolTokens;
 
             // Update ticker pools and price from the initial buy
-            transaction.update(newTickerRef, { 
-                poolNgn: updatedPoolNgn,
-                poolTokens: updatedPoolTokens,
-                price: updatedPrice,
-                chartData: [
-                  { time: new Date().toISOString(), price: initialPrice, volume: 0 },
-                  { time: new Date().toISOString(), price: updatedPrice, volume: initialBuyNgn }
-                ],
-            });
+            finalTickerData.poolNgn = updatedPoolNgn;
+            finalTickerData.poolTokens = updatedPoolTokens;
+            finalTickerData.price = updatedPrice;
+            finalTickerData.chartData = [
+                // Set the "before" price to the initial price for correct % change calculation
+                { time: new Date(Date.now() - 1000).toISOString(), price: initialPrice, volume: 0 },
+                // Set the "after" price
+                { time: new Date().toISOString(), price: updatedPrice, volume: initialBuyNgn }
+            ];
 
             // Create portfolio holding for the user
             const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
             const holdingRef = doc(portfolioColRef);
+            const effectivePricePerToken = initialBuyNgn / tokensOut;
             transaction.set(holdingRef, {
                 tickerId: newTickerRef.id,
                 amount: tokensOut,
-                avgBuyPrice: initialBuyNgn / tokensOut
+                avgBuyPrice: effectivePricePerToken
             });
         }
         
+        // Set the initial ticker data (either original or updated from the buy)
+         transaction.set(newTickerRef, {
+            ...finalTickerData,
+            createdAt: serverTimestamp()
+        });
+
         return newTickerRef;
       });
 
