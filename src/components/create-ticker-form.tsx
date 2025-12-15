@@ -85,8 +85,7 @@ export function CreateTickerForm() {
       slug,
       description: values.description,
       supply: values.supply,
-      poolNgn: INITIAL_MARKET_CAP,
-      poolTokens: values.supply,
+      marketCap: INITIAL_MARKET_CAP,
       price: initialPrice,
       icon: randomIcon.id,
       chartData: [], // Will be populated in the transaction
@@ -115,52 +114,56 @@ export function CreateTickerForm() {
         const newTickerRef = doc(tickersCollectionRef);
         
         let finalTickerData = { ...newTickerData };
+        let tokensOut = 0;
+        let avgBuyPrice = 0;
 
         // If there's an initial buy, perform the buy logic within the same transaction
         if (initialBuyNgn > 0) {
-            const initialPoolNgn = newTickerData.poolNgn;
-            const initialPoolTokens = newTickerData.poolTokens;
+            const initialMarketCap = finalTickerData.marketCap;
+            if (initialMarketCap <= 0) throw new Error("Market cap must be positive.");
 
-            const k = initialPoolNgn * initialPoolTokens;
-            const tokensOut = initialPoolTokens - (k / (initialPoolNgn + initialBuyNgn));
+            const priceChangeFactor = (initialMarketCap + initialBuyNgn) / initialMarketCap;
+            const newPrice = finalTickerData.price * priceChangeFactor;
             
-            if (tokensOut <= 0) {
-                throw new Error("Initial buy amount is too small.");
-            }
+            const avgPriceDuringBuy = (finalTickerData.price + newPrice) / 2;
+            tokensOut = initialBuyNgn / avgPriceDuringBuy;
+            avgBuyPrice = avgPriceDuringBuy;
 
-            const updatedPoolNgn = initialPoolNgn + initialBuyNgn;
-            const updatedPoolTokens = initialPoolTokens - tokensOut;
-            const updatedPrice = updatedPoolNgn / updatedPoolTokens;
-
-            // Update ticker pools and price from the initial buy
-            finalTickerData.poolNgn = updatedPoolNgn;
-            finalTickerData.poolTokens = updatedPoolTokens;
-            finalTickerData.price = updatedPrice;
-            finalTickerData.chartData = [
-                // Set the "before" price to the initial price for correct % change calculation
-                { time: new Date(Date.now() - 1000).toISOString(), price: initialPrice, volume: 0 },
-                // Set the "after" price
-                { time: new Date().toISOString(), price: updatedPrice, volume: initialBuyNgn }
-            ];
+            if (tokensOut <= 0) throw new Error("Initial buy amount is too small.");
+            if (tokensOut > finalTickerData.supply) throw new Error("Not enough tokens in supply for initial buy.");
+            
+            finalTickerData.price = newPrice;
+            finalTickerData.marketCap = initialMarketCap + initialBuyNgn;
+            finalTickerData.supply = finalTickerData.supply - tokensOut;
 
             // Create portfolio holding for the user
             const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
             const holdingRef = doc(portfolioColRef);
-            const effectivePricePerToken = initialBuyNgn / tokensOut;
             transaction.set(holdingRef, {
                 tickerId: newTickerRef.id,
                 amount: tokensOut,
-                avgBuyPrice: effectivePricePerToken
+                avgBuyPrice: avgBuyPrice
             });
-        } else {
-             finalTickerData.chartData = [{
-                time: new Date().toISOString(),
-                price: initialPrice,
-                volume: 0
-            }];
         }
         
-        // Set the initial ticker data (either original or updated from the buy)
+        // Add chart data points
+        const now = new Date();
+        const beforeTime = new Date(now.getTime() - 1000).toISOString(); // 1 second before
+        
+        // The "before" state is always the baseline initial state
+        finalTickerData.chartData.push({
+            time: beforeTime,
+            price: initialPrice,
+            volume: 0,
+        });
+
+        // The "after" state reflects the result of the initial buy (if any)
+        finalTickerData.chartData.push({
+            time: now.toISOString(),
+            price: finalTickerData.price,
+            volume: initialBuyNgn,
+        });
+        
          transaction.set(newTickerRef, {
             ...finalTickerData,
             createdAt: serverTimestamp()

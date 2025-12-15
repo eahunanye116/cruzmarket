@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { cn, calculateReclaimableValue } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -36,7 +36,7 @@ export default function PortfolioPage() {
       const ticker = tickers.find(t => t.id === holding.tickerId);
       if (!ticker) return null;
 
-      const currentValue = calculateReclaimableValue(holding.amount, ticker);
+      const currentValue = holding.amount * ticker.price;
       const initialCost = holding.amount * holding.avgBuyPrice;
       const profitOrLoss = currentValue - initialCost;
       const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;

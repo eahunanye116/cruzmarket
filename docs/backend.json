@@ -12,8 +12,7 @@
         "icon": { "type": "string" },
         "price": { "type": "number" },
         "supply": { "type": "number" },
-        "poolNgn": { "type": "number" },
-        "poolTokens": { "type": "number" },
+        "marketCap": { "type": "number" },
         "chartData": { 
           "type": "array",
           "items": {
@@ -27,7 +26,7 @@
         },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "createdAt", "poolNgn", "poolTokens"]
+      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap"]
     },
     "activity": {
       "title": "Activity",

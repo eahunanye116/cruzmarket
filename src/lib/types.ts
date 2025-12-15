@@ -8,8 +8,7 @@ export type Ticker = {
   icon: string;
   price: number;
   supply: number;
-  poolNgn: number; // NGN liquidity in the pool
-  poolTokens: number; // Token liquidity in the pool
+  marketCap: number; 
   chartData: { time: string; price: number, volume: number }[];
   recentActivity?: string;
   createdAt: Timestamp;

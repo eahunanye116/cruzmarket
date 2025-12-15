@@ -8,7 +8,7 @@ import { TickerChangeBadge } from './ticker-change-badge';
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
   const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
-  const marketCap = ticker.poolNgn;
+  const marketCap = ticker.marketCap;
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group">
