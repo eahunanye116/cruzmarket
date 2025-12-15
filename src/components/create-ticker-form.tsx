@@ -89,6 +89,7 @@ export function CreateTickerForm() {
       price: initialPrice,
       icon: randomIcon.id,
       chartData: [], // Will be populated in the transaction
+      creatorId: user.uid,
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);
@@ -142,7 +143,8 @@ export function CreateTickerForm() {
             transaction.set(holdingRef, {
                 tickerId: newTickerRef.id,
                 amount: tokensOut,
-                avgBuyPrice: avgBuyPrice
+                avgBuyPrice: avgBuyPrice,
+                userId: user.uid,
             });
         }
         

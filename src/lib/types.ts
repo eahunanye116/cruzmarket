@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type Ticker = {
@@ -12,12 +13,14 @@ export type Ticker = {
   chartData: { time: string; price: number, volume: number }[];
   recentActivity?: string;
   createdAt: Timestamp;
+  creatorId: string;
 };
 
 export type PortfolioHolding = {
   tickerId: string;
   amount: number;
   avgBuyPrice: number;
+  userId?: string; // Add this to identify owner in collectionGroup queries
 };
 
 export type EnrichedPortfolioHolding = PortfolioHolding & {

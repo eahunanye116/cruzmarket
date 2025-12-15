@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { cn } from '@/lib/utils';
-import { Separator } from './ui/separator';
+import { calculateReclaimableValue } from '@/lib/utils';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -113,32 +113,19 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.marketCap <= 0) return 0;
-    if (tokenAmountToSell > ticker.supply) return 0; // Avoids incorrect calculation if selling more than exists
 
-    const percentOfSupply = tokenAmountToSell / ticker.supply;
-    const valueToExtract = ticker.marketCap * percentOfSupply;
-    
-    const newMarketCap = ticker.marketCap - valueToExtract;
+    const newMarketCap = ticker.marketCap * ((ticker.supply - tokenAmountToSell) / ticker.supply);
     const priceChangeFactor = newMarketCap / ticker.marketCap;
     const newPrice = ticker.price * priceChangeFactor;
     const avgPrice = (ticker.price + newPrice) / 2;
     
     return tokenAmountToSell * avgPrice;
-}, [tokenAmountToSell, ticker.marketCap, ticker.price, ticker.supply]);
+  }, [tokenAmountToSell, ticker.marketCap, ticker.price, ticker.supply]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
     
-    // Use the linear model to calculate the real value if sold
-    const tokenAmount = userHolding.amount;
-    const percentOfSupply = tokenAmount / ticker.supply;
-    const valueToExtract = ticker.marketCap * percentOfSupply;
-    const newMarketCap = ticker.marketCap - valueToExtract;
-    const priceChangeFactor = newMarketCap / ticker.marketCap;
-    const newPrice = ticker.price * priceChangeFactor;
-    const avgPrice = (ticker.price + newPrice) / 2;
-    const currentValue = tokenAmount * avgPrice;
-
+    const currentValue = calculateReclaimableValue(userHolding.amount, ticker);
     const initialCost = userHolding.amount * userHolding.avgBuyPrice;
     const pnl = currentValue - initialCost;
     const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
@@ -165,20 +152,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            if (currentTickerData.supply <= 0) throw new Error("No tokens in supply.");
-            if (tokenAmount > currentTickerData.supply) throw new Error("Sell amount exceeds total supply.");
-
-            const percentOfSupply = tokenAmount / currentTickerData.supply;
-            const valueToExtract = currentTickerData.marketCap * percentOfSupply;
-            
-            if (valueToExtract > currentTickerData.marketCap) throw new Error("Sell amount exceeds market cap.");
-            
-            const newMarketCap = currentTickerData.marketCap - valueToExtract;
-            const newSupply = currentTickerData.supply + tokenAmount; // Tokens return to supply
-            const newPrice = newSupply > 0 ? newMarketCap / newSupply : 0;
-
-            const avgPriceDuringSell = (currentTickerData.price + newPrice) / 2;
-            const ngnOut = tokenAmount * avgPriceDuringSell;
+            const newMarketCap = currentTickerData.marketCap * ((currentTickerData.supply - tokenAmount) / currentTickerData.supply);
+            const newPrice = newMarketCap / (currentTickerData.supply - tokenAmount);
+            const avgPrice = (currentTickerData.price + newPrice) / 2;
+            const ngnOut = tokenAmount * avgPrice;
 
             if (ngnOut <= 0) throw new Error("Cannot receive zero or negative NGN.");
            
@@ -196,7 +173,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(tickerRef, { 
                 price: newPrice,
                 marketCap: newMarketCap,
-                supply: newSupply,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
@@ -205,8 +181,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             });
             return ngnOut;
         });
+        
+        const batch = writeBatch(firestore);
+        const activityRef = doc(collection(firestore, 'activities'));
 
-        addDoc(collection(firestore, 'activities'), {
+        batch.set(activityRef, {
             type: 'SELL',
             tickerId: ticker.id,
             tickerName: ticker.name,
@@ -215,6 +194,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
+        
+        await batch.commit();
 
         toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name.split(' ')[0]}` });
         sellForm.reset();
@@ -251,13 +232,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
 
-            const newMarketCap = currentTickerData.marketCap + ngnAmount;
-            const newPrice = newMarketCap / currentTickerData.supply;
+            const priceChangeFactor = (currentTickerData.marketCap + ngnAmount) / currentTickerData.marketCap;
+            const newPrice = currentTickerData.price * priceChangeFactor;
             const avgPriceDuringBuy = (currentTickerData.price + newPrice) / 2;
             const tokensOut = ngnAmount / avgPriceDuringBuy;
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
-            if (tokensOut > currentTickerData.supply) throw new Error("Not enough tokens in supply.");
             
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
@@ -283,12 +263,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     tickerId: ticker.id,
                     amount: tokensOut,
                     avgBuyPrice: effectivePricePerToken,
+                    userId: user.uid
                 });
             }
 
              transaction.update(tickerRef, { 
                 price: newPrice,
-                marketCap: newMarketCap,
+                marketCap: currentTickerData.marketCap + ngnAmount,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
@@ -298,7 +279,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
              return tokensOut;
         });
 
-        addDoc(collection(firestore, 'activities'), {
+        const batch = writeBatch(firestore);
+        const activityRef = doc(collection(firestore, 'activities'));
+        batch.set(activityRef, {
             type: 'BUY',
             tickerId: ticker.id,
             tickerName: ticker.name,
@@ -307,6 +290,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
+
+        await batch.commit();
 
         toast({ title: "Purchase Successful!", description: `You bought ${boughtTokens.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
@@ -332,10 +317,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const isLoading = profileLoading || holdingLoading;
   const hasPosition = userHolding && userHolding.amount > 0;
-
-  const tabs = ['buy', 'sell'];
-  if (hasPosition) tabs.push('position');
-
 
   if (!user) {
     return <p className="text-sm text-muted-foreground text-center">Please sign in to trade.</p>;
@@ -456,7 +437,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                         <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Current Value</span>
+                        <span className="text-muted-foreground">Reclaimable Value</span>
                         <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                      <div className="flex justify-between items-center text-sm font-bold">

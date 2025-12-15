@@ -18,8 +18,8 @@ service cloud.firestore {
     // Updates and deletes are disallowed for now to prevent tampering.
     match /tickers/{tickerId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
     }
 
     // Activities can be read by anyone (for the live feed).
@@ -38,6 +38,12 @@ service cloud.firestore {
       match /portfolio/{holdingId} {
         allow read, write, delete: if isSignedIn() && isOwner(userId);
       }
+    }
+    
+    // Allow collection group queries on 'portfolio' for analytics.
+    // Anyone can read, but writes are still restricted by the sub-collection rule.
+    match /{path=**}/portfolio/{holdingId} {
+      allow read: if true;
     }
   }
 }

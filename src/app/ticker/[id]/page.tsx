@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -16,6 +17,7 @@ import { differenceInMinutes, sub, formatDistanceToNow } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
+import { TokenAnalysis } from '@/components/token-analysis';
 
 
 export default function TickerPage({ params }: { params: { id: string } }) {
@@ -25,8 +27,12 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
 
   const activitiesQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'activities'), where('tickerId', '==', resolvedParams.id), orderBy('createdAt', 'desc'));
+    if (!firestore || !resolvedParams.id) return null;
+    return query(
+      collection(firestore, 'activities'), 
+      where('tickerId', '==', resolvedParams.id), 
+      orderBy('createdAt', 'desc')
+    );
   }, [firestore, resolvedParams.id]);
 
   const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
@@ -39,13 +45,13 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     const now = new Date();
     const currentPrice = ticker.price;
     const tickerAgeInMinutes = differenceInMinutes(now, ticker.createdAt.toDate());
-    const earliestPrice = ticker.chartData[0].price;
-
+    
     const findPastPrice = (targetMinutes: number) => {
       // If the ticker is younger than the target timeframe, use the earliest price for comparison.
+      const earliestDataPoint = ticker.chartData[0];
       if (tickerAgeInMinutes < targetMinutes) {
-        if (earliestPrice === 0) return null; // Avoid division by zero
-        return earliestPrice;
+        if (earliestDataPoint.price === 0) return null; // Avoid division by zero
+        return earliestDataPoint.price;
       }
       
       const targetTime = sub(now, { minutes: targetMinutes });
@@ -127,7 +133,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const stats = [
     { label: 'Market Cap', value: `₦${(ticker?.marketCap ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
-    { label: 'Circulating Supply', value: `${((ticker?.supply ?? 0) / 1_000_000_000).toFixed(2)}B` },
+    { label: 'Circulating Supply', value: `${(ticker?.supply ?? 0).toLocaleString()}` },
   ];
 
   return (
@@ -217,17 +223,36 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           </Card>
 
           <Card>
-            <CardHeader>
-                <CardTitle>Trades</CardTitle>
-                <CardDescription>All buy and sell activity for ${ticker.name}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {activitiesLoading ? (
-                    <Skeleton className="h-64 w-full" />
-                ) : (
-                    <TickerTransactions activities={activities || []} />
-                )}
-            </CardContent>
+             <Tabs defaultValue="trades">
+                <CardHeader>
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="trades">Trades</TabsTrigger>
+                        <TabsTrigger value="analysis">Analysis</TabsTrigger>
+                    </TabsList>
+                </CardHeader>
+                <TabsContent value="trades">
+                    <CardHeader className="pt-0">
+                        <CardTitle>Trades</CardTitle>
+                        <CardDescription>All buy and sell activity for ${ticker.name}.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {activitiesLoading ? (
+                            <Skeleton className="h-64 w-full" />
+                        ) : (
+                            <TickerTransactions activities={activities || []} />
+                        )}
+                    </CardContent>
+                </TabsContent>
+                 <TabsContent value="analysis">
+                     <CardHeader className="pt-0">
+                        <CardTitle>Token Analysis</CardTitle>
+                        <CardDescription>Holder statistics for ${ticker.name}.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <TokenAnalysis ticker={ticker} />
+                    </CardContent>
+                </TabsContent>
+             </Tabs>
           </Card>
         </div>
 
