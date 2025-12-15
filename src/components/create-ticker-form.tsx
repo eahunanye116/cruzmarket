@@ -26,8 +26,8 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker } from "@/lib/types";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+
 
 const marketCapOptions = {
   '100000': { fee: 1000, label: '₦100,000' },
@@ -287,30 +287,25 @@ export function CreateTickerForm() {
           control={form.control}
           name="initialMarketCap"
           render={({ field }) => (
-            <FormItem className="space-y-3">
+            <FormItem>
               <FormLabel>Starting Market Cap</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                >
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a starting market cap" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
                   {Object.entries(marketCapOptions).map(([value, { label, fee }]) => (
-                    <FormItem key={value}>
-                      <FormControl>
-                        <RadioGroupItem value={value} id={value} className="sr-only" />
-                      </FormControl>
-                      <Label
-                        htmlFor={value}
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary"
-                      >
-                        <span className="text-lg font-bold">{label}</span>
-                        <span className="text-xs text-muted-foreground">Fee: ₦{fee.toLocaleString()}</span>
-                      </Label>
-                    </FormItem>
+                    <SelectItem key={value} value={value}>
+                      <div className="flex justify-between w-full">
+                        <span>{label}</span>
+                        <span className="text-muted-foreground ml-4">Fee: ₦{fee.toLocaleString()}</span>
+                      </div>
+                    </SelectItem>
                   ))}
-                </RadioGroup>
-              </FormControl>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
