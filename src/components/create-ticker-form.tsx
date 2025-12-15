@@ -89,11 +89,7 @@ export function CreateTickerForm() {
       poolTokens: values.supply,
       price: initialPrice,
       icon: randomIcon.id,
-      chartData: [{
-        time: new Date().toISOString(),
-        price: initialPrice,
-        volume: 0
-      }],
+      chartData: [], // Will be populated in the transaction
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);
@@ -125,7 +121,8 @@ export function CreateTickerForm() {
             const initialPoolNgn = newTickerData.poolNgn;
             const initialPoolTokens = newTickerData.poolTokens;
 
-            const tokensOut = initialPoolTokens - ((initialPoolNgn * initialPoolTokens) / (initialPoolNgn + initialBuyNgn));
+            const k = initialPoolNgn * initialPoolTokens;
+            const tokensOut = initialPoolTokens - (k / (initialPoolNgn + initialBuyNgn));
             
             if (tokensOut <= 0) {
                 throw new Error("Initial buy amount is too small.");
@@ -155,6 +152,12 @@ export function CreateTickerForm() {
                 amount: tokensOut,
                 avgBuyPrice: effectivePricePerToken
             });
+        } else {
+             finalTickerData.chartData = [{
+                time: new Date().toISOString(),
+                price: initialPrice,
+                volume: 0
+            }];
         }
         
         // Set the initial ticker data (either original or updated from the buy)
