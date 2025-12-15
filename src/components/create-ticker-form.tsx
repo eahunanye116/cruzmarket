@@ -26,6 +26,13 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker } from "@/lib/types";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+
+const marketCapOptions = {
+  '100000': { fee: 2000, label: '₦100,000' },
+  '1000000': { fee: 10000, label: '₦1,000,000' },
+  '10000000': { fee: 50000, label: '₦10,000,000' },
+};
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -41,11 +48,11 @@ const formSchema = z.object({
   supply: z.coerce.number().positive({
     message: "Initial supply must be a positive number.",
   }),
+  initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
+    message: "Please select a valid market cap option.",
+  }),
   initialBuyNgn: z.coerce.number().nonnegative().optional(),
 });
-
-const CREATION_FEE = 2000;
-const INITIAL_MARKET_CAP = 100000;
 
 export function CreateTickerForm() {
   const { toast } = useToast();
@@ -60,12 +67,16 @@ export function CreateTickerForm() {
       name: "",
       description: "",
       supply: 1000000000,
+      initialMarketCap: '100000',
       initialBuyNgn: 0,
     },
   });
   
+  const selectedMarketCap = form.watch('initialMarketCap') as keyof typeof marketCapOptions;
   const initialBuyValue = form.watch('initialBuyNgn') || 0;
-  const totalCost = CREATION_FEE + initialBuyValue;
+  
+  const creationFee = marketCapOptions[selectedMarketCap]?.fee || 0;
+  const totalCost = creationFee + initialBuyValue;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore || !user) {
@@ -78,17 +89,18 @@ export function CreateTickerForm() {
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
     
-    const initialPrice = INITIAL_MARKET_CAP / values.supply;
+    const initialMarketCap = Number(values.initialMarketCap);
+    const initialPrice = initialMarketCap / values.supply;
 
     const newTickerData: Omit<Ticker, 'id' | 'createdAt'> = {
       name: values.name,
       slug,
       description: values.description,
       supply: values.supply,
-      marketCap: INITIAL_MARKET_CAP,
+      marketCap: initialMarketCap,
       price: initialPrice,
       icon: randomIcon.id,
-      chartData: [], // Will be populated in the transaction
+      chartData: [], 
       creatorId: user.uid,
     };
 
@@ -118,12 +130,11 @@ export function CreateTickerForm() {
         let tokensOut = 0;
         let avgBuyPrice = 0;
 
-        // If there's an initial buy, perform the buy logic within the same transaction
         if (initialBuyNgn > 0) {
-            const initialMarketCap = finalTickerData.marketCap;
-            if (initialMarketCap <= 0) throw new Error("Market cap must be positive.");
+            const currentMarketCap = finalTickerData.marketCap;
+            if (currentMarketCap <= 0) throw new Error("Market cap must be positive.");
 
-            const priceChangeFactor = (initialMarketCap + initialBuyNgn) / initialMarketCap;
+            const priceChangeFactor = (currentMarketCap + initialBuyNgn) / currentMarketCap;
             const newPrice = finalTickerData.price * priceChangeFactor;
             
             const avgPriceDuringBuy = (finalTickerData.price + newPrice) / 2;
@@ -134,10 +145,9 @@ export function CreateTickerForm() {
             if (tokensOut > finalTickerData.supply) throw new Error("Not enough tokens in supply for initial buy.");
             
             finalTickerData.price = newPrice;
-            finalTickerData.marketCap = initialMarketCap + initialBuyNgn;
+            finalTickerData.marketCap = currentMarketCap + initialBuyNgn;
             finalTickerData.supply = finalTickerData.supply - tokensOut;
 
-            // Create portfolio holding for the user
             const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
             const holdingRef = doc(portfolioColRef);
             transaction.set(holdingRef, {
@@ -148,18 +158,15 @@ export function CreateTickerForm() {
             });
         }
         
-        // Add chart data points
         const now = new Date();
-        const beforeTime = new Date(now.getTime() - 1000).toISOString(); // 1 second before
+        const beforeTime = new Date(now.getTime() - 1000).toISOString();
         
-        // The "before" state is always the baseline initial state
         finalTickerData.chartData.push({
             time: beforeTime,
             price: initialPrice,
             volume: 0,
         });
 
-        // The "after" state reflects the result of the initial buy (if any)
         finalTickerData.chartData.push({
             time: now.toISOString(),
             price: finalTickerData.price,
@@ -174,11 +181,9 @@ export function CreateTickerForm() {
         return newTickerRef;
       });
 
-      // Log activities using a write batch (outside the main transaction)
       const batch = writeBatch(firestore);
       const activitiesCollection = collection(firestore, 'activities');
       
-      // Log CREATE activity
       batch.set(doc(activitiesCollection), {
         type: 'CREATE',
         tickerId: newTickerDocRef.id,
@@ -189,7 +194,6 @@ export function CreateTickerForm() {
         createdAt: serverTimestamp(),
       });
 
-      // Log BUY activity if initial buy was made
       if (initialBuyNgn > 0) {
         batch.set(doc(activitiesCollection), {
           type: 'BUY',
@@ -206,7 +210,7 @@ export function CreateTickerForm() {
       
       toast({
         title: "🚀 Ticker Created!",
-        description: `Your new meme ticker "${values.name}" is now live. ₦${CREATION_FEE.toLocaleString()} fee paid.`,
+        description: `Your new meme ticker "${values.name}" is now live. ₦${creationFee.toLocaleString()} fee paid.`,
         className: "bg-accent text-accent-foreground border-accent",
       });
 
@@ -279,6 +283,39 @@ export function CreateTickerForm() {
         />
         <FormField
           control={form.control}
+          name="initialMarketCap"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Starting Market Cap</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                >
+                  {Object.entries(marketCapOptions).map(([value, { label, fee }]) => (
+                    <FormItem key={value}>
+                      <FormControl>
+                        <RadioGroupItem value={value} id={value} className="sr-only" />
+                      </FormControl>
+                      <Label
+                        htmlFor={value}
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary"
+                      >
+                        <span className="text-lg font-bold">{label}</span>
+                        <span className="text-xs text-muted-foreground">Fee: ₦{fee.toLocaleString()}</span>
+                      </Label>
+                    </FormItem>
+                  ))}
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="supply"
           render={({ field }) => (
             <FormItem>
@@ -310,7 +347,7 @@ export function CreateTickerForm() {
           )}
         />
         <div className="rounded-lg border bg-muted/50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">Creation Fee: ₦{CREATION_FEE.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Creation Fee: ₦{creationFee.toLocaleString()}</p>
             {initialBuyValue > 0 && <p className="text-sm text-muted-foreground">Initial Buy: ₦{initialBuyValue.toLocaleString()}</p>}
             <p className="font-bold text-lg mt-1">Total Cost: ₦{totalCost.toLocaleString()}</p>
         </div>
@@ -326,3 +363,5 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    

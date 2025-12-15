@@ -24,9 +24,10 @@
             }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "creatorId": { "type": "string" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap"]
+      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap", "creatorId"]
     },
     "activity": {
       "title": "Activity",
@@ -88,3 +89,5 @@
     }
   }
 }
+
+    
