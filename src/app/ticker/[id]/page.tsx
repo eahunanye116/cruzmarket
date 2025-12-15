@@ -263,3 +263,5 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
+    

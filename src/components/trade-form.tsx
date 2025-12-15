@@ -99,13 +99,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
 
-  // Simple Linear Model Calculations
+  // Bonding Curve Calculations
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountToBuy || ngnAmountToBuy <= 0 || !ticker || ticker.marketCap <= 0) return 0;
     
     const newMarketCap = ticker.marketCap + ngnAmountToBuy;
-    const priceChangeFactor = newMarketCap / ticker.marketCap;
-    const newPrice = ticker.price * priceChangeFactor;
+    const newPrice = newMarketCap / ticker.supply; // Price after buy
     const avgPrice = (ticker.price + newPrice) / 2;
 
     return ngnAmountToBuy / avgPrice;
@@ -113,14 +112,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const ngnToReceive = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.marketCap <= 0) return 0;
-
-    const newMarketCap = ticker.marketCap * ((ticker.supply - tokenAmountToSell) / ticker.supply);
-    const priceChangeFactor = newMarketCap / ticker.marketCap;
-    const newPrice = ticker.price * priceChangeFactor;
-    const avgPrice = (ticker.price + newPrice) / 2;
-    
-    return tokenAmountToSell * avgPrice;
-  }, [tokenAmountToSell, ticker.marketCap, ticker.price, ticker.supply]);
+    return calculateReclaimableValue(tokenAmountToSell, ticker);
+  }, [tokenAmountToSell, ticker]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
@@ -152,12 +145,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
             
-            const newMarketCap = currentTickerData.marketCap * ((currentTickerData.supply - tokenAmount) / currentTickerData.supply);
-            const newPrice = newMarketCap / (currentTickerData.supply - tokenAmount);
-            const avgPrice = (currentTickerData.price + newPrice) / 2;
-            const ngnOut = tokenAmount * avgPrice;
-
+            const ngnOut = calculateReclaimableValue(tokenAmount, currentTickerData);
             if (ngnOut <= 0) throw new Error("Cannot receive zero or negative NGN.");
+
+            const newMarketCap = currentTickerData.marketCap - ngnOut;
+            const newSupply = currentTickerData.supply + tokenAmount;
+            const newPrice = newMarketCap / newSupply;
            
             const newBalance = userDoc.data().balance + ngnOut;
             transaction.update(userRef, { balance: newBalance });
@@ -173,6 +166,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             transaction.update(tickerRef, { 
                 price: newPrice,
                 marketCap: newMarketCap,
+                supply: newSupply,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
                     price: newPrice,
@@ -232,13 +226,17 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
 
-            const priceChangeFactor = (currentTickerData.marketCap + ngnAmount) / currentTickerData.marketCap;
-            const newPrice = currentTickerData.price * priceChangeFactor;
+            const newMarketCap = currentTickerData.marketCap + ngnAmount;
+            const newPrice = newMarketCap / currentTickerData.supply;
             const avgPriceDuringBuy = (currentTickerData.price + newPrice) / 2;
             const tokensOut = ngnAmount / avgPriceDuringBuy;
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
+            if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
             
+            const newSupply = currentTickerData.supply - tokensOut;
+            const finalPrice = newMarketCap / newSupply;
+
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
@@ -268,11 +266,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             }
 
              transaction.update(tickerRef, { 
-                price: newPrice,
-                marketCap: currentTickerData.marketCap + ngnAmount,
+                price: finalPrice,
+                marketCap: newMarketCap,
+                supply: newSupply,
                 chartData: arrayUnion({
                     time: new Date().toISOString(),
-                    price: newPrice,
+                    price: finalPrice,
                     volume: ngnAmount
                 })
              });
@@ -455,3 +454,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    

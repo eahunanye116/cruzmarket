@@ -47,13 +47,13 @@ const formSchema = z.object({
   }).max(200, {
     message: "Description must not exceed 200 characters.",
   }),
-  supply: z.coerce.number().positive({
-    message: "Initial supply must be a positive number.",
-  }),
+  supply: z.coerce.number()
+    .min(1000000, { message: "Supply must be at least 1,000,000."})
+    .max(1000000000000, { message: "Supply cannot exceed 1 trillion."}),
   initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
     message: "Please select a valid market cap option.",
   }),
-  initialBuyNgn: z.coerce.number().nonnegative().optional(),
+  initialBuyNgn: z.coerce.number().min(1000, { message: "Minimum initial buy is ₦1,000."}).optional(),
 });
 
 export function CreateTickerForm() {
@@ -70,7 +70,7 @@ export function CreateTickerForm() {
       description: "",
       supply: 1000000000,
       initialMarketCap: '100000',
-      initialBuyNgn: 0,
+      initialBuyNgn: 1000,
     },
   });
   
@@ -321,7 +321,7 @@ export function CreateTickerForm() {
                 <Input type="number" placeholder="1000000000" {...field} />
               </FormControl>
               <FormDescription>
-                The total number of tokens that will ever exist. This cannot be changed.
+                The total number of tokens that will ever exist. (Min: 1M, Max: 1T).
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -334,10 +334,10 @@ export function CreateTickerForm() {
             <FormItem>
               <FormLabel>Initial Buy (Optional)</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
+                <Input type="number" placeholder="1000" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
               </FormControl>
               <FormDescription>
-                Amount in NGN to automatically buy upon creation, making you the first buyer.
+                Amount in NGN to automatically buy upon creation, making you the first buyer. Min ₦1,000.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -360,3 +360,5 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    
