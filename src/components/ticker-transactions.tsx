@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import type { Activity } from '@/lib/types';
@@ -81,7 +82,7 @@ export function TickerTransactions({ activities }: { activities: Activity[] }) {
                   {activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}
+                  {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
                 </TableCell>
               </TableRow>
             )) : (
