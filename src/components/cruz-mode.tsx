@@ -1,3 +1,4 @@
+
 'use client';
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
@@ -5,6 +6,8 @@ import { TickerChangeBadge } from './ticker-change-badge';
 import { Button } from './ui/button';
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
+import { useMemo } from 'react';
+import { sub } from 'date-fns';
 
 function isValidUrl(url: string) {
     try {
@@ -18,6 +21,43 @@ function isValidUrl(url: string) {
 
 export function CruzMode({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
+
+  const change24h = useMemo(() => {
+    if (!ticker.chartData || ticker.chartData.length < 1) {
+      return 0;
+    }
+
+    const now = new Date();
+    const currentPrice = ticker.price;
+    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
+    const earliestDataPoint = ticker.chartData[0];
+    
+    const findPastPrice = () => {
+      const targetMinutes = 24 * 60;
+      const targetTime = sub(now, { minutes: targetMinutes });
+
+      if (tickerCreationTime > targetTime) {
+          return earliestDataPoint.price;
+      }
+      
+      let closestDataPoint = null;
+      for (const dataPoint of ticker.chartData) {
+          const dataPointTime = new Date(dataPoint.time);
+          if (dataPointTime <= targetTime) {
+              closestDataPoint = dataPoint;
+          } else {
+              break; 
+          }
+      }
+      
+      return (closestDataPoint || earliestDataPoint).price;
+    };
+    
+    const pastPrice = findPastPrice();
+    
+    if (pastPrice === null || pastPrice === 0) return 0;
+    return ((currentPrice - pastPrice) / pastPrice) * 100;
+  }, [ticker]);
 
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 bg-card">
@@ -63,7 +103,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
         <div className="my-6 flex items-center gap-4">
             <div className="text-center">
                 <p className="font-bold text-lg">24h Change</p>
-                <TickerChangeBadge ticker={ticker} period="24h" />
+                <TickerChangeBadge change={change24h} />
             </div>
              <div className="text-center">
                 <p className="font-bold text-lg">Market Cap</p>
@@ -80,3 +120,5 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
     </section>
   );
 }
+
+    

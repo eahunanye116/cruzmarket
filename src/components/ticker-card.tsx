@@ -1,9 +1,12 @@
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Ticker } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { TickerChangeBadge } from './ticker-change-badge';
+import { useMemo } from 'react';
+import { sub } from 'date-fns';
 
 function isValidUrl(url: string) {
     try {
@@ -15,8 +18,44 @@ function isValidUrl(url: string) {
 }
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
-
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
+
+  const change24h = useMemo(() => {
+    if (!ticker.chartData || ticker.chartData.length < 1) {
+      return 0;
+    }
+
+    const now = new Date();
+    const currentPrice = ticker.price;
+    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
+    const earliestDataPoint = ticker.chartData[0];
+    
+    const findPastPrice = () => {
+      const targetMinutes = 24 * 60;
+      const targetTime = sub(now, { minutes: targetMinutes });
+
+      if (tickerCreationTime > targetTime) {
+          return earliestDataPoint.price;
+      }
+      
+      let closestDataPoint = null;
+      for (const dataPoint of ticker.chartData) {
+          const dataPointTime = new Date(dataPoint.time);
+          if (dataPointTime <= targetTime) {
+              closestDataPoint = dataPoint;
+          } else {
+              break; 
+          }
+      }
+      
+      return (closestDataPoint || earliestDataPoint).price;
+    };
+    
+    const pastPrice = findPastPrice();
+    
+    if (pastPrice === null || pastPrice === 0) return 0;
+    return ((currentPrice - pastPrice) / pastPrice) * 100;
+  }, [ticker]);
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group block">
@@ -39,9 +78,11 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                 ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
             </div>
           </div>
-          <TickerChangeBadge ticker={ticker} period="24h" />
+          <TickerChangeBadge change={change24h} />
         </CardContent>
       </Card>
     </Link>
   );
 }
+
+    

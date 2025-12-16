@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInMinutes, sub, formatDistanceToNow } from 'date-fns';
+import { sub, formatDistanceToNow } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
@@ -296,3 +296,5 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
+    
