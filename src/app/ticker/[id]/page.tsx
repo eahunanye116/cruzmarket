@@ -2,7 +2,6 @@
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useFirestore } from '@/firebase';
@@ -128,7 +127,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   }
   
   const tokenAge = formatDistanceToNow(ticker.createdAt.toDate(), { addSuffix: true }).replace('about ', '');
-  const icon = PlaceHolderImages.find((img) => img.id === ticker.icon);
 
   const stats = [
     { label: 'Market Cap', value: `₦${(ticker?.marketCap ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
@@ -143,14 +141,13 @@ export default function TickerPage({ params }: { params: { id: string } }) {
            <Card className="h-full">
              <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
-                    {icon && (
+                    {ticker.icon && (
                         <Image
-                            src={icon.imageUrl}
+                            src={ticker.icon}
                             alt={`${ticker.name} icon`}
                             width={80}
                             height={80}
-                            className="rounded-none border-2 border-primary mb-4 sm:mb-0"
-                            data-ai-hint={icon.imageHint}
+                            className="rounded-none border-2 border-primary mb-4 sm:mb-0 aspect-square object-cover"
                         />
                     )}
                     <div className="flex-1">
@@ -263,5 +260,3 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
-    

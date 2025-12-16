@@ -9,7 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -154,19 +153,17 @@ export default function PortfolioPage() {
           <TableBody>
             {enrichedPortfolio.map((holding) => {
               if (!holding) return null;
-              const icon = PlaceHolderImages.find((img) => img.id === holding.ticker.icon);
               return (
                 <TableRow key={holding.tickerId}>
                   <TableCell>
                     <div className="flex items-center gap-4">
-                      {icon && (
+                      {holding.ticker.icon && (
                         <Image
-                          src={icon.imageUrl}
+                          src={holding.ticker.icon}
                           alt={holding.ticker.name}
                           width={32}
                           height={32}
-                          className="rounded-none border-2"
-                          data-ai-hint={icon.imageHint}
+                          className="rounded-none border-2 aspect-square object-cover"
                         />
                       )}
                       <div>

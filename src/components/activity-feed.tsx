@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import type { Activity } from '@/lib/types';
 import { Sparkles, Minus, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -55,18 +54,16 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
       <CardContent>
         <ul className="space-y-4">
           {activities.map((activity) => {
-            const icon = PlaceHolderImages.find((img) => img.id === activity.tickerIcon);
             return (
               <li key={activity.id} className="flex items-center gap-4">
                 <div className="flex-shrink-0">
-                  {icon ? (
+                  {activity.tickerIcon ? (
                     <Image
-                      src={icon.imageUrl}
+                      src={activity.tickerIcon}
                       alt={activity.tickerName}
                       width={40}
                       height={40}
-                      className="rounded-none border-2"
-                      data-ai-hint={icon.imageHint}
+                      className="rounded-none border-2 aspect-square object-cover"
                     />
                   ) : (
                     <div className="h-10 w-10 border-2 bg-muted"></div>

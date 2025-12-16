@@ -9,12 +9,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Ban, History, Plus, Minus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { Activity } from '@/lib/types';
+import { Activity, Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -42,6 +41,21 @@ export default function TransactionsPage() {
   }, [user, firestore]);
   
   const { data: activities, loading } = useCollection<Activity>(activitiesQuery);
+  
+  const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
+  const { data: tickers } = useCollection<Ticker>(tickersQuery);
+
+  const enrichedActivities = useMemo(() => {
+    if (!activities || !tickers) return [];
+    return activities.map(activity => {
+      const ticker = tickers.find(t => t.id === activity.tickerId);
+      return {
+        ...activity,
+        tickerIcon: ticker?.icon || '',
+      };
+    });
+  }, [activities, tickers]);
+
 
   if (!user && !loading) {
     return (
@@ -90,7 +104,7 @@ export default function TransactionsPage() {
                 ))}
               </TableBody>
             </Table>
-          ) : activities && activities.length > 0 ? (
+          ) : enrichedActivities && enrichedActivities.length > 0 ? (
             <Table>
             <TableHeader>
                 <TableRow>
@@ -101,20 +115,18 @@ export default function TransactionsPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {activities.map((activity) => {
-                const icon = PlaceHolderImages.find((img) => img.id === activity.tickerIcon);
+                {enrichedActivities.map((activity) => {
                 return (
                     <TableRow key={activity.id}>
                     <TableCell>
                         <div className="flex items-center gap-4">
-                        {icon && (
+                        {activity.tickerIcon && (
                             <Image
-                            src={icon.imageUrl}
+                            src={activity.tickerIcon}
                             alt={activity.tickerName}
                             width={32}
                             height={32}
-                            className="rounded-none border-2"
-                            data-ai-hint={icon.imageHint}
+                            className="rounded-none border-2 aspect-square object-cover"
                             />
                         )}
                         <div>

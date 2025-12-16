@@ -21,7 +21,6 @@ import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch, arrayUnion } from "firebase/firestore";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
@@ -42,6 +41,7 @@ const formSchema = z.object({
   }).max(20, {
     message: "Ticker name must not exceed 20 characters.",
   }),
+  icon: z.string().url({ message: "Please enter a valid image URL." }),
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
   }).max(200, {
@@ -67,6 +67,7 @@ export function CreateTickerForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      icon: "",
       description: "",
       supply: 1000000000,
       initialMarketCap: '100000',
@@ -89,7 +90,6 @@ export function CreateTickerForm() {
     setIsSubmitting(true);
     
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
-    const randomIcon = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
     
     const initialMarketCap = Number(values.initialMarketCap);
     const initialPrice = initialMarketCap / values.supply;
@@ -101,7 +101,7 @@ export function CreateTickerForm() {
       supply: values.supply,
       marketCap: initialMarketCap,
       price: initialPrice,
-      icon: randomIcon.id,
+      icon: values.icon,
       chartData: [], 
       creatorId: user.uid,
     };
@@ -190,7 +190,7 @@ export function CreateTickerForm() {
         type: 'CREATE',
         tickerId: newTickerDocRef.id,
         tickerName: values.name,
-        tickerIcon: randomIcon.id,
+        tickerIcon: values.icon,
         value: 0,
         userId: user.uid,
         createdAt: serverTimestamp(),
@@ -201,7 +201,7 @@ export function CreateTickerForm() {
           type: 'BUY',
           tickerId: newTickerDocRef.id,
           tickerName: values.name,
-          tickerIcon: randomIcon.id,
+          tickerIcon: values.icon,
           value: initialBuyNgn,
           userId: user.uid,
           createdAt: serverTimestamp(),
@@ -258,6 +258,22 @@ export function CreateTickerForm() {
               </FormControl>
               <FormDescription>
                 The unique name of your meme ticker.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="icon"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Icon URL</FormLabel>
+              <FormControl>
+                <Input placeholder="https://example.com/image.png" {...field} />
+              </FormControl>
+              <FormDescription>
+                The public URL of the image for your token.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -360,5 +376,3 @@ export function CreateTickerForm() {
     </Form>
   );
 }
-
-    
