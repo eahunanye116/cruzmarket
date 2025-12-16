@@ -1,4 +1,5 @@
 
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
       const targetTime = sub(now, { minutes: targetMinutes });
 
       if (tickerCreationTime > targetTime) {
+          if (earliestDataPoint.price === 0) return null;
           return earliestDataPoint.price;
       }
       
@@ -48,7 +50,10 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
           }
       }
       
-      return (closestDataPoint || earliestDataPoint).price;
+      const priceToCompare = closestDataPoint || earliestDataPoint;
+
+      if (priceToCompare.price === 0) return null;
+      return priceToCompare.price;
     };
     
     const pastPrice = findPastPrice();
@@ -84,5 +89,3 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
     </Link>
   );
 }
-
-    
