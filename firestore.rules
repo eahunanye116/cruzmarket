@@ -17,8 +17,8 @@ service cloud.firestore {
     // Tickers can be read by anyone, but only created by signed-in users.
     // Updates and deletes are disallowed for now to prevent tampering.
     match /tickers/{tickerId} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
+      allow read, update: if true;
+      allow create: if isSignedIn();
       allow delete: if false;
     }
 
