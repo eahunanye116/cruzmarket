@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore } from '@/firebase';
@@ -19,7 +20,7 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
     );
   }, [firestore, ticker]);
 
-  const { data: holdings, loading } = useCollection<PortfolioHolding>(holdingsQuery);
+  const { data: holdings, loading } = useCollection<PortfolioHolding>(holdingsQuery, `portfolio`);
 
   const analysis = useMemo(() => {
     const emptyAnalysis = {

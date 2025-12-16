@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onSnapshot, Query, FirestoreError, getDocs, queryEqual, collection } from 'firebase/firestore';
+import { onSnapshot, Query, FirestoreError, getDocs, queryEqual } from 'firebase/firestore';
 import { useFirestore } from '..';
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
@@ -29,6 +30,7 @@ const useMemoizedQuery = (query: Query | null) => {
 
 export function useCollection<T>(
   query: Query | null,
+  path: string, // Require path for robust error handling
   options: UseCollectionOptions = { listen: true }
 ) {
   const [data, setData] = useState<T[] | null>(null);
@@ -47,8 +49,6 @@ export function useCollection<T>(
     setLoading(true);
 
     const handlePermissionError = (err: FirestoreError) => {
-        // Access the internal _query property to reliably get the path.
-        const path = (memoizedQuery as any)._query?.path?.segments?.join('/') || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: `/${path}`,
           operation: 'list',
@@ -82,7 +82,7 @@ export function useCollection<T>(
         });
     }
 
-  }, [memoizedQuery, firestore, options.listen]);
+  }, [memoizedQuery, firestore, options.listen, path]);
 
   return { data, loading, error };
 }

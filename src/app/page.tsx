@@ -17,10 +17,10 @@ export default function Home() {
   const firestore = useFirestore();
 
   const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
-  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
+  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery, 'tickers');
   
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
-  const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery);
+  const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery, 'activities');
   
   const kingTicker = useMemo(() => {
     if (!tickers) return null;
@@ -36,6 +36,7 @@ export default function Home() {
   const trendingTickers = useMemo(() => {
     if (!tickers) return [];
     
+    // Sort by trendingScore, but handle cases where it might be undefined or null
     const sortedByTrend = [...tickers].sort((a, b) => (b.trendingScore || 0) - (a.trendingScore || 0));
 
     // Filter out the king and take the next 3 trending
@@ -63,4 +64,3 @@ export default function Home() {
     </div>
   );
 }
-

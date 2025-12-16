@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore } from '@/firebase';
 import {
@@ -40,10 +41,10 @@ export default function TransactionsPage() {
     return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
   }, [user, firestore]);
   
-  const { data: activities, loading } = useCollection<Activity>(activitiesQuery);
+  const { data: activities, loading } = useCollection<Activity>(activitiesQuery, 'activities');
   
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
-  const { data: tickers } = useCollection<Ticker>(tickersQuery);
+  const { data: tickers } = useCollection<Ticker>(tickersQuery, 'tickers');
 
   const enrichedActivities = useMemo(() => {
     if (!activities || !tickers) return [];

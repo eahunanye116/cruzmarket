@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,16 +24,19 @@ export function useDoc<T>(
 
   useEffect(() => {
     if (!memoizedDocRef || !firestore) {
+      setData(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     
-    const handlePermissionError = () => {
+    const handlePermissionError = (err: FirestoreError) => {
       const permissionError = new FirestorePermissionError({
         path: memoizedDocRef.path,
         operation: 'get',
       });
+      setError(err);
+      setLoading(false);
       errorEmitter.emit('permission-error', permissionError);
     }
 
@@ -44,10 +48,9 @@ export function useDoc<T>(
           setData(null);
         }
         setLoading(false);
+        setError(null);
       }, (err) => {
-        setError(err);
-        setLoading(false);
-        handlePermissionError();
+        handlePermissionError(err);
       });
 
       return () => unsubscribe();
@@ -60,11 +63,10 @@ export function useDoc<T>(
             setData(null);
           }
           setLoading(false);
+          setError(null);
         })
         .catch(err => {
-          setError(err);
-          setLoading(false);
-          handlePermissionError();
+          handlePermissionError(err);
         });
     }
 

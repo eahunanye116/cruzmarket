@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore } from '@/firebase';
 import {
@@ -23,11 +24,12 @@ export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
 
-  const portfolioQuery = user ? query(collection(firestore, `users/${user.uid}/portfolio`)) : null;
-  const { data: portfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
+  const portfolioPath = user ? `users/${user.uid}/portfolio` : '';
+  const portfolioQuery = user ? query(collection(firestore, portfolioPath)) : null;
+  const { data: portfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery, portfolioPath);
 
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
-  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
+  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery, 'tickers');
 
   const enrichedPortfolio = useMemo(() => {
     if (!portfolio || !tickers) return [];
