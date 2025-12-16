@@ -4,13 +4,25 @@ import { Card, CardFooter } from '@/components/ui/card';
 import type { Ticker } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+function isValidUrl(url: string) {
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 export function TickerCard({ ticker }: { ticker: Ticker }) {
+
+  const hasValidCover = ticker.coverImage && isValidUrl(ticker.coverImage);
+  const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group block">
       <Card className="h-full overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1 flex flex-col">
         <div className="relative w-full h-24">
-            {ticker.coverImage ? (
+            {hasValidCover ? (
                 <>
                     <Image
                         src={ticker.coverImage}
@@ -27,7 +39,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
         <div className="flex-1 flex flex-col justify-between p-4 pt-0">
           <div>
             <div className="relative -mt-8 mb-2">
-                {ticker.icon ? (
+                {hasValidIcon ? (
                     <Image
                         src={ticker.icon}
                         alt={`${ticker.name} icon`}
@@ -36,7 +48,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                         className="rounded-none border-4 border-background aspect-square object-cover bg-card"
                     />
                 ) : (
-                    <div className="h-[64px] w-[64px] rounded-none border-4 border-background bg-card"></div>
+                    <div className="h-[64px] w-[64px] rounded-none border-4 border-background bg-card bg-muted"></div>
                 )}
             </div>
             <div className="font-headline text-lg font-bold">${ticker.name}</div>
