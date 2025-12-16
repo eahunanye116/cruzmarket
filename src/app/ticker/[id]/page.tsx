@@ -19,6 +19,14 @@ import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
 import { TokenAnalysis } from '@/components/token-analysis';
 
+function isValidUrl(url: string) {
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 export default function TickerPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
@@ -134,6 +142,9 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: 'Circulating Supply', value: `${(ticker?.supply ?? 0).toLocaleString()}` },
   ];
+  
+  const hasValidCover = ticker.coverImage && isValidUrl(ticker.coverImage);
+  const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -141,17 +152,21 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         <div className="lg:col-span-2">
            <Card className="h-full overflow-hidden">
             <div className="relative h-48 w-full">
-                 <Image
-                    src={ticker.coverImage}
-                    alt={`${ticker.name} cover image`}
-                    fill
-                    className="object-cover"
-                />
+                 {hasValidCover ? (
+                    <Image
+                        src={ticker.coverImage}
+                        alt={`${ticker.name} cover image`}
+                        fill
+                        className="object-cover"
+                    />
+                 ) : (
+                    <div className="absolute inset-0 bg-muted"></div>
+                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
             </div>
              <CardHeader className="relative -mt-16 sm:-mt-20 p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-end sm:gap-6">
-                    {ticker.icon && (
+                    {hasValidIcon ? (
                         <Image
                             src={ticker.icon}
                             alt={`${ticker.name} icon`}
@@ -159,6 +174,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                             height={100}
                             className="rounded-none border-4 border-background aspect-square object-cover bg-background"
                         />
+                    ) : (
+                        <div className="h-[100px] w-[100px] rounded-none border-4 border-background bg-background bg-muted"></div>
                     )}
                     <div className="flex-1 mt-4 sm:mt-0">
                         <div className="flex items-center gap-3">
