@@ -8,7 +8,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
   title: 'CruiseMarket',
-  description: 'The premier market for meme tickers.',
+  description: 'The premier battleground for meme tickers. Create, trade, and conquer the market.',
 };
 
 const comicNeue = Comic_Neue({
