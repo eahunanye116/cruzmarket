@@ -28,7 +28,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           muted
           playsInline
           className="w-full h-full object-cover"
-          src="https://streamable.com/e/y9w52g?autoplay=1&muted=1&loop=1"
+          src="https://streamable.com/e/pajpzq?autoplay=1&muted=1&loop=1"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-card to-card/50"></div>
       </div>
