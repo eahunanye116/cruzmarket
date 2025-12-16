@@ -16,7 +16,7 @@ export function cn(...inputs: ClassValue[]) {
  * @returns The estimated NGN to be received.
  */
 export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): number {
-  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0 || ticker.supply <= -1) { // Allow 0 supply
+  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0 || ticker.supply <= 0) {
     return 0;
   }
   
@@ -32,3 +32,5 @@ export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): 
 
   return ngnOut > 0 ? ngnOut : 0;
 };
+
+    

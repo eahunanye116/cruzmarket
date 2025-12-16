@@ -180,7 +180,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const k = currentTickerData.marketCap * currentTickerData.supply;
             const newSupply = currentTickerData.supply + tokenAmount;
             const newMarketCap = k / newSupply;
-            const newPrice = k / (newSupply * newSupply);
+            const newPrice = newMarketCap / newSupply;
            
             const newBalance = userDoc.data().balance + ngnToUser;
             transaction.update(userRef, { balance: newBalance });
@@ -266,13 +266,14 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const currentTickerData = tickerDoc.data();
 
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
-            const k = currentTickerData.marketCap * currentTickerData.supply;
             
+            // --- CORE MATH CORRECTION ---
+            const k = currentTickerData.marketCap * currentTickerData.supply;
             const newMarketCap = currentTickerData.marketCap + ngnForCurve;
             const newSupply = k / newMarketCap;
-            const finalPrice = k / (newSupply * newSupply);
             const tokensOut = currentTickerData.supply - newSupply;
-
+            const finalPrice = newMarketCap / newSupply; // Corrected Price Calculation
+            // --- END CORRECTION ---
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
             if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
@@ -284,7 +285,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
-             const effectivePricePerToken = ngnForCurve / tokensOut;
+            const effectivePricePerToken = ngnForCurve / tokensOut;
 
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
@@ -524,3 +525,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
