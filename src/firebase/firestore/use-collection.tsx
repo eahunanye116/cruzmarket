@@ -48,7 +48,7 @@ export function useCollection<T>(
 
     const handlePermissionError = (err: FirestoreError) => {
         // Access the internal _query property to reliably get the path.
-        const path = (memoizedQuery as any)._query?.path?.segments.join('/') || 'unknown path';
+        const path = (memoizedQuery as any)._query?.path?.segments?.join('/') || 'unknown path';
         const permissionError = new FirestorePermissionError({
           path: `/${path}`,
           operation: 'list',
