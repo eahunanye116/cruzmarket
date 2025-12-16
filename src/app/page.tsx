@@ -34,6 +34,7 @@ export default function Home() {
       return;
     }
 
+    // The challenger is always the contender with the highest market cap
     const challenger = contenders.sort((a, b) => b.marketCap - a.marketCap)[0];
 
     if (!kingTicker) {
@@ -42,20 +43,22 @@ export default function Home() {
       setKingCoronationTime(new Date());
     } else {
       const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
       
-      const reignIsOver = kingCoronationTime ? kingCoronationTime < fiveMinutesAgo : false;
-      
-      // If the current king is no longer a contender (e.g. market cap dropped)
+      // Check if the current king is still a contender
       const kingIsStillContender = contenders.some(c => c.id === kingTicker.id);
-      if(!kingIsStillContender) {
+      if (!kingIsStillContender) {
+        // If king's market cap dropped below 1M, dethrone immediately
         setKingTicker(challenger);
         setKingCoronationTime(new Date());
         return;
       }
-
-      // Dethrone if reign is over AND challenger is stronger
-      if (reignIsOver && challenger.marketCap > kingTicker.marketCap) {
+      
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      const reignIsOver = kingCoronationTime ? kingCoronationTime < fiveMinutesAgo : false;
+      
+      // If reign is over, the top challenger takes the throne, even if their market cap is lower than the old king's.
+      // We also check if the challenger is a new king to avoid resetting the coronation time unnecessarily.
+      if (reignIsOver && challenger.id !== kingTicker.id) {
         setKingTicker(challenger);
         setKingCoronationTime(new Date());
       }
