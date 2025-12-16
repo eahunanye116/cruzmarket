@@ -158,7 +158,7 @@ export function CreateTickerForm() {
         });
         
         const now = new Date();
-        const beforeTime = new Date(now.getTime() - 1000).toISOString();
+        const beforeTime = new Date(now.getTime() - (12 * 60 * 1000)).toISOString();
         
         finalTickerData.chartData.push({
             time: beforeTime,
