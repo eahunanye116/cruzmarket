@@ -9,6 +9,7 @@ import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Ticker, Activity } from '@/lib/types';
+import { CruzMode } from '@/components/cruz-mode';
 
 
 export default function Home() {
@@ -17,20 +18,21 @@ export default function Home() {
   const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
   
-  // Note: Since 'change24h' is removed, we sort trending by creation date for now.
-  // This should be updated when dynamic stats are calculated.
-  const trendingTickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc'), limit(3)) : null;
+  const trendingTickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('trendingScore', 'desc'), limit(4)) : null;
   const { data: trendingTickers, loading: trendingLoading } = useCollection<Ticker>(trendingTickersQuery);
   
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
   const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery);
 
+  const kingTicker = trendingTickers?.[0];
+  const otherTrendingTickers = trendingTickers?.slice(1) || [];
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+       {trendingLoading ? <Skeleton className="h-72 mb-12" /> : kingTicker && <CruzMode ticker={kingTicker} />}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-12">
         <div className="lg:col-span-2">
-          {trendingLoading ? <Skeleton className="h-24" /> : <TrendingSection trendingTickers={trendingTickers || []} />}
+          {trendingLoading ? <Skeleton className="h-24" /> : <TrendingSection trendingTickers={otherTrendingTickers} />}
           <div className="mt-12">
             <h2 className="text-3xl font-bold tracking-tight font-headline mb-6">All Meme Tickers</h2>
             {tickersLoading ? <Skeleton className="h-96" /> : <TickerList tickers={tickers || []} />}
