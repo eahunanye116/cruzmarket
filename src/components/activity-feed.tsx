@@ -5,6 +5,15 @@ import { Sparkles, Minus, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 
+function isValidUrl(url: string) {
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
     case 'BUY':
@@ -54,10 +63,11 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
       <CardContent>
         <ul className="space-y-4">
           {activities.map((activity) => {
+            const hasValidIcon = activity.tickerIcon && isValidUrl(activity.tickerIcon);
             return (
               <li key={activity.id} className="flex items-center gap-4">
                 <div className="flex-shrink-0">
-                  {activity.tickerIcon ? (
+                  {hasValidIcon ? (
                     <Image
                       src={activity.tickerIcon}
                       alt={activity.tickerName}
@@ -77,7 +87,7 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                        <ActivityIcon type={activity.type}/>
                        <span className="ml-1">{activity.type}</span>
                      </Badge>
-                     <p className="text-xs text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</p>
+                     <p className="text-xs text-muted-foreground">{activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}</p>
                    </div>
                   <ActivityText activity={activity} />
                 </div>
