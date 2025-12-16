@@ -68,29 +68,36 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     const tickerAgeInMinutes = ticker.createdAt ? differenceInMinutes(now, ticker.createdAt.toDate()) : 0;
     
     const findPastPrice = (targetMinutes: number) => {
-      // If the ticker is younger than the target timeframe, use the earliest price for comparison.
       const earliestDataPoint = ticker.chartData[0];
+      
+      // If the ticker is younger than the target timeframe, always use the very first price.
       if (tickerAgeInMinutes < targetMinutes) {
-        if (earliestDataPoint.price === 0) return null; // Avoid division by zero
+        if (earliestDataPoint.price === 0) return null;
         return earliestDataPoint.price;
       }
       
       const targetTime = sub(now, { minutes: targetMinutes });
       
-      // Find the data point closest to the target time in the past.
-      let closestDataPoint = ticker.chartData.reduce((prev, curr) => {
-        const currDate = new Date(curr.time);
-        const prevDate = new Date(prev.time);
-        if (currDate > targetTime) return prev; // Only consider points in the past
-        
-        const currDiff = Math.abs(targetTime.getTime() - currDate.getTime());
-        const prevDiff = Math.abs(targetTime.getTime() - prevDate.getTime());
-        
-        return currDiff < prevDiff ? curr : prev;
-      });
+      // Find the data point that is closest to but not after the target time.
+      let closestDataPoint = null;
+      let minDiff = Infinity;
 
-      if (closestDataPoint.price === 0) return null; // Avoid division by zero
-      return closestDataPoint.price;
+      for (const dataPoint of ticker.chartData) {
+          const dataPointTime = new Date(dataPoint.time);
+          if (dataPointTime <= targetTime) {
+              const diff = targetTime.getTime() - dataPointTime.getTime();
+              if (diff < minDiff) {
+                  minDiff = diff;
+                  closestDataPoint = dataPoint;
+              }
+          }
+      }
+      
+      // If no point is found (e.g., all points are newer), fallback to earliest
+      const priceToCompare = closestDataPoint || earliestDataPoint;
+
+      if (priceToCompare.price === 0) return null; // Avoid division by zero
+      return priceToCompare.price;
     };
     
     const price10mAgo = findPastPrice(10);
@@ -299,3 +306,5 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
+    
