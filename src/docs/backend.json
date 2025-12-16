@@ -1,0 +1,96 @@
+
+{
+  "entities": {
+    "ticker": {
+      "title": "Ticker",
+      "description": "Represents a meme ticker available for trading.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "tickerAddress": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "price": { "type": "number" },
+        "supply": { "type": "number" },
+        "marketCap": { "type": "number" },
+        "chartData": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "time": { "type": "string", "format": "date" },
+              "price": { "type": "number" },
+              "volume": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "creatorId": { "type": "string" },
+        "trendingScore": { "type": "number" },
+        "volume24h": { "type": "number" },
+        "priceChange24h": { "type": "number" }
+      },
+      "required": ["name", "slug", "tickerAddress", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Represents a single trading or creation event in the activity feed.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE"] },
+        "tickerName": { "type": "string" },
+        "tickerIcon": { "type": "string" },
+        "value": { "type": "number" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
+    },
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores public information about a user.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "balance": { "type": "number" }
+      },
+      "required": ["email", "balance"]
+    },
+    "portfolioHolding": {
+      "title": "Portfolio Holding",
+      "description": "Represents a user's holding of a specific ticker.",
+      "type": "object",
+      "properties": {
+        "tickerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "avgBuyPrice": { "type": "number" }
+      },
+      "required": ["tickerId", "amount", "avgBuyPrice"]
+    }
+  },
+  "auth": {
+    "providers": ["email"]
+  },
+  "firestore": {
+    "/tickers/{tickerId}": {
+      "schema": { "$ref": "#/entities/ticker" },
+      "description": "Collection of all available meme tickers."
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/activity" },
+      "description": "Collection of all user activities for the live feed."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/userProfile" },
+      "description": "Collection of all user profiles."
+    },
+    "/users/{userId}/portfolio/{holdingId}": {
+      "schema": { "$ref": "#/entities/portfolioHolding" },
+      "description": "Sub-collection for a user's portfolio holdings."
+    }
+  }
+}

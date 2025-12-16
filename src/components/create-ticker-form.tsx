@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,7 +54,7 @@ const formSchema = z.object({
   initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
     message: "Please select a valid market cap option.",
   }),
-  initialBuyNgn: z.coerce.number().min(1000, { message: "Minimum initial buy is ₦1,000."}).optional(),
+  initialBuyNgn: z.coerce.number().min(1000, { message: "Minimum initial buy is ₦1,000."}),
 });
 
 export function CreateTickerForm() {
@@ -89,15 +88,20 @@ export function CreateTickerForm() {
       toast({ variant: "destructive", title: "Error", description: "You must be signed in to create a ticker." });
       return;
     }
+     if (initialBuyValue < 1000) {
+      form.setError('initialBuyNgn', { message: 'Initial buy must be at least ₦1,000.'});
+      return;
+    }
 
     setIsSubmitting(true);
     
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
-    
     const initialMarketCap = Number(values.initialMarketCap);
-    const initialPrice = initialMarketCap / values.supply;
-
-    const newTickerData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress'> = {
+    
+    const k = initialMarketCap * values.supply;
+    const initialPrice = k / (values.supply * values.supply);
+    
+    const newTickerData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress' | 'trendingScore' | 'volume24h' | 'priceChange24h'> = {
       name: values.name,
       slug,
       description: values.description,
@@ -112,7 +116,6 @@ export function CreateTickerForm() {
 
     const userProfileRef = doc(firestore, "users", user.uid);
     const tickersCollectionRef = collection(firestore, 'tickers');
-    const initialBuyNgn = values.initialBuyNgn || 0;
 
     try {
       const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
@@ -133,36 +136,28 @@ export function CreateTickerForm() {
         const newTickerRef = doc(tickersCollectionRef);
         
         let finalTickerData = { ...newTickerData };
-        let tokensOut = 0;
-        let avgBuyPrice = 0;
+        
+        const ngnForCurve = initialBuyValue - (initialBuyValue * 0.002);
 
-        if (initialBuyNgn > 0) {
-            const currentMarketCap = finalTickerData.marketCap;
-            if (currentMarketCap <= 0) throw new Error("Market cap must be positive.");
+        const newMarketCap = finalTickerData.marketCap + ngnForCurve;
+        const newSupply = k / newMarketCap;
+        const finalPrice = k / (newSupply * newSupply);
+        const tokensOut = finalTickerData.supply - newSupply;
+        
+        const avgBuyPrice = ngnForCurve / tokensOut;
 
-            const priceChangeFactor = (currentMarketCap + initialBuyNgn) / currentMarketCap;
-            const newPrice = finalTickerData.price * priceChangeFactor;
-            
-            const avgPriceDuringBuy = (finalTickerData.price + newPrice) / 2;
-            tokensOut = initialBuyNgn / avgPriceDuringBuy;
-            avgBuyPrice = avgPriceDuringBuy;
+        finalTickerData.price = finalPrice;
+        finalTickerData.marketCap = newMarketCap;
+        finalTickerData.supply = newSupply;
 
-            if (tokensOut <= 0) throw new Error("Initial buy amount is too small.");
-            if (tokensOut > finalTickerData.supply) throw new Error("Not enough tokens in supply for initial buy.");
-            
-            finalTickerData.price = newPrice;
-            finalTickerData.marketCap = currentMarketCap + initialBuyNgn;
-            finalTickerData.supply = finalTickerData.supply - tokensOut;
-
-            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
-            const holdingRef = doc(portfolioColRef);
-            transaction.set(holdingRef, {
-                tickerId: newTickerRef.id,
-                amount: tokensOut,
-                avgBuyPrice: avgBuyPrice,
-                userId: user.uid,
-            });
-        }
+        const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
+        const holdingRef = doc(portfolioColRef);
+        transaction.set(holdingRef, {
+            tickerId: newTickerRef.id,
+            amount: tokensOut,
+            avgBuyPrice: avgBuyPrice,
+            userId: user.uid,
+        });
         
         const now = new Date();
         const beforeTime = new Date(now.getTime() - 1000).toISOString();
@@ -176,13 +171,16 @@ export function CreateTickerForm() {
         finalTickerData.chartData.push({
             time: now.toISOString(),
             price: finalTickerData.price,
-            volume: initialBuyNgn,
+            volume: ngnForCurve,
         });
         
          transaction.set(newTickerRef, {
             ...finalTickerData,
             tickerAddress: `${newTickerRef.id}cruz`,
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            trendingScore: 0,
+            priceChange24h: 0,
+            volume24h: ngnForCurve,
         });
 
         return newTickerRef;
@@ -201,17 +199,15 @@ export function CreateTickerForm() {
         createdAt: serverTimestamp(),
       });
 
-      if (initialBuyNgn > 0) {
-        batch.set(doc(activitiesCollection), {
-          type: 'BUY',
-          tickerId: newTickerDocRef.id,
-          tickerName: values.name,
-          tickerIcon: values.icon,
-          value: initialBuyNgn,
-          userId: user.uid,
-          createdAt: serverTimestamp(),
-        });
-      }
+      batch.set(doc(activitiesCollection), {
+        type: 'BUY',
+        tickerId: newTickerDocRef.id,
+        tickerName: values.name,
+        tickerIcon: values.icon,
+        value: initialBuyValue,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      });
       
       await batch.commit();
       
@@ -221,12 +217,10 @@ export function CreateTickerForm() {
         className: "bg-accent text-accent-foreground border-accent",
       });
 
-       if (initialBuyNgn > 0) {
-        toast({
-          title: "First Purchase Made!",
-          description: `You automatically purchased ₦${initialBuyNgn.toLocaleString()} worth of ${values.name}.`,
-        });
-      }
+      toast({
+        title: "First Purchase Made!",
+        description: `You automatically purchased ₦${initialBuyValue.toLocaleString()} worth of ${values.name}.`,
+      });
 
       form.reset();
       router.push(`/ticker/${newTickerDocRef.id}`);
@@ -369,7 +363,7 @@ export function CreateTickerForm() {
           name="initialBuyNgn"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Initial Buy (Optional)</FormLabel>
+              <FormLabel>Initial Buy</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="1000" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
               </FormControl>

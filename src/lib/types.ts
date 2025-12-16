@@ -16,6 +16,9 @@ export type Ticker = {
   recentActivity?: string;
   createdAt: Timestamp;
   creatorId: string;
+  trendingScore?: number;
+  volume24h?: number;
+  priceChange24h?: number;
 };
 
 export type PortfolioHolding = {

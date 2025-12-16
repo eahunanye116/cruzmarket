@@ -1,5 +1,4 @@
 
-
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -21,7 +20,8 @@ import { TokenAnalysis } from '@/components/token-analysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
-function isValidUrl(url: string) {
+function isValidUrl(url: string | undefined | null): url is string {
+    if (!url) return false;
     try {
         new URL(url);
         return true;
@@ -65,7 +65,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
     const now = new Date();
     const currentPrice = ticker.price;
-    const tickerAgeInMinutes = differenceInMinutes(now, ticker.createdAt.toDate());
+    const tickerAgeInMinutes = ticker.createdAt ? differenceInMinutes(now, ticker.createdAt.toDate()) : 0;
     
     const findPastPrice = (targetMinutes: number) => {
       // If the ticker is younger than the target timeframe, use the earliest price for comparison.
@@ -111,15 +111,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     };
   }, [ticker]);
   
-  const volume24h = useMemo(() => {
-    if (!ticker || !ticker.chartData) return 0;
-
-    const oneDayAgo = sub(new Date(), { days: 1 });
-    return ticker.chartData
-      .filter(data => new Date(data.time) >= oneDayAgo)
-      .reduce((acc, data) => acc + data.volume, 0);
-  }, [ticker]);
-
 
   if (loading) {
     return (
@@ -148,16 +139,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     notFound();
   }
   
-  const tokenAge = formatDistanceToNow(ticker.createdAt.toDate(), { addSuffix: true }).replace('about ', '');
-
+  const tokenAge = ticker.createdAt ? formatDistanceToNow(ticker.createdAt.toDate(), { addSuffix: true }).replace('about ', '') : 'new';
+  const volume24h = ticker.volume24h || 0;
+  
   const stats = [
     { label: 'Market Cap', value: `₦${(ticker?.marketCap ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
-    { label: 'Circulating Supply', value: `${(ticker?.supply ?? 0).toLocaleString()}` },
   ];
   
-  const hasValidCover = ticker.coverImage && isValidUrl(ticker.coverImage);
-  const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
+  const hasValidCover = isValidUrl(ticker.coverImage);
+  const hasValidIcon = isValidUrl(ticker.icon);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

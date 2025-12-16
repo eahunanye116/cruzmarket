@@ -16,36 +16,19 @@ export function cn(...inputs: ClassValue[]) {
  * @returns The estimated NGN to be received.
  */
 export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): number {
-  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0 || ticker.supply <= 0) {
+  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0 || ticker.supply <= -1) { // Allow 0 supply
     return 0;
   }
   
-  // The value you get from selling is the reduction in market cap.
-  // The new market cap is proportional to the square of the supply reduction.
-  // This is a simplified model. A real one would use integration.
-  const currentMC = ticker.marketCap;
-  const currentSupply = ticker.supply;
-  
-  // What the market cap would be if this many tokens were *removed* from the start.
-  // This isn't quite right. Let's use a simpler, more direct price impact model.
-  const sellValueAtCurrentPrice = tokenAmount * ticker.price;
-  
-  // The new market cap after our sell
-  const newMarketCap = currentMC - sellValueAtCurrentPrice;
-  const newSupply = currentSupply + tokenAmount; // supply increases on sell
+  // y = k / x
+  // where y = marketCap, x = supply, k = constant
+  const k = ticker.marketCap * ticker.supply;
+  if (k <= 0) return 0;
 
-  if (newMarketCap <= 0 || newSupply <= currentSupply) {
-    // If the sale would crash the market, you get the remaining market cap
-    return currentMC > 0 ? currentMC : 0;
-  }
-  
-  const newPrice = newMarketCap / newSupply;
-  
-  // The user gets the value based on the average price during their sale
-  const avgPrice = (ticker.price + newPrice) / 2;
-  const ngnOut = tokenAmount * avgPrice;
+  const newSupply = ticker.supply + tokenAmount;
+  const newMarketCap = k / newSupply;
+
+  const ngnOut = ticker.marketCap - newMarketCap;
 
   return ngnOut > 0 ? ngnOut : 0;
 };
-
-    

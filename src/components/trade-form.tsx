@@ -25,8 +25,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { cn } from '@/lib/utils';
-import { calculateReclaimableValue } from '@/lib/utils';
+import { cn, calculateReclaimableValue } from '@/lib/utils';
+import { differenceInMinutes, sub } from 'date-fns';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -37,6 +37,21 @@ const sellSchema = z.object({
 });
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002; // 0.2%
+
+// Helper function to calculate trending score
+const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
+    // Give more weight to volume, but also consider price change.
+    // Normalize or scale these values as needed for your ecosystem.
+    const volumeWeight = 0.7;
+    const priceChangeWeight = 0.3;
+
+    // Use log to temper the effect of huge volumes
+    const volumeScore = Math.log1p(volume24h) * volumeWeight; 
+    // Price change can be negative, let's use its magnitude but favor positive change
+    const priceChangeScore = (priceChange24h > 0 ? priceChange24h : priceChange24h / 2) * priceChangeWeight;
+    
+    return volumeScore + priceChangeScore;
+};
 
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
@@ -113,11 +128,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountForCurve || ngnAmountForCurve <= 0 || !ticker || ticker.marketCap <= 0) return 0;
     
-    const newMarketCap = ticker.marketCap + ngnAmountForCurve;
-    const newPrice = newMarketCap / ticker.supply; // Price after buy
-    const avgPrice = (ticker.price + newPrice) / 2;
-
-    return ngnAmountForCurve / avgPrice;
+    const k = ticker.marketCap * ticker.supply;
+    const newSupply = ticker.supply - (ngnAmountForCurve * ticker.supply) / (ticker.marketCap + ngnAmountForCurve);
+    const tokensOut = ticker.supply - newSupply;
+    
+    return tokensOut;
   }, [ngnAmountForCurve, ticker]);
 
   const ngnToReceiveBeforeFee = useMemo(() => {
@@ -153,7 +168,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
 
     try {
-        const { ngnToUser } = await runTransaction(firestore, async (transaction) => {
+        const { ngnToUser, ngnOutBeforeFee } = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -169,9 +184,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const fee = ngnOutBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnOutBeforeFee - fee;
 
-            const newMarketCap = currentTickerData.marketCap - ngnOutBeforeFee;
+            const k = currentTickerData.marketCap * currentTickerData.supply;
             const newSupply = currentTickerData.supply + tokenAmount;
-            const newPrice = newMarketCap > 0 && newSupply > 0 ? newMarketCap / newSupply : 0;
+            const newMarketCap = k / newSupply;
+            const newPrice = k / (newSupply * newSupply);
            
             const newBalance = userDoc.data().balance + ngnToUser;
             transaction.update(userRef, { balance: newBalance });
@@ -184,12 +200,24 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 transaction.delete(holdingRef);
             }
             
+            // Trending Score Logic
+            const now = new Date();
+            const twentyFourHoursAgo = sub(now, { hours: 24 });
+            const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
+            const price24hAgo = price24hAgoDataPoint?.price || currentTickerData.price;
+            const priceChange24h = price24hAgo > 0 ? ((newPrice - price24hAgo) / price24hAgo) * 100 : 0;
+            const volume24h = (currentTickerData.volume24h || 0) + ngnOutBeforeFee;
+            const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
+
             transaction.update(tickerRef, { 
                 price: newPrice,
                 marketCap: newMarketCap,
                 supply: newSupply,
+                volume24h,
+                priceChange24h,
+                trendingScore,
                 chartData: arrayUnion({
-                    time: new Date().toISOString(),
+                    time: now.toISOString(),
                     price: newPrice,
                     volume: ngnOutBeforeFee
                 })
@@ -205,7 +233,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             tickerId: ticker.id,
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: ngnToUser, // Log the value the user actually received
+            value: ngnOutBeforeFee,
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
@@ -231,7 +259,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     if (!firestore || !user || !userProfile) return;
     setIsSubmitting(true);
     try {
-        const boughtTokens = await runTransaction(firestore, async (transaction) => {
+        const { tokensOut, ngnForCurve, finalPrice } = await runTransaction(firestore, async (transaction) => {
             const ngnAmount = values.ngnAmount;
             const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
             const ngnForCurve = ngnAmount - fee;
@@ -249,18 +277,17 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const currentTickerData = tickerDoc.data();
 
             if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
-
+            const k = currentTickerData.marketCap * currentTickerData.supply;
+            
             const newMarketCap = currentTickerData.marketCap + ngnForCurve;
-            const newPrice = newMarketCap / currentTickerData.supply;
-            const avgPriceDuringBuy = (currentTickerData.price + newPrice) / 2;
-            const tokensOut = ngnForCurve / avgPriceDuringBuy;
+            const newSupply = k / newMarketCap;
+            const finalPrice = k / (newSupply * newSupply);
+            const tokensOut = currentTickerData.supply - newSupply;
+
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
             if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
             
-            const newSupply = currentTickerData.supply - tokensOut;
-            const finalPrice = newSupply > 0 ? newMarketCap / newSupply : 0;
-
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
@@ -288,18 +315,30 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     userId: user.uid
                 });
             }
+            
+            // Trending Score Logic
+            const now = new Date();
+            const twentyFourHoursAgo = sub(now, { hours: 24 });
+            const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
+            const price24hAgo = price24hAgoDataPoint?.price || currentTickerData.price;
+            const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
+            const volume24h = (currentTickerData.volume24h || 0) + ngnForCurve;
+            const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
              transaction.update(tickerRef, { 
                 price: finalPrice,
                 marketCap: newMarketCap,
                 supply: newSupply,
+                volume24h,
+                priceChange24h,
+                trendingScore,
                 chartData: arrayUnion({
-                    time: new Date().toISOString(),
+                    time: now.toISOString(),
                     price: finalPrice,
                     volume: ngnForCurve
                 })
              });
-             return tokensOut;
+             return { tokensOut, ngnForCurve, finalPrice };
         });
 
         const batch = writeBatch(firestore);
@@ -309,14 +348,14 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             tickerId: ticker.id,
             tickerName: ticker.name,
             tickerIcon: ticker.icon,
-            value: values.ngnAmount,
+            value: ngnForCurve,
             userId: user.uid,
             createdAt: serverTimestamp(),
         });
 
         await batch.commit();
 
-        toast({ title: "Purchase Successful!", description: `You bought ${boughtTokens.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+        toast({ title: "Purchase Successful!", description: `You bought ${tokensOut.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
         await fetchHolding();
 
