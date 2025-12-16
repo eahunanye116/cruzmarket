@@ -94,21 +94,21 @@ export function CreateTickerForm() {
     setIsSubmitting(true);
     
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
-    const initialMarketCap = Number(values.initialMarketCap);
+    const initialMarketCapNum = Number(values.initialMarketCap);
     
-    const k = initialMarketCap * values.supply;
+    // y = k/x where y=mc, x=supply
+    const k = initialMarketCapNum * values.supply;
     const initialPrice = k / (values.supply * values.supply);
     
-    const newTickerData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress' | 'trendingScore' | 'volume24h' | 'priceChange24h'> = {
+    const newTickerBaseData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress' | 'trendingScore' | 'volume24h' | 'priceChange24h' | 'chartData' > = {
       name: values.name,
       slug,
       description: values.description,
       supply: values.supply,
-      marketCap: initialMarketCap,
+      marketCap: initialMarketCapNum,
       price: initialPrice,
       icon: values.icon,
       coverImage: values.coverImage,
-      chartData: [], 
       creatorId: user.uid,
     };
 
@@ -131,23 +131,21 @@ export function CreateTickerForm() {
         const newBalance = userProfile.balance - totalCost;
         transaction.update(userProfileRef, { balance: newBalance });
 
-        const newTickerRef = doc(tickersCollectionRef);
+        // --- Start of Corrected Creation & Buy Logic ---
         
-        let finalTickerData = { ...newTickerData };
-        
+        // 1. Define the state before the initial buy
+        let tickerData = { ...newTickerBaseData };
         const ngnForCurve = initialBuyValue - (initialBuyValue * 0.002);
-
-        const newMarketCap = finalTickerData.marketCap + ngnForCurve;
+        
+        // 2. Calculate the result of the initial buy
+        const newMarketCap = tickerData.marketCap + ngnForCurve;
         const newSupply = k / newMarketCap;
         const finalPrice = k / (newSupply * newSupply);
-        const tokensOut = finalTickerData.supply - newSupply;
-        
+        const tokensOut = tickerData.supply - newSupply;
         const avgBuyPrice = ngnForCurve / tokensOut;
 
-        finalTickerData.price = finalPrice;
-        finalTickerData.marketCap = newMarketCap;
-        finalTickerData.supply = newSupply;
-
+        // 3. Create the new portfolio holding for the creator
+        const newTickerRef = doc(tickersCollectionRef);
         const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
         const holdingRef = doc(portfolioColRef);
         transaction.set(holdingRef, {
@@ -157,29 +155,32 @@ export function CreateTickerForm() {
             userId: user.uid,
         });
         
+        // 4. Update the ticker data to the post-buy state
+        tickerData.price = finalPrice;
+        tickerData.marketCap = newMarketCap;
+        tickerData.supply = newSupply;
+
+        // 5. Create accurate chart data
         const now = new Date();
         const beforeTime = new Date(now.getTime() - (12 * 60 * 1000)).toISOString();
         
-        finalTickerData.chartData.push({
-            time: beforeTime,
-            price: initialPrice,
-            volume: 0,
-        });
-
-        finalTickerData.chartData.push({
-            time: now.toISOString(),
-            price: finalTickerData.price,
-            volume: ngnForCurve,
-        });
+        const chartData = [
+          { time: beforeTime, price: initialPrice, volume: 0 },
+          { time: now.toISOString(), price: finalPrice, volume: ngnForCurve }
+        ];
         
-         transaction.set(newTickerRef, {
-            ...finalTickerData,
+        // 6. Set the final ticker document in Firestore
+        transaction.set(newTickerRef, {
+            ...tickerData,
+            chartData: chartData,
             tickerAddress: `${newTickerRef.id}cruz`,
             createdAt: serverTimestamp(),
             trendingScore: 0,
             priceChange24h: 0,
             volume24h: ngnForCurve,
         });
+
+        // --- End of Corrected Logic ---
 
         return newTickerRef;
       });
@@ -382,3 +383,5 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    
