@@ -24,32 +24,39 @@ export function TickerChangeBadge({ ticker, period }: { ticker: Ticker; period: 
 
     const now = new Date();
     const currentPrice = ticker.price;
-    const tickerAgeInMinutes = differenceInMinutes(now, ticker.createdAt.toDate());
-    const earliestPrice = ticker.chartData[0].price;
-
+    const tickerAgeInMinutes = ticker.createdAt ? differenceInMinutes(now, ticker.createdAt.toDate()) : 0;
+    const earliestDataPoint = ticker.chartData[0];
+    const earliestPrice = earliestDataPoint.price;
+    
     const targetMinutes = periodToMinutes[period];
 
     const findPastPrice = () => {
-      // If the ticker is younger than the target timeframe, use the earliest price for comparison.
+      // If the ticker is younger than the target timeframe, always use the very first price.
       if (tickerAgeInMinutes < targetMinutes) {
         return earliestPrice;
       }
       
       const targetTime = sub(now, { minutes: targetMinutes });
       
-      // Find the data point closest to the target time in the past.
-      let closestDataPoint = ticker.chartData.reduce((prev, curr) => {
-        const currDate = new Date(curr.time);
-        const prevDate = new Date(prev.time);
-        if (currDate > targetTime) return prev; // Only consider points in the past
-        
-        const currDiff = Math.abs(targetTime.getTime() - currDate.getTime());
-        const prevDiff = Math.abs(targetTime.getTime() - prevDate.getTime());
-        
-        return currDiff < prevDiff ? curr : prev;
-      });
+      // Find the data point that is closest to but not after the target time.
+      let closestDataPoint = null;
+      let minDiff = Infinity;
 
-      return closestDataPoint.price;
+      for (const dataPoint of ticker.chartData) {
+          const dataPointTime = new Date(dataPoint.time);
+          if (dataPointTime <= targetTime) {
+              const diff = targetTime.getTime() - dataPointTime.getTime();
+              if (diff < minDiff) {
+                  minDiff = diff;
+                  closestDataPoint = dataPoint;
+              }
+          }
+      }
+      
+      // If no point is found (e.g., all points are newer), fallback to earliest
+      const priceToCompare = closestDataPoint || earliestDataPoint;
+
+      return priceToCompare.price;
     };
     
     const pastPrice = findPastPrice();
