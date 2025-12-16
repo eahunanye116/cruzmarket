@@ -96,7 +96,7 @@ export function CreateTickerForm() {
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const initialMarketCapNum = Number(values.initialMarketCap);
     
-    // y = k/x where y=mc, x=supply
+    // y = k/x, price is derivative dy/dx = -k/x^2 (we use absolute value)
     const k = initialMarketCapNum * values.supply;
     const initialPrice = k / (values.supply * values.supply);
     
@@ -132,9 +132,7 @@ export function CreateTickerForm() {
         transaction.update(userProfileRef, { balance: newBalance });
 
         // --- Start of Corrected Creation & Buy Logic ---
-        
-        // 1. Define the state before the initial buy
-        let tickerData = { ...newTickerBaseData };
+        const tickerData = { ...newTickerBaseData };
         const ngnForCurve = initialBuyValue - (initialBuyValue * 0.002);
         
         // 2. Calculate the result of the initial buy
@@ -162,11 +160,9 @@ export function CreateTickerForm() {
 
         // 5. Create accurate chart data
         const now = new Date();
-        const beforeTime = new Date(now.getTime() - (12 * 60 * 1000)).toISOString();
-        
         const chartData = [
-          { time: beforeTime, price: initialPrice, volume: 0 },
-          { time: now.toISOString(), price: finalPrice, volume: ngnForCurve }
+          { time: now.toISOString(), price: initialPrice, volume: 0 },
+          { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: ngnForCurve }
         ];
         
         // 6. Set the final ticker document in Firestore
@@ -383,5 +379,3 @@ export function CreateTickerForm() {
     </Form>
   );
 }
-
-    

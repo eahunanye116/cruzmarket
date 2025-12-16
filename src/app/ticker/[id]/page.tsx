@@ -65,31 +65,26 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
     const now = new Date();
     const currentPrice = ticker.price;
-    const tickerAgeInMinutes = ticker.createdAt ? differenceInMinutes(now, ticker.createdAt.toDate()) : 0;
+    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
     
     const findPastPrice = (targetMinutes: number) => {
       const earliestDataPoint = ticker.chartData[0];
+      const targetTime = sub(now, { minutes: targetMinutes });
       
       // If the ticker is younger than the target timeframe, always use the very first price.
-      if (tickerAgeInMinutes < targetMinutes) {
+      if (tickerCreationTime > targetTime) {
         if (earliestDataPoint.price === 0) return null;
         return earliestDataPoint.price;
       }
       
-      const targetTime = sub(now, { minutes: targetMinutes });
-      
       // Find the data point that is closest to but not after the target time.
       let closestDataPoint = null;
-      let minDiff = Infinity;
-
       for (const dataPoint of ticker.chartData) {
           const dataPointTime = new Date(dataPoint.time);
           if (dataPointTime <= targetTime) {
-              const diff = targetTime.getTime() - dataPointTime.getTime();
-              if (diff < minDiff) {
-                  minDiff = diff;
-                  closestDataPoint = dataPoint;
-              }
+              closestDataPoint = dataPoint;
+          } else {
+              break; // Assuming chartData is sorted by time
           }
       }
       
@@ -100,21 +95,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       return priceToCompare.price;
     };
     
-    const price10mAgo = findPastPrice(10);
-    const price1hAgo = findPastPrice(60);
-    const price24hAgo = findPastPrice(24 * 60);
-    const price30dAgo = findPastPrice(30 * 24 * 60);
-    
     const calculateChange = (pastPrice: number | null) => {
       if (pastPrice === null || pastPrice === 0) return 0;
       return ((currentPrice - pastPrice) / pastPrice) * 100;
     }
-
+    
     return {
-      '10m': calculateChange(price10mAgo),
-      '1h': calculateChange(price1hAgo),
-      '24h': calculateChange(price24hAgo),
-      '30d': calculateChange(price30dAgo),
+      '10m': calculateChange(findPastPrice(10)),
+      '1h': calculateChange(findPastPrice(60)),
+      '24h': calculateChange(findPastPrice(24 * 60)),
+      '30d': calculateChange(findPastPrice(30 * 24 * 60)),
     };
   }, [ticker]);
   
@@ -306,5 +296,3 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
-    
