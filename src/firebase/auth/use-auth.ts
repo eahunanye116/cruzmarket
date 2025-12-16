@@ -9,8 +9,7 @@ import {
   FirebaseError
 } from 'firebase/auth';
 import { doc, setDoc, getFirestore } from 'firebase/firestore';
-import { errorEmitter } from '../error-emitter';
-import { FirestorePermissionError } from '../errors';
+
 
 type AuthResult = {
   userCredential?: UserCredential;
@@ -34,15 +33,9 @@ export function useAuth() {
         balance: 1000000,
       };
 
-      setDoc(userProfileRef, newUserProfile)
-        .catch((serverError) => {
-          const permissionError = new FirestorePermissionError({
-            path: userProfileRef.path,
-            operation: 'create',
-            requestResourceData: newUserProfile,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
+      // We are not handling permission errors here anymore,
+      // as they are logged in the hooks.
+      setDoc(userProfileRef, newUserProfile).catch(console.error);
 
       return { userCredential };
     } catch (error) {

@@ -4,8 +4,6 @@
 import { useState, useEffect } from 'react';
 import { onSnapshot, Query, FirestoreError, getDocs, queryEqual } from 'firebase/firestore';
 import { useFirestore } from '..';
-import { errorEmitter } from '../error-emitter';
-import { FirestorePermissionError } from '../errors';
 
 type UseCollectionOptions = {
   listen?: boolean;
@@ -48,14 +46,10 @@ export function useCollection<T>(
     }
     setLoading(true);
 
-    const handlePermissionError = (err: FirestoreError) => {
-        const permissionError = new FirestorePermissionError({
-          path: `/${path}`,
-          operation: 'list',
-        });
+    const handleError = (err: FirestoreError) => {
+        console.error(`Firestore error on collection "${path}":`, err);
         setError(err);
         setLoading(false);
-        errorEmitter.emit('permission-error', permissionError);
     }
 
     if (options.listen) {
@@ -65,7 +59,7 @@ export function useCollection<T>(
         setLoading(false);
         setError(null);
       }, (err) => {
-        handlePermissionError(err);
+        handleError(err);
       });
 
       return () => unsubscribe();
@@ -78,7 +72,7 @@ export function useCollection<T>(
           setError(null);
         })
         .catch(err => {
-          handlePermissionError(err);
+          handleError(err);
         });
     }
 

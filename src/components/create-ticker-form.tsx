@@ -21,8 +21,6 @@ import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch, arrayUnion } from "firebase/firestore";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
 import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -231,13 +229,6 @@ export function CreateTickerForm() {
         title: "Creation Failed",
         description: e.message || "An unexpected error occurred.",
       });
-      if (!e.message.includes("Insufficient balance")) {
-        const permissionError = new FirestorePermissionError({
-            path: userProfileRef.path,
-            operation: 'update',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      }
     } finally {
         setIsSubmitting(false);
     }

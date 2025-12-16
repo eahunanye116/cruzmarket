@@ -4,8 +4,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { onSnapshot, DocumentReference, DocumentData, FirestoreError, getDoc } from 'firebase/firestore';
 import { useFirestore } from '..';
-import { errorEmitter } from '../error-emitter';
-import { FirestorePermissionError } from '../errors';
 
 type UseDocOptions = {
   listen?: boolean;
@@ -30,14 +28,10 @@ export function useDoc<T>(
     }
     setLoading(true);
     
-    const handlePermissionError = (err: FirestoreError) => {
-      const permissionError = new FirestorePermissionError({
-        path: memoizedDocRef.path,
-        operation: 'get',
-      });
+    const handleError = (err: FirestoreError) => {
+      console.error(`Firestore error on doc "${memoizedDocRef.path}":`, err);
       setError(err);
       setLoading(false);
-      errorEmitter.emit('permission-error', permissionError);
     }
 
     if (options.listen) {
@@ -50,7 +44,7 @@ export function useDoc<T>(
         setLoading(false);
         setError(null);
       }, (err) => {
-        handlePermissionError(err);
+        handleError(err);
       });
 
       return () => unsubscribe();
@@ -66,7 +60,7 @@ export function useDoc<T>(
           setError(null);
         })
         .catch(err => {
-          handlePermissionError(err);
+          handleError(err);
         });
     }
 

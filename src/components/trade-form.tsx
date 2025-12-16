@@ -23,8 +23,6 @@ import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { differenceInMinutes, sub } from 'date-fns';
 
@@ -86,11 +84,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
       }
     } catch(e) {
         console.error("Error fetching portfolio holding:", e);
-        const permissionError = new FirestorePermissionError({
-            path: `users/${user.uid}/portfolio`,
-            operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setHoldingLoading(false);
     }
@@ -246,10 +239,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
-        if (!(e.message.includes('Insufficient tokens'))) {
-            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
-            errorEmitter.emit('permission-error', permissionError);
-        }
     } finally {
         setIsSubmitting(false);
     }
@@ -361,10 +350,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
-        if (!(e.message.includes('Insufficient balance'))) {
-            const permissionError = new FirestorePermissionError({ path: `users/${user.uid}`, operation: 'update' });
-            errorEmitter.emit('permission-error', permissionError);
-        }
     } finally {
         setIsSubmitting(false);
     }
