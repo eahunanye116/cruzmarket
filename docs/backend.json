@@ -10,6 +10,7 @@
         "slug": { "type": "string" },
         "description": { "type": "string" },
         "icon": { "type": "string" },
+        "coverImage": { "type": "string" },
         "price": { "type": "number" },
         "supply": { "type": "number" },
         "marketCap": { "type": "number" },
@@ -27,7 +28,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "creatorId": { "type": "string" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap", "creatorId"]
+      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
     },
     "activity": {
       "title": "Activity",

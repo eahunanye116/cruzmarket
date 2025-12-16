@@ -1,4 +1,5 @@
 
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -138,19 +139,28 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <div className="lg:col-span-2">
-           <Card className="h-full">
-             <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
+           <Card className="h-full overflow-hidden">
+            <div className="relative h-48 w-full">
+                 <Image
+                    src={ticker.coverImage}
+                    alt={`${ticker.name} cover image`}
+                    fill
+                    className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+            </div>
+             <CardHeader className="relative -mt-16 sm:-mt-20 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:gap-6">
                     {ticker.icon && (
                         <Image
                             src={ticker.icon}
                             alt={`${ticker.name} icon`}
-                            width={80}
-                            height={80}
-                            className="rounded-none border-2 border-primary mb-4 sm:mb-0 aspect-square object-cover"
+                            width={100}
+                            height={100}
+                            className="rounded-none border-4 border-background aspect-square object-cover bg-background"
                         />
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 mt-4 sm:mt-0">
                         <div className="flex items-center gap-3">
                           <CardTitle className="font-headline text-4xl">${ticker.name}</CardTitle>
                            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">

@@ -7,6 +7,7 @@ export type Ticker = {
   slug: string;
   description: string;
   icon: string;
+  coverImage: string;
   price: number;
   supply: number;
   marketCap: number; 

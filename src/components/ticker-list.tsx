@@ -6,19 +6,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TickerCard } from '@/components/ticker-card';
 import type { Ticker } from '@/lib/types';
 import { Search } from 'lucide-react';
+import { Button } from './ui/button';
 
 type SortKey = 'createdAt' | 'price' ;
+const PAGE_SIZE = 8;
 
 export function TickerList({ tickers }: { tickers: Ticker[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
+    setVisibleCount(PAGE_SIZE); // Reset pagination on new search
   };
 
   const handleSortChange = (value: string) => {
     setSortKey(value as SortKey);
+    setVisibleCount(PAGE_SIZE); // Reset pagination on sort change
   };
 
   const filteredAndSortedTickers = useMemo(() => {
@@ -39,6 +44,14 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
       return 0;
     });
   }, [tickers, searchTerm, sortKey]);
+
+  const visibleTickers = useMemo(() => {
+    return filteredAndSortedTickers.slice(0, visibleCount);
+  }, [filteredAndSortedTickers, visibleCount]);
+
+  const showMore = () => {
+    setVisibleCount(prevCount => prevCount + PAGE_SIZE);
+  };
 
   return (
     <div>
@@ -64,15 +77,20 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
         </Select>
       </div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredAndSortedTickers.map(ticker => (
+        {visibleTickers.map(ticker => (
           <TickerCard key={ticker.id} ticker={ticker} />
         ))}
-        {filteredAndSortedTickers.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">No tickers found matching your search.</p>
-          </div>
-        )}
       </div>
+       {visibleTickers.length === 0 && (
+        <div className="col-span-full text-center py-12">
+          <p className="text-muted-foreground">No tickers found matching your search.</p>
+        </div>
+      )}
+      {filteredAndSortedTickers.length > visibleCount && (
+        <div className="mt-8 text-center">
+            <Button onClick={showMore} variant="outline">View More</Button>
+        </div>
+      )}
     </div>
   );
 }

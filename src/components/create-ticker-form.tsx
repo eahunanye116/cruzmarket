@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +42,8 @@ const formSchema = z.object({
   }).max(20, {
     message: "Ticker name must not exceed 20 characters.",
   }),
-  icon: z.string().url({ message: "Please enter a valid image URL." }),
+  icon: z.string().url({ message: "Please enter a valid icon image URL." }),
+  coverImage: z.string().url({ message: "Please enter a valid cover image URL." }),
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
   }).max(200, {
@@ -68,6 +70,7 @@ export function CreateTickerForm() {
     defaultValues: {
       name: "",
       icon: "",
+      coverImage: "",
       description: "",
       supply: 1000000000,
       initialMarketCap: '100000',
@@ -102,6 +105,7 @@ export function CreateTickerForm() {
       marketCap: initialMarketCap,
       price: initialPrice,
       icon: values.icon,
+      coverImage: values.coverImage,
       chartData: [], 
       creatorId: user.uid,
     };
@@ -268,12 +272,28 @@ export function CreateTickerForm() {
           name="icon"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Icon URL</FormLabel>
+              <FormLabel>Icon URL (Square)</FormLabel>
               <FormControl>
-                <Input placeholder="https://example.com/image.png" {...field} />
+                <Input placeholder="https://example.com/icon.png" {...field} />
               </FormControl>
               <FormDescription>
-                The public URL of the image for your token.
+                Public URL for the small, square token icon.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="coverImage"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cover Image URL (16:9)</FormLabel>
+              <FormControl>
+                <Input placeholder="https://example.com/cover.png" {...field} />
+              </FormControl>
+              <FormDescription>
+                Public URL for the widescreen cover/banner image.
               </FormDescription>
               <FormMessage />
             </FormItem>
