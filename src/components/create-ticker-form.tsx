@@ -181,7 +181,7 @@ export function CreateTickerForm() {
         
          transaction.set(newTickerRef, {
             ...finalTickerData,
-            tickerAddress: newTickerRef.id,
+            tickerAddress: `${newTickerRef.id}cruz`,
             createdAt: serverTimestamp()
         });
 
