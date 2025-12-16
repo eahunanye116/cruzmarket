@@ -5,6 +5,7 @@ export type Ticker = {
   id: string;
   name: string;
   slug: string;
+  tickerAddress: string;
   description: string;
   icon: string;
   coverImage: string;

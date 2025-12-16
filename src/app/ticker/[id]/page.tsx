@@ -4,13 +4,13 @@
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Check } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { use, useMemo } from 'react';
+import { use, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { differenceInMinutes, sub, formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,8 @@ import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
 import { TokenAnalysis } from '@/components/token-analysis';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 function isValidUrl(url: string) {
     try {
@@ -33,6 +35,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   const firestore = useFirestore();
   const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
   const { data: ticker, loading } = useDoc<Ticker>(tickerDocRef);
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
 
   const activitiesQuery = useMemo(() => {
     if (!firestore || !resolvedParams.id) return null;
@@ -44,6 +48,15 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   }, [firestore, resolvedParams.id]);
 
   const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+
+  const handleCopy = () => {
+    if (ticker?.tickerAddress) {
+      navigator.clipboard.writeText(ticker.tickerAddress);
+      setIsCopied(true);
+      toast({ title: 'Copied!', description: 'Ticker address copied to clipboard.' });
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
 
   const calculatedChanges = useMemo(() => {
     if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
@@ -187,6 +200,14 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         <CardDescription className="text-2xl font-semibold text-primary mt-1 mb-3">
                             ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </CardDescription>
+                         <div className="flex items-center gap-2">
+                           <p className="text-xs font-mono text-muted-foreground truncate">
+                            {ticker.tickerAddress}
+                           </p>
+                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy}>
+                               {isCopied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
+                           </Button>
+                        </div>
                     </div>
                 </div>
             </CardHeader>

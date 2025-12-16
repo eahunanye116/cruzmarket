@@ -97,7 +97,7 @@ export function CreateTickerForm() {
     const initialMarketCap = Number(values.initialMarketCap);
     const initialPrice = initialMarketCap / values.supply;
 
-    const newTickerData: Omit<Ticker, 'id' | 'createdAt'> = {
+    const newTickerData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress'> = {
       name: values.name,
       slug,
       description: values.description,
@@ -181,6 +181,7 @@ export function CreateTickerForm() {
         
          transaction.set(newTickerRef, {
             ...finalTickerData,
+            tickerAddress: newTickerRef.id,
             createdAt: serverTimestamp()
         });
 

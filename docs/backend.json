@@ -8,6 +8,7 @@
       "properties": {
         "name": { "type": "string" },
         "slug": { "type": "string" },
+        "tickerAddress": { "type": "string" },
         "description": { "type": "string" },
         "icon": { "type": "string" },
         "coverImage": { "type": "string" },
@@ -28,7 +29,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "creatorId": { "type": "string" }
       },
-      "required": ["name", "slug", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
+      "required": ["name", "slug", "tickerAddress", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
     },
     "activity": {
       "title": "Activity",
