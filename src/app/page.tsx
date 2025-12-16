@@ -15,6 +15,9 @@ import { CruzMode } from '@/components/cruz-mode';
 
 export default function Home() {
   const firestore = useFirestore();
+  const [kingTicker, setKingTicker] = useState<Ticker | null>(null);
+  const [kingCoronationTime, setKingCoronationTime] = useState<Date | null>(null);
+
 
   const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery, 'tickers');
@@ -22,15 +25,42 @@ export default function Home() {
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
   const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery, 'activities');
   
-  const kingTicker = useMemo(() => {
-    if (!tickers) return null;
+  useEffect(() => {
+    if (!tickers) return;
 
     const contenders = tickers.filter(t => t.marketCap >= 1000000);
-    if (contenders.length === 0) return null;
+    if (contenders.length === 0) {
+      setKingTicker(null); // No one is worthy
+      return;
+    }
 
-    // Sort contenders by market cap to find the king
-    return contenders.sort((a, b) => b.marketCap - a.marketCap)[0];
-  }, [tickers]);
+    const challenger = contenders.sort((a, b) => b.marketCap - a.marketCap)[0];
+
+    if (!kingTicker) {
+      // First king is crowned
+      setKingTicker(challenger);
+      setKingCoronationTime(new Date());
+    } else {
+      const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      
+      const reignIsOver = kingCoronationTime ? kingCoronationTime < fiveMinutesAgo : false;
+      
+      // If the current king is no longer a contender (e.g. market cap dropped)
+      const kingIsStillContender = contenders.some(c => c.id === kingTicker.id);
+      if(!kingIsStillContender) {
+        setKingTicker(challenger);
+        setKingCoronationTime(new Date());
+        return;
+      }
+
+      // Dethrone if reign is over AND challenger is stronger
+      if (reignIsOver && challenger.marketCap > kingTicker.marketCap) {
+        setKingTicker(challenger);
+        setKingCoronationTime(new Date());
+      }
+    }
+  }, [tickers, kingTicker, kingCoronationTime]);
 
 
   const trendingTickers = useMemo(() => {
