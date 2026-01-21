@@ -1,9 +1,8 @@
-
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowDown, ArrowUp, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
@@ -12,13 +11,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { sub, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
 import { TokenAnalysis } from '@/components/token-analysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { PriceChart } from '@/components/price-chart';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -57,56 +57,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       setTimeout(() => setIsCopied(false), 2000);
     }
   };
-
-  const calculatedChanges = useMemo(() => {
-    if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
-      return { '10m': 0, '1h': 0, '24h': 0, '30d': 0 };
-    }
-
-    const now = new Date();
-    const currentPrice = ticker.price;
-    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
-    
-    const findPastPrice = (targetMinutes: number) => {
-      const earliestDataPoint = ticker.chartData[0];
-      const targetTime = sub(now, { minutes: targetMinutes });
-      
-      // If the ticker is younger than the target timeframe, always use the very first price.
-      if (tickerCreationTime > targetTime) {
-        if (earliestDataPoint.price === 0) return null;
-        return earliestDataPoint.price;
-      }
-      
-      // Find the data point that is closest to but not after the target time.
-      let closestDataPoint = null;
-      for (const dataPoint of ticker.chartData) {
-          const dataPointTime = new Date(dataPoint.time);
-          if (dataPointTime <= targetTime) {
-              closestDataPoint = dataPoint;
-          } else {
-              break; // Assuming chartData is sorted by time
-          }
-      }
-      
-      // If no point is found (e.g., all points are newer), fallback to earliest
-      const priceToCompare = closestDataPoint || earliestDataPoint;
-
-      if (priceToCompare.price === 0) return null; // Avoid division by zero
-      return priceToCompare.price;
-    };
-    
-    const calculateChange = (pastPrice: number | null) => {
-      if (pastPrice === null || pastPrice === 0) return 0;
-      return ((currentPrice - pastPrice) / pastPrice) * 100;
-    }
-    
-    return {
-      '10m': calculateChange(findPastPrice(10)),
-      '1h': calculateChange(findPastPrice(60)),
-      '24h': calculateChange(findPastPrice(24 * 60)),
-      '30d': calculateChange(findPastPrice(30 * 24 * 60)),
-    };
-  }, [ticker]);
   
 
   if (loading) {
@@ -215,28 +165,12 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         <div className="lg:col-span-2 space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Market Stats</CardTitle>
+              <CardTitle>Price History & Stats</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="10m">
-                <TabsList className="grid w-full grid-cols-4 mb-4">
-                  <TabsTrigger value="10m">10M</TabsTrigger>
-                  <TabsTrigger value="1h">1H</TabsTrigger>
-                  <TabsTrigger value="24h">24H</TabsTrigger>
-                  <TabsTrigger value="30d">30D</TabsTrigger>
-                </TabsList>
-                {Object.entries(calculatedChanges).map(([key, change]) => (
-                  <TabsContent value={key} key={key}>
-                    <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
-                      <div className={cn("text-4xl font-bold flex items-center", change >= 0 ? "text-accent" : "text-destructive")}>
-                        {change >= 0 ? <ArrowUp className="h-8 w-8 mr-2" /> : <ArrowDown className="h-8 w-8 mr-2" />}
-                        {change.toFixed(2)}%
-                      </div>
-                      <p className="text-muted-foreground text-sm mt-1">Change</p>
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <div className="h-80 w-full pr-4">
+                  <PriceChart data={ticker.chartData || []} />
+              </div>
                <ul className="space-y-3 mt-6">
                 {stats.map(stat => (
                   <li key={stat.label} className="flex justify-between items-center text-sm">
@@ -296,5 +230,3 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
-    
