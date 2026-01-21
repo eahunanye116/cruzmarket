@@ -1,4 +1,3 @@
-
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -187,10 +186,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                     <span className={`font-semibold`}>{stat.value}</span>
                   </li>
                 ))}
-                 <li className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">24h Change</span>
-                    <TickerChangeBadge change={change24h} />
-                  </li>
               </ul>
             </CardContent>
           </Card>
