@@ -3,7 +3,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { ArrowUp, ArrowDown, TrendingUp } from 'lucide-react';
+import { ArrowUp, ArrowDown, TrendingUp, Rocket, BarChart } from 'lucide-react';
 
 interface PnlCardProps {
   userName: string | null | undefined;
@@ -27,8 +27,15 @@ export function PnlCard({
   const isProfit = totalProfitOrLoss >= 0;
 
   return (
-    <div className="relative w-[400px] h-[500px] bg-background p-8 flex flex-col justify-between rounded-lg overflow-hidden animated-gradient">
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm"></div>
+    <div className="relative w-[400px] h-[500px] bg-background p-8 flex flex-col justify-between rounded-lg border-2 overflow-hidden shadow-hard-lg">
+        
+        {/* Background Graphics Layer */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 animated-gradient"></div>
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-sm"></div>
+          <BarChart className="absolute -bottom-12 -right-12 h-64 w-64 text-primary/5 opacity-50" />
+          <Rocket className="absolute -top-10 -left-10 h-48 w-48 text-accent/5 opacity-50 -rotate-45" />
+        </div>
 
         <div className="relative z-10 flex items-center gap-4">
             <Avatar className="h-14 w-14 border-2">
@@ -73,5 +80,3 @@ export function PnlCard({
     </div>
   );
 }
-
-    
