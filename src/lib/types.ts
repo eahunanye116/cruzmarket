@@ -62,3 +62,8 @@ export type PlatformSettings = {
   signupEnabled: boolean;
 };
     
+export type SavedTone = {
+    id: string;
+    tone: string;
+    userId: string;
+};

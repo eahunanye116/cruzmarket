@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,14 +11,23 @@ import { generateTweetAction, postTweetAction } from '@/app/actions/x-actions';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
+import { useCollection, useFirestore, useUser } from '@/firebase';
+import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
+import { SavedTone } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 
 export function XManagement() {
   const { toast } = useToast();
+  const firestore = useFirestore();
+  const user = useUser();
 
   // Shared State
   const [tone, setTone] = useState('Default');
   const [customTone, setCustomTone] = useState('');
-  const [savedTones, setSavedTones] = useState<string[]>([]);
+  
+  // Firestore-backed saved tones
+  const savedTonesQuery = user && firestore ? collection(firestore, `users/${user.uid}/savedTones`) : null;
+  const { data: savedTones, loading: tonesLoading } = useCollection<SavedTone>(savedTonesQuery);
 
   // General Tweet State
   const [generalTweet, setGeneralTweet] = useState('');
@@ -31,36 +40,40 @@ export function XManagement() {
   const [isGeneratingTrend, setIsGeneratingTrend] = useState(false);
   const [isPostingTrend, setIsPostingTrend] = useState(false);
 
-  useEffect(() => {
-    try {
-        const storedTones = localStorage.getItem('cruzmarket-saved-tones');
-        if (storedTones) {
-            setSavedTones(JSON.parse(storedTones));
-        }
-    } catch (error) {
-        console.error("Failed to parse saved tones from localStorage", error);
-        localStorage.removeItem('cruzmarket-saved-tones');
-    }
-  }, []);
-
-  const handleSaveTone = () => {
-    if (customTone && !savedTones.includes(customTone)) {
-        const newSavedTones = [...savedTones, customTone];
-        setSavedTones(newSavedTones);
-        localStorage.setItem('cruzmarket-saved-tones', JSON.stringify(newSavedTones));
-        toast({ title: 'Tone Saved!', description: `"${customTone}" has been added to your saved tones.` });
-    } else if (savedTones.includes(customTone)) {
-        toast({ variant: 'destructive', title: 'Already Saved', description: 'This tone is already in your saved list.' });
-    } else {
+  const handleSaveTone = async () => {
+    if (!customTone) {
         toast({ variant: 'destructive', title: 'Cannot Save', description: 'Custom tone field is empty.' });
+        return;
+    }
+    if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Must be signed in to save tones.' });
+        return;
+    }
+     if (savedTones?.some(t => t.tone === customTone)) {
+        toast({ variant: 'destructive', title: 'Already Saved', description: 'This tone is already in your saved list.' });
+        return;
+    }
+
+    try {
+        await addDoc(collection(firestore, `users/${user.uid}/savedTones`), {
+            tone: customTone,
+            userId: user.uid,
+        });
+        toast({ title: 'Tone Saved!', description: `"${customTone}" has been added to your saved tones.` });
+        setCustomTone(''); // Clear input after saving
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
     }
   };
 
-  const handleDeleteTone = (toneToDelete: string) => {
-    const newSavedTones = savedTones.filter(t => t !== toneToDelete);
-    setSavedTones(newSavedTones);
-    localStorage.setItem('cruzmarket-saved-tones', JSON.stringify(newSavedTones));
-    toast({ title: 'Tone Deleted!' });
+  const handleDeleteTone = async (toneId: string) => {
+    if (!firestore || !user) return;
+    try {
+        await deleteDoc(doc(firestore, `users/${user.uid}/savedTones`, toneId));
+        toast({ title: 'Tone Deleted!' });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+    }
   };
 
   const handleUseSavedTone = (savedTone: string) => {
@@ -180,16 +193,16 @@ export function XManagement() {
                         </div>
                     )}
                  </div>
-                 {savedTones.length > 0 && (
+                 {(savedTones && savedTones.length > 0) && (
                     <div className="space-y-2 pt-4 border-t">
                         <Label>Saved Tones</Label>
                         <div className="flex flex-wrap gap-2">
-                            {savedTones.map((savedTone) => (
-                                <Badge key={savedTone} variant="secondary" className="cursor-pointer pl-2 pr-1 py-1 text-sm">
-                                   <button onClick={() => handleUseSavedTone(savedTone)} className="hover:underline pr-2">
-                                     {savedTone}
+                            {tonesLoading ? <Skeleton className="h-6 w-full" /> : savedTones.map((savedToneDoc) => (
+                                <Badge key={savedToneDoc.id} variant="secondary" className="cursor-pointer pl-2 pr-1 py-1 text-sm">
+                                   <button onClick={() => handleUseSavedTone(savedToneDoc.tone)} className="hover:underline pr-2">
+                                     {savedToneDoc.tone}
                                    </button>
-                                   <button onClick={() => handleDeleteTone(savedTone)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                   <button onClick={() => handleDeleteTone(savedToneDoc.id)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
                                      <XIcon className="h-3 w-3" />
                                      <span className="sr-only">Delete tone</span>
                                    </button>

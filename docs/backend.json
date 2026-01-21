@@ -41,6 +41,7 @@
       "type": "object",
       "properties": {
         "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE"] },
+        "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
         "value": { "type": "number" },
@@ -50,7 +51,7 @@
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["type", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
+      "required": ["type", "tickerId", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
     },
     "userProfile": {
       "title": "User Profile",
@@ -62,7 +63,7 @@
         "photoURL": { "type": "string", "format": "uri" },
         "balance": { "type": "number" }
       },
-      "required": ["email", "balance"]
+      "required": ["email", "displayName", "balance"]
     },
     "portfolioHolding": {
       "title": "Portfolio Holding",
@@ -86,6 +87,16 @@
         }
       },
       "required": ["signupEnabled"]
+    },
+    "savedTone": {
+      "title": "Saved Tone",
+      "description": "Represents a custom AI tone saved by a user for generating tweets.",
+      "type": "object",
+      "properties": {
+        "tone": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["tone", "userId"]
     }
   },
   "auth": {
@@ -107,6 +118,10 @@
     "/users/{userId}/portfolio/{holdingId}": {
       "schema": { "$ref": "#/entities/portfolioHolding" },
       "description": "Sub-collection for a user's portfolio holdings."
+    },
+    "/users/{userId}/savedTones/{toneId}": {
+      "schema": { "$ref": "#/entities/savedTone" },
+      "description": "Sub-collection for a user's saved AI tones."
     },
     "/settings/privacy": {
       "schema": { "$ref": "#/entities/platformSettings" },
