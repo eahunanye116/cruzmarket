@@ -11,18 +11,33 @@ import {
 } from "@/components/ui/table"
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
+import { ArrowDown, ArrowUp, Ban, Wallet, Share, Download, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query } from 'firebase/firestore';
 import { PortfolioHolding, Ticker } from '@/lib/types';
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { PnlCard } from '@/components/pnl-card';
+import { toPng } from 'html-to-image';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const [isPnlCardOpen, setIsPnlCardOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const pnlCardRef = useRef<HTMLDivElement>(null);
 
   const portfolioPath = user ? `users/${user.uid}/portfolio` : '';
   const portfolioQuery = user ? query(collection(firestore, portfolioPath)) : null;
@@ -64,6 +79,36 @@ export default function PortfolioPage() {
   
   const totalProfitOrLoss = totals.currentValue - totals.initialCost;
   const totalProfitOrLossPercentage = totals.initialCost > 0 ? (totalProfitOrLoss / totals.initialCost) * 100 : 0;
+
+  const handleDownload = useCallback(() => {
+    if (pnlCardRef.current === null) {
+      return;
+    }
+
+    setIsDownloading(true);
+
+    toPng(pnlCardRef.current, { cacheBust: true, pixelRatio: 2 })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `cruzmarket-pnl-${user?.displayName || user?.email}.png`;
+        link.href = dataUrl;
+        link.click();
+        setIsDownloading(false);
+        toast({
+          title: "Download Started",
+          description: "Your PnL card is being downloaded.",
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+        setIsDownloading(false);
+        toast({
+          variant: "destructive",
+          title: "Download Failed",
+          description: "Could not generate PnL card image.",
+        });
+      });
+  }, [pnlCardRef, user, toast]);
 
   if (!user) {
     return (
@@ -129,16 +174,50 @@ export default function PortfolioPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold font-headline mb-2">My Portfolio</h1>
-        <div className="flex items-baseline gap-4">
-            <p className="text-3xl font-semibold text-primary">₦{totals.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <div className={cn("flex items-center font-semibold", totalProfitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
-              {totalProfitOrLoss >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
-              <span>{totalProfitOrLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className="ml-2">({totalProfitOrLossPercentage.toFixed(2)}%)</span>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div>
+          <h1 className="text-4xl font-bold font-headline mb-2">My Portfolio</h1>
+          <div className="flex items-baseline gap-4">
+              <p className="text-3xl font-semibold text-primary">₦{totals.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <div className={cn("flex items-center font-semibold", totalProfitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
+                {totalProfitOrLoss >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
+                <span>{totalProfitOrLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="ml-2">({totalProfitOrLossPercentage.toFixed(2)}%)</span>
+              </div>
+          </div>
         </div>
+        <Dialog open={isPnlCardOpen} onOpenChange={setIsPnlCardOpen}>
+          <DialogTrigger asChild>
+             <Button variant="outline" className="mt-4 md:mt-0">
+                <Share className="mr-2 h-4 w-4" />
+                Share PnL Card
+              </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-fit p-0 bg-transparent border-none">
+            <div className="relative">
+              <div ref={pnlCardRef}>
+                 <PnlCard 
+                    userName={user?.displayName}
+                    userAvatar={user?.photoURL}
+                    userEmail={user?.email}
+                    totalCurrentValue={totals.currentValue}
+                    totalProfitOrLoss={totalProfitOrLoss}
+                    totalProfitOrLossPercentage={totalProfitOrLossPercentage}
+                  />
+              </div>
+               <div className="absolute -bottom-14 left-1/2 -translate-x-1/2">
+                  <Button onClick={handleDownload} disabled={isDownloading}>
+                      {isDownloading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                      )}
+                      {isDownloading ? 'Generating...' : 'Download Card'}
+                  </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
       
       <Card className="overflow-hidden">
