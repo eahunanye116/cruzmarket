@@ -96,9 +96,7 @@ export function CreateTickerForm() {
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const initialMarketCapNum = Number(values.initialMarketCap);
     
-    // y = k/x, price is derivative dy/dx = -k/x^2 (we use absolute value)
     const k = initialMarketCapNum * values.supply;
-    const initialPrice = k / (values.supply * values.supply);
     
     const newTickerBaseData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress' | 'trendingScore' | 'volume24h' | 'priceChange24h' | 'chartData' > = {
       name: values.name,
@@ -106,7 +104,7 @@ export function CreateTickerForm() {
       description: values.description,
       supply: values.supply,
       marketCap: initialMarketCapNum,
-      price: initialPrice,
+      price: 0, // Will be set inside transaction
       icon: values.icon,
       coverImage: values.coverImage,
       creatorId: user.uid,
@@ -131,18 +129,19 @@ export function CreateTickerForm() {
         const newBalance = userProfile.balance - totalCost;
         transaction.update(userProfileRef, { balance: newBalance });
 
-        // --- Start of Corrected Creation & Buy Logic ---
         const tickerData = { ...newTickerBaseData };
         const ngnForCurve = initialBuyValue - (initialBuyValue * 0.002);
         
-        // 2. Calculate the result of the initial buy
-        const newMarketCap = tickerData.marketCap + ngnForCurve;
-        const newSupply = k / newMarketCap;
-        const finalPrice = k / (newSupply * newSupply);
-        const tokensOut = tickerData.supply - newSupply;
+        const finalMarketCap = tickerData.marketCap + ngnForCurve;
+        if (finalMarketCap <= 0) throw new Error("Market cap cannot be zero or negative.");
+        
+        const finalSupply = k / finalMarketCap;
+        const tokensOut = tickerData.supply - finalSupply;
+        const finalPrice = finalMarketCap / finalSupply;
         const avgBuyPrice = ngnForCurve / tokensOut;
+        
+        const initialPrice = tickerData.marketCap / tickerData.supply;
 
-        // 3. Create the new portfolio holding for the creator
         const newTickerRef = doc(tickersCollectionRef);
         const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
         const holdingRef = doc(portfolioColRef);
@@ -153,21 +152,17 @@ export function CreateTickerForm() {
             userId: user.uid,
         });
         
-        // 4. Update the ticker data to the post-buy state
-        tickerData.price = finalPrice;
-        tickerData.marketCap = newMarketCap;
-        tickerData.supply = newSupply;
-
-        // 5. Create accurate chart data
         const now = new Date();
         const chartData = [
-          { time: now.toISOString(), price: initialPrice, volume: 0 },
-          { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: ngnForCurve }
+          { time: now.toISOString(), price: initialPrice, volume: 0, marketCap: initialMarketCapNum },
+          { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: ngnForCurve, marketCap: finalMarketCap }
         ];
         
-        // 6. Set the final ticker document in Firestore
         transaction.set(newTickerRef, {
             ...tickerData,
+            price: finalPrice,
+            marketCap: finalMarketCap,
+            supply: finalSupply,
             chartData: chartData,
             tickerAddress: `${newTickerRef.id}cruz`,
             createdAt: serverTimestamp(),
@@ -175,8 +170,6 @@ export function CreateTickerForm() {
             priceChange24h: 0,
             volume24h: ngnForCurve,
         });
-
-        // --- End of Corrected Logic ---
 
         return newTickerRef;
       });

@@ -22,7 +22,8 @@
             "properties": {
               "time": { "type": "string", "format": "date" },
               "price": { "type": "number" },
-              "volume": { "type": "number" }
+              "volume": { "type": "number" },
+              "marketCap": { "type": "number" }
             }
           }
         },

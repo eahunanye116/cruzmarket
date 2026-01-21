@@ -12,7 +12,7 @@ export type Ticker = {
   price: number;
   supply: number;
   marketCap: number; 
-  chartData: { time: string; price: number, volume: number }[];
+  chartData: { time: string; price: number, volume: number, marketCap?: number }[];
   recentActivity?: string;
   createdAt: Timestamp;
   creatorId: string;

@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -59,30 +60,30 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     }
   };
   
-  const priceChange24h = useMemo(() => {
+  const change24h = useMemo(() => {
     if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
       return 0;
     }
 
     const now = new Date();
-    const currentPrice = ticker.price;
+    const currentMarketCap = ticker.marketCap;
     const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
     const earliestDataPoint = ticker.chartData[0];
     
-    const findPastPrice = () => {
+    const findPastMarketCap = () => {
       const targetMinutes = 24 * 60;
       const targetTime = sub(now, { minutes: targetMinutes });
 
-      // If the token was created within the last 24 hours, use the creation price.
+      // If the token was created within the last 24 hours, use the creation market cap.
       if (tickerCreationTime > targetTime) {
-          // If creation price is 0, there's no change to calculate yet.
-          if (earliestDataPoint.price === 0) return null;
-          return earliestDataPoint.price;
+          if (!earliestDataPoint.marketCap || earliestDataPoint.marketCap === 0) return null;
+          return earliestDataPoint.marketCap;
       }
       
       // Find the data point closest to 24 hours ago
       let closestDataPoint = null;
       for (const dataPoint of ticker.chartData) {
+          if (!dataPoint.marketCap) continue; // Skip points without market cap data
           const dataPointTime = new Date(dataPoint.time);
           if (dataPointTime <= targetTime) {
               closestDataPoint = dataPoint;
@@ -92,17 +93,17 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           }
       }
       
-      const priceToCompare = closestDataPoint || earliestDataPoint;
+      const mcToCompare = closestDataPoint || earliestDataPoint;
 
-      if (priceToCompare.price === 0) return null; // Avoid division by zero
-      return priceToCompare.price;
+      if (!mcToCompare.marketCap || mcToCompare.marketCap === 0) return null; // Avoid division by zero
+      return mcToCompare.marketCap;
     };
     
-    const pastPrice = findPastPrice();
+    const pastMarketCap = findPastMarketCap();
     
-    if (pastPrice === null || pastPrice === 0) return 0;
+    if (pastMarketCap === null || pastMarketCap === 0) return 0;
 
-    return ((currentPrice - pastPrice) / pastPrice) * 100;
+    return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
   }, [ticker]);
   
 
@@ -186,7 +187,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                             <p className="text-2xl font-semibold text-primary leading-none">
                                 ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                             </p>
-                            <TickerChangeBadge change={priceChange24h} />
+                            <TickerChangeBadge change={change24h} />
                         </div>
                          <div className="flex items-center gap-2">
                            <p className="text-xs font-mono text-muted-foreground truncate">
@@ -230,7 +231,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                 ))}
                  <li className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">24h Change</span>
-                    <TickerChangeBadge change={priceChange24h} />
+                    <TickerChangeBadge change={change24h} />
                   </li>
               </ul>
             </CardContent>

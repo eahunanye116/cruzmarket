@@ -221,7 +221,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 chartData: arrayUnion({
                     time: now.toISOString(),
                     price: newPrice,
-                    volume: ngnToGetBeforeFee
+                    volume: ngnToGetBeforeFee,
+                    marketCap: newMarketCap,
                 })
             });
             return { ngnToUser };
@@ -279,7 +280,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const newMarketCap = currentTickerData.marketCap + ngnForCurve;
             const newSupply = k / newMarketCap;
             const tokensOut = currentTickerData.supply - newSupply;
-            const finalPrice = k / (newSupply * newSupply); 
+            const finalPrice = newMarketCap / newSupply; 
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
             if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
@@ -331,7 +332,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 chartData: arrayUnion({
                     time: now.toISOString(),
                     price: finalPrice,
-                    volume: ngnForCurve
+                    volume: ngnForCurve,
+                    marketCap: newMarketCap,
                 })
              });
              return { tokensOut };
