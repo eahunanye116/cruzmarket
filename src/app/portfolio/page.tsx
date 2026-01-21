@@ -36,10 +36,10 @@ export default function PortfolioPage() {
 
   const portfolioPath = user ? `users/${user.uid}/portfolio` : '';
   const portfolioQuery = user ? query(collection(firestore, portfolioPath)) : null;
-  const { data: portfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery, portfolioPath);
+  const { data: portfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
 
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
-  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery, 'tickers');
+  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
 
   const enrichedPortfolio = useMemo(() => {
     if (!portfolio || !tickers) return [];

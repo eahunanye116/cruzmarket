@@ -20,10 +20,10 @@ export default function Home() {
   const [currentContenderIndex, setCurrentContenderIndex] = useState(0);
 
   const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
-  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery, 'tickers');
+  const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
   
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
-  const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery, 'activities');
+  const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery);
   
   useEffect(() => {
     if (!tickers) return;

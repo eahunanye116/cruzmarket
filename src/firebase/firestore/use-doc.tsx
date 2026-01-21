@@ -29,7 +29,6 @@ export function useDoc<T>(
     setLoading(true);
     
     const handleError = (err: FirestoreError) => {
-      console.error(`Firestore error on doc "${memoizedDocRef.path}":`, err);
       setError(err);
       setLoading(false);
     }

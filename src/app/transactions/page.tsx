@@ -36,7 +36,7 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
     case 'BUY':
       return <Plus className="h-4 w-4 text-accent-foreground" />;
     case 'SELL':
-      return <Minus className="h-4 w-4 text-destructive" />;
+      return <Minus className="h-4 w-4 text-destructive-foreground" />;
     default:
       return null;
   }
@@ -52,10 +52,10 @@ export default function TransactionsPage() {
     return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
   }, [user, firestore]);
   
-  const { data: activities, loading } = useCollection<Activity>(activitiesQuery, 'activities');
+  const { data: activities, loading } = useCollection<Activity>(activitiesQuery);
   
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
-  const { data: tickers } = useCollection<Ticker>(tickersQuery, 'tickers');
+  const { data: tickers } = useCollection<Ticker>(tickersQuery);
 
   const enrichedActivities = useMemo(() => {
     if (!activities || !tickers) return [];
@@ -132,6 +132,7 @@ export default function TransactionsPage() {
             <TableBody>
                 {enrichedActivities.map((activity) => {
                   const hasValidIcon = isValidUrl(activity.tickerIcon);
+                  const isTrade = activity.type === 'BUY' || activity.type === 'SELL';
                   return (
                       <TableRow key={activity.id}>
                         <TableCell>
@@ -154,7 +155,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell>
                             <Badge variant={
-                                activity.type === 'BUY' ? 'default' : 'destructive'
+                                activity.type === 'BUY' ? 'default' : activity.type === 'SELL' ? 'destructive' : 'secondary'
                                 } className="text-xs">
                                 <ActivityIcon type={activity.type}/>
                                 <span className="ml-1">{activity.type}</span>
@@ -167,7 +168,7 @@ export default function TransactionsPage() {
                             {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
                         </TableCell>
                         <TableCell className="text-right">
-                          {activity.type === 'BUY' && (
+                          {isTrade && (
                             <Button asChild variant="ghost" size="icon" className="h-8 w-8">
                                 <Link href={`/trade/${activity.id}`}>
                                   <ArrowRight className="h-4 w-4" />
@@ -196,5 +197,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    

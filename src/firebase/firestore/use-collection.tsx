@@ -28,7 +28,6 @@ const useMemoizedQuery = (query: Query | null) => {
 
 export function useCollection<T>(
   query: Query | null,
-  path: string, // Require path for robust error handling
   options: UseCollectionOptions = { listen: true }
 ) {
   const [data, setData] = useState<T[] | null>(null);
@@ -47,7 +46,6 @@ export function useCollection<T>(
     setLoading(true);
 
     const handleError = (err: FirestoreError) => {
-        console.error(`Firestore error on collection "${path}":`, err);
         setError(err);
         setLoading(false);
     }
@@ -76,7 +74,7 @@ export function useCollection<T>(
         });
     }
 
-  }, [memoizedQuery, firestore, options.listen, path]);
+  }, [memoizedQuery, firestore, options.listen]);
 
   return { data, loading, error };
 }

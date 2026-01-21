@@ -45,7 +45,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     );
   }, [firestore, resolvedParams.id]);
 
-  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery, 'activities');
+  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
   const handleCopy = () => {
     if (ticker?.tickerAddress) {

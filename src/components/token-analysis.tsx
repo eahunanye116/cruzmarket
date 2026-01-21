@@ -19,7 +19,7 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
     );
   }, [firestore, ticker]);
 
-  const { data: holdings, loading } = useCollection<PortfolioHolding>(holdingsQuery, `portfolio`);
+  const { data: holdings, loading } = useCollection<PortfolioHolding>(holdingsQuery);
 
   const analysis = useMemo(() => {
     const emptyAnalysis = {
