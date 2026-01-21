@@ -1,10 +1,13 @@
-
+'use client';
 
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Ticker } from '@/lib/types';
 import { TickerSparkline } from './ticker-sparkline';
+import { useMemo } from 'react';
+import { calculateMarketCapChange, cn } from '@/lib/utils';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 
 function isValidUrl(url: string) {
     try {
@@ -17,6 +20,7 @@ function isValidUrl(url: string) {
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
+  const change24h = useMemo(() => calculateMarketCapChange(ticker), [ticker]);
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group block">
@@ -35,8 +39,23 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
           )}
           <div className="flex-1">
             <div className="font-headline font-bold">${ticker.name}</div>
-            <div className="text-primary font-semibold text-sm">
-                ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+             <div className="flex items-end gap-2">
+                <div className="text-primary font-semibold text-sm">
+                    ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                </div>
+                 <div className={cn(
+                    "flex items-center text-xs font-semibold",
+                    change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive"
+                )}>
+                    {change24h !== null ? (
+                        <>
+                            {change24h >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                            <span className="ml-1">{change24h.toFixed(2)}%</span>
+                        </>
+                    ) : (
+                        <span>--%</span>
+                    )}
+                </div>
             </div>
           </div>
           <TickerSparkline ticker={ticker} />
