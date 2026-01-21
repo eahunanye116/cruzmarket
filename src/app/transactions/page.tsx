@@ -62,13 +62,14 @@ export default function TransactionsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [selectedActivityForPnl, setSelectedActivityForPnl] = useState<EnrichedActivity | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [isPnlDialogOpen, setIsPnlDialogOpen] = useState(false);
   
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const pnlCardRef = useRef<HTMLDivElement>(null);
 
+  // --- Data for the main transaction list ---
   const activitiesQuery = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
@@ -91,17 +92,25 @@ export default function TransactionsPage() {
     });
   }, [activities, tickers]);
   
-  const dialogTickerRef = useMemo(() => {
-    if (!firestore || !selectedActivityForPnl?.tickerId) return null;
-    return doc(firestore, 'tickers', selectedActivityForPnl.tickerId);
-  }, [firestore, selectedActivityForPnl]);
 
+  // --- Data for the PnL Dialog (fetched on-demand) ---
+  const activityRef = useMemo(() => {
+    if (!firestore || !selectedActivityId) return null;
+    return doc(firestore, 'activities', selectedActivityId);
+  }, [firestore, selectedActivityId]);
+  const { data: selectedActivity, loading: activityDialogLoading } = useDoc<Activity>(activityRef);
+
+  const dialogTickerRef = useMemo(() => {
+    if (!firestore || !selectedActivity?.tickerId) return null;
+    return doc(firestore, 'tickers', selectedActivity.tickerId);
+  }, [firestore, selectedActivity]);
   const { data: dialogTicker, loading: dialogTickerLoading } = useDoc<Ticker>(dialogTickerRef);
 
+
   const pnlData = useMemo(() => {
-    if (!selectedActivityForPnl || !dialogTicker || selectedActivityForPnl.tokenAmount == null || selectedActivityForPnl.pricePerToken == null) return null;
+    if (!selectedActivity || !dialogTicker || selectedActivity.tokenAmount == null || selectedActivity.pricePerToken == null) return null;
     
-    const { tokenAmount, pricePerToken } = selectedActivityForPnl;
+    const { tokenAmount, pricePerToken } = selectedActivity;
     
     const initialCost = tokenAmount * pricePerToken;
     const currentValue = calculateReclaimableValue(tokenAmount, dialogTicker);
@@ -113,12 +122,20 @@ export default function TransactionsPage() {
       profitOrLoss,
       profitOrLossPercentage
     };
-  }, [selectedActivityForPnl, dialogTicker]);
+  }, [selectedActivity, dialogTicker]);
 
-  const handleShareClick = (activity: EnrichedActivity) => {
-    setSelectedActivityForPnl(activity);
+  const handleShareClick = (activityId: string) => {
+    setSelectedActivityId(activityId);
     setIsPnlDialogOpen(true);
   };
+
+  const handleDialogClose = (open: boolean) => {
+    setIsPnlDialogOpen(open);
+    if (!open) {
+      // Important: Reset the activity ID when dialog closes to allow re-fetching next time
+      setSelectedActivityId(null);
+    }
+  }
   
   const handleDownload = useCallback(() => {
     if (pnlCardRef.current === null) return;
@@ -230,7 +247,6 @@ export default function TransactionsPage() {
             <TableBody>
                 {enrichedActivities.map((activity) => {
                   const hasValidIcon = isValidUrl(activity.tickerIcon);
-                  const canShowPnl = activity.type === 'BUY' && activity.pricePerToken != null && activity.tokenAmount != null;
                   return (
                       <TableRow key={activity.id}>
                         <TableCell>
@@ -267,7 +283,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {activity.type === 'BUY' && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShareClick(activity)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShareClick(activity.id)}>
                                 <Share className="h-4 w-4" />
                             </Button>
                           )}
@@ -291,7 +307,7 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={isPnlDialogOpen} onOpenChange={setIsPnlDialogOpen}>
+      <Dialog open={isPnlDialogOpen} onOpenChange={handleDialogClose}>
           <DialogContent className="sm:max-w-md">
              <DialogHeader>
               <DialogTitle>Share Trade PnL</DialogTitle>
@@ -299,7 +315,7 @@ export default function TransactionsPage() {
                 Download or share your trade performance on social media.
               </DialogDescription>
             </DialogHeader>
-            {dialogTickerLoading || !selectedActivityForPnl ? (
+            {activityDialogLoading || dialogTickerLoading ? (
               <div className="flex justify-center items-center h-48">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
@@ -343,5 +359,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    
