@@ -438,7 +438,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         <Form {...sellForm}>
           <form onSubmit={sellForm.handleSubmit(onSellSubmit)} className="space-y-4">
              <div className="text-right text-sm text-muted-foreground">
-              You Own: {holdingLoading ? <Skeleton className="h-4 w-20 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]}</span>}
+              You Own: {holdingLoading ? <Skeleton className="h-4 w-32 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]} (~₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>}
             </div>
             <FormField
               control={sellForm.control}
@@ -521,5 +521,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-
-    
