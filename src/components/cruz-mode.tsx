@@ -45,7 +45,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
                 <h3 className="font-headline text-4xl font-bold">${ticker.name}</h3>
                 <div className="flex items-end gap-3 mt-1">
                     <p className="text-primary text-2xl font-semibold leading-none">
-                        ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                        ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                     </p>
                     <div className={cn("flex items-center font-semibold text-sm", change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive")}>
                         {change24h !== null ? (
@@ -69,7 +69,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             </div>
              <div className="text-center">
                 <p className="font-bold text-lg">Market Cap</p>
-                <p className="font-semibold text-muted-foreground mt-1">₦{ticker.marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="font-semibold text-muted-foreground mt-1">₦{(ticker.marketCap || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
         </div>
 

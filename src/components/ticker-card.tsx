@@ -55,7 +55,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                     <div className="font-headline font-bold truncate" title={`$${ticker.name}`}>${ticker.name}</div>
                     <div className="flex items-end gap-2 flex-wrap">
                         <div className="text-primary font-semibold text-sm">
-                            ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                            ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </div>
                         <div className={cn(
                             "flex items-center text-xs font-semibold",
@@ -81,7 +81,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
             <div className="grid grid-cols-2 gap-4 text-xs pt-4 border-t border-border/50">
                 <div className="text-left">
                     <p className="text-muted-foreground">Mkt Cap</p>
-                    <p className="font-semibold text-sm text-foreground">{formatCompact(ticker.marketCap)}</p>
+                    <p className="font-semibold text-sm text-foreground">{formatCompact(ticker.marketCap || 0)}</p>
                 </div>
                 <div className="text-right">
                     <p className="text-muted-foreground">Volume (24h)</p>

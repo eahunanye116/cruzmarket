@@ -24,7 +24,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
                       <p className="font-headline font-bold">${ticker.name}</p>
                       <div className="flex items-end gap-2">
                         <p className="text-sm text-primary font-semibold">
-                          ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                          ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </p>
                         <div className={cn(
                           "flex items-center text-xs font-semibold",

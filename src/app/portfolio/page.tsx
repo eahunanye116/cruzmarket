@@ -187,7 +187,7 @@ export default function PortfolioPage() {
                       <div>
                         <p className="font-medium">{holding.ticker.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Price: ₦{holding.ticker.price.toLocaleString('en-US', { maximumFractionDigits: 8 })}
+                          Price: ₦{(holding.ticker.price || 0).toLocaleString('en-US', { maximumFractionDigits: 8 })}
                         </p>
                       </div>
                     </div>

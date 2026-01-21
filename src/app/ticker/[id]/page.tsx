@@ -139,7 +139,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                         </div>
                         <div className="flex items-end gap-3 mt-1 mb-3">
                             <p className="text-2xl font-semibold text-primary leading-none">
-                                ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                                ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                             </p>
                             <div className={cn("flex items-center font-semibold text-sm", change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive")}>
                                 {change24h !== null ? (

@@ -129,8 +129,8 @@ export function TickerManagement() {
                         <span className="font-medium">{ticker.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>₦{ticker.price.toLocaleString('en-US', { maximumFractionDigits: 8 })}</TableCell>
-                    <TableCell>₦{ticker.marketCap.toLocaleString()}</TableCell>
+                    <TableCell>₦{(ticker.price || 0).toLocaleString('en-US', { maximumFractionDigits: 8 })}</TableCell>
+                    <TableCell>₦{(ticker.marketCap || 0).toLocaleString()}</TableCell>
                     <TableCell className="font-mono text-xs">{ticker.creatorId}</TableCell>
                     <TableCell className="text-right">
                        <DropdownMenu>

@@ -10,7 +10,7 @@ import { PrivacyManagement } from '@/components/admin/privacy-management';
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
 // You can find your UID in the Firebase Authentication console.
-const ADMIN_UID = 'YOUR_ADMIN_UID_HERE'; 
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1'; 
 
 export default function AdminPage() {
   const user = useUser();
