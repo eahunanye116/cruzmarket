@@ -12,6 +12,7 @@ import { z } from 'genkit';
 
 const GenerateTweetInputSchema = z.object({
   topic: z.string().optional().nullable().describe('An optional trending topic to include in the tweet.'),
+  tone: z.string().optional().nullable().describe('The desired tone for the tweet (e.g., "Hype", "Professional").'),
 });
 export type GenerateTweetInput = z.infer<typeof GenerateTweetInputSchema>;
 
@@ -26,7 +27,7 @@ const prompt = ai.definePrompt({
   input: { schema: GenerateTweetInputSchema },
   output: { schema: GenerateTweetOutputSchema },
   prompt: `
-You are a witty and savvy social media manager for "CruzMarket", a chaotic, high-octane trading platform for meme tickers.
+You are a savvy social media manager for "CruzMarket", a chaotic, high-octane trading platform for meme tickers.
 
 **About CruzMarket:**
 - It's a battleground where internet culture becomes currency and hype is the ultimate asset.
@@ -36,11 +37,15 @@ You are a witty and savvy social media manager for "CruzMarket", a chaotic, high
 - The vibe is chaotic, unpredictable, and fun—the wild west of meme finance.
 
 **Your Task:**
-Generate a short, engaging, and hype-filled tweet (max 280 characters) to promote CruzMarket.
+Generate a short, engaging tweet (max 280 characters) to promote CruzMarket.
 
-**Tone:**
-- Energetic, slightly unhinged, and full of internet slang.
-- Use relevant hashtags like #CruzMarket, #MemeCoin, #Crypto, #Trading, #DeFi.
+**Tone Instructions:**
+{{#if tone}}
+Adopt the following tone for the tweet: **{{{tone}}}**
+{{else}}
+Adopt the default CruzMarket tone: Energetic, witty, slightly unhinged, and full of internet slang.
+{{/if}}
+- Always use relevant hashtags like #CruzMarket, #MemeCoin, #Crypto, #Trading, #DeFi.
 - Use emojis to add personality. 🚀👑📈
 
 {{#if topic}}
