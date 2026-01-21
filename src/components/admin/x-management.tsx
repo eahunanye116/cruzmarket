@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wand2, Twitter } from 'lucide-react';
+import { Loader2, Wand2, Twitter, Save, X as XIcon } from 'lucide-react';
 import { generateTweetAction, postTweetAction } from '@/app/actions/x-actions';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
 
 export function XManagement() {
   const { toast } = useToast();
@@ -17,6 +18,7 @@ export function XManagement() {
   // Shared State
   const [tone, setTone] = useState('Default');
   const [customTone, setCustomTone] = useState('');
+  const [savedTones, setSavedTones] = useState<string[]>([]);
 
   // General Tweet State
   const [generalTweet, setGeneralTweet] = useState('');
@@ -28,6 +30,43 @@ export function XManagement() {
   const [trendTweet, setTrendTweet] = useState('');
   const [isGeneratingTrend, setIsGeneratingTrend] = useState(false);
   const [isPostingTrend, setIsPostingTrend] = useState(false);
+
+  useEffect(() => {
+    try {
+        const storedTones = localStorage.getItem('cruzmarket-saved-tones');
+        if (storedTones) {
+            setSavedTones(JSON.parse(storedTones));
+        }
+    } catch (error) {
+        console.error("Failed to parse saved tones from localStorage", error);
+        localStorage.removeItem('cruzmarket-saved-tones');
+    }
+  }, []);
+
+  const handleSaveTone = () => {
+    if (customTone && !savedTones.includes(customTone)) {
+        const newSavedTones = [...savedTones, customTone];
+        setSavedTones(newSavedTones);
+        localStorage.setItem('cruzmarket-saved-tones', JSON.stringify(newSavedTones));
+        toast({ title: 'Tone Saved!', description: `"${customTone}" has been added to your saved tones.` });
+    } else if (savedTones.includes(customTone)) {
+        toast({ variant: 'destructive', title: 'Already Saved', description: 'This tone is already in your saved list.' });
+    } else {
+        toast({ variant: 'destructive', title: 'Cannot Save', description: 'Custom tone field is empty.' });
+    }
+  };
+
+  const handleDeleteTone = (toneToDelete: string) => {
+    const newSavedTones = savedTones.filter(t => t !== toneToDelete);
+    setSavedTones(newSavedTones);
+    localStorage.setItem('cruzmarket-saved-tones', JSON.stringify(newSavedTones));
+    toast({ title: 'Tone Deleted!' });
+  };
+
+  const handleUseSavedTone = (savedTone: string) => {
+    setTone('Custom');
+    setCustomTone(savedTone);
+  };
   
   const getFinalTone = () => {
     if (tone === 'Custom' && !customTone) {
@@ -105,34 +144,60 @@ export function XManagement() {
         <Card>
             <CardHeader>
                 <CardTitle>AI Tone Control</CardTitle>
-                <CardDescription>Select a tone for the AI to use when generating tweets, or provide your own.</CardDescription>
+                <CardDescription>Select a tone for the AI to use, provide your own custom tone, and save it for later.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-                 <div className="space-y-2">
-                    <Label>Tone</Label>
-                    <Select value={tone} onValueChange={setTone}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a tone" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Default">Default (Witty & Un-hinged)</SelectItem>
-                            <SelectItem value="Hype">Hype</SelectItem>
-                            <SelectItem value="Professional">Professional</SelectItem>
-                            <SelectItem value="Sarcastic">Sarcastic</SelectItem>
-                            <SelectItem value="Custom">Custom</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                {tone === 'Custom' && (
+            <CardContent className="space-y-4">
+                 <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                        <Label>Custom Tone</Label>
-                        <Input
-                            placeholder="e.g., 'Like a pirate who just found treasure'"
-                            value={customTone}
-                            onChange={(e) => setCustomTone(e.target.value)}
-                        />
+                        <Label>Tone</Label>
+                        <Select value={tone} onValueChange={setTone}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a tone" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Default">Default (Witty & Un-hinged)</SelectItem>
+                                <SelectItem value="Hype">Hype</SelectItem>
+                                <SelectItem value="Professional">Professional</SelectItem>
+                                <SelectItem value="Sarcastic">Sarcastic</SelectItem>
+                                <SelectItem value="Custom">Custom</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
-                )}
+                    {tone === 'Custom' && (
+                        <div className="space-y-2">
+                            <Label>Custom Tone</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="e.g., 'Like a pirate who just found treasure'"
+                                    value={customTone}
+                                    onChange={(e) => setCustomTone(e.target.value)}
+                                />
+                                <Button variant="outline" size="icon" onClick={handleSaveTone} disabled={!customTone}>
+                                    <Save className="h-4 w-4" />
+                                    <span className="sr-only">Save Tone</span>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                 </div>
+                 {savedTones.length > 0 && (
+                    <div className="space-y-2 pt-4 border-t">
+                        <Label>Saved Tones</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {savedTones.map((savedTone) => (
+                                <Badge key={savedTone} variant="secondary" className="cursor-pointer pl-2 pr-1 py-1 text-sm">
+                                   <button onClick={() => handleUseSavedTone(savedTone)} className="hover:underline pr-2">
+                                     {savedTone}
+                                   </button>
+                                   <button onClick={() => handleDeleteTone(savedTone)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                     <XIcon className="h-3 w-3" />
+                                     <span className="sr-only">Delete tone</span>
+                                   </button>
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                 )}
             </CardContent>
         </Card>
         <div className="grid gap-6 md:grid-cols-2">
