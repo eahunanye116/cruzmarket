@@ -36,41 +36,43 @@ export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): 
 
 export function calculateMarketCapChange(ticker: Ticker | null | undefined): number | null {
   // 1. Basic validation
-  if (!ticker?.chartData || ticker.chartData.length === 0) {
+  if (!ticker?.chartData || ticker.chartData.length < 1 || !ticker.marketCap || ticker.marketCap <= 0) {
     return null;
   }
 
   const currentMarketCap = ticker.marketCap;
-  if (!currentMarketCap || currentMarketCap <= 0) {
-    return null;
-  }
 
-  // 2. Sort data and find the reference point in the past.
+  // 2. Sort data just in case it's not already sorted
   const sortedChartData = [...ticker.chartData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
   const now = new Date();
   const twentyFourHoursAgo = sub(now, { hours: 24 });
 
   let pastMarketCap: number | undefined;
   
-  // Find the last data point that is older than 24 hours.
+  // 3. Find the last data point from over 24 hours ago THAT HAS A VALID MARKET CAP.
   const point24hAgo = sortedChartData
-      .filter(p => new Date(p.time) <= twentyFourHoursAgo)
+      .filter(p => new Date(p.time) <= twentyFourHoursAgo && p.marketCap && p.marketCap > 0)
       .pop();
 
-  if (point24hAgo && point24hAgo.marketCap > 0) {
-    // If we found a point from >24h ago, use it.
+  if (point24hAgo) {
     pastMarketCap = point24hAgo.marketCap;
   } else {
-    // Otherwise (e.g., token is newer than 24h), use the very first data point as the starting cap.
-    pastMarketCap = sortedChartData[0]?.marketCap;
+    // 4. If no point from >24h ago exists, find the EARLIEST data point in history that has a valid market cap.
+    // This correctly handles tokens newer than 24h, or older tokens that only recently got market cap data points.
+    const firstValidPoint = sortedChartData.find(p => p.marketCap && p.marketCap > 0);
+    if (firstValidPoint) {
+      pastMarketCap = firstValidPoint.marketCap;
+    }
   }
 
-  // 3. Perform calculation
+  // 5. Perform calculation
   if (pastMarketCap && pastMarketCap > 0) {
     const change = ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
+    // If the change is extremely small (e.g. due to floating point), treat as 0. Avoids showing -0.00%
+    if (Math.abs(change) < 0.0001) return 0;
     return change;
   }
   
-  // 4. If we can't calculate, return null.
+  // 6. If we still can't calculate, return null.
   return null;
 }
