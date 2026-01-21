@@ -25,9 +25,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 abstract-bg">
       <div className="flex flex-col items-center text-center">
         <div className="flex items-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
-          <Zap className="h-6 w-6 animate-pulse" />
           CRUZ MODE
-          <Zap className="h-6 w-6 animate-pulse" />
         </div>
         <p className="text-muted-foreground mb-6">The undisputed King of the Hill.</p>
         
