@@ -180,12 +180,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             
             if (tokenAmount <= 0) throw new Error("Calculated token amount is zero or negative.");
             if (tokenAmount > userHolding.amount) {
-                // This check is good to have inside the transaction too.
-                throw new Error(`Insufficient tokens. You have ${userHolding.amount}, but ${tokenAmount} are required.`);
+                throw new Error(`Insufficient tokens. You have ${userHolding.amount.toLocaleString()}, but ${tokenAmount.toLocaleString()} are required.`);
             }
             
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
+            const pricePerToken = ngnToGetBeforeFee / tokenAmount;
 
             const newSupply = currentTickerData.supply + tokenAmount;
             const newMarketCap = k / newSupply;
@@ -202,7 +202,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 transaction.delete(holdingRef);
             }
             
-            // Trending Score Logic
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
@@ -225,23 +224,23 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     marketCap: newMarketCap,
                 })
             });
+
+            // Add activity to transaction
+            const activityRef = doc(collection(firestore, 'activities'));
+            transaction.set(activityRef, {
+                type: 'SELL',
+                tickerId: ticker.id,
+                tickerName: ticker.name,
+                tickerIcon: ticker.icon,
+                value: ngnToGetBeforeFee,
+                tokenAmount: tokenAmount,
+                pricePerToken: pricePerToken,
+                userId: user.uid,
+                createdAt: serverTimestamp(),
+            });
+
             return { ngnToUser };
         });
-        
-        const batch = writeBatch(firestore);
-        const activityRef = doc(collection(firestore, 'activities'));
-
-        batch.set(activityRef, {
-            type: 'SELL',
-            tickerId: ticker.id,
-            tickerName: ticker.name,
-            tickerIcon: ticker.icon,
-            value: ngnToGetBeforeFee,
-            userId: user.uid,
-            createdAt: serverTimestamp(),
-        });
-        
-        await batch.commit();
 
         toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}` });
         sellForm.reset();
@@ -313,7 +312,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 });
             }
             
-            // Trending Score Logic
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
@@ -336,22 +334,23 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     marketCap: newMarketCap,
                 })
              });
+
+            // Add activity atomically
+            const activityRef = doc(collection(firestore, 'activities'));
+            transaction.set(activityRef, {
+                type: 'BUY',
+                tickerId: ticker.id,
+                tickerName: ticker.name,
+                tickerIcon: ticker.icon,
+                value: ngnForCurve,
+                tokenAmount: tokensOut,
+                pricePerToken: effectivePricePerToken,
+                userId: user.uid,
+                createdAt: serverTimestamp(),
+            });
+
              return { tokensOut };
         });
-
-        const batch = writeBatch(firestore);
-        const activityRef = doc(collection(firestore, 'activities'));
-        batch.set(activityRef, {
-            type: 'BUY',
-            tickerId: ticker.id,
-            tickerName: ticker.name,
-            tickerIcon: ticker.icon,
-            value: ngnAmountForCurve,
-            userId: user.uid,
-            createdAt: serverTimestamp(),
-        });
-
-        await batch.commit();
 
         toast({ title: "Purchase Successful!", description: `You bought ${tokensOut.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
@@ -539,3 +538,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    

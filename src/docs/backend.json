@@ -44,6 +44,8 @@
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
         "value": { "type": "number" },
+        "tokenAmount": { "type": "number" },
+        "pricePerToken": { "type": "number" },
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -95,3 +97,5 @@
     }
   }
 }
+
+    

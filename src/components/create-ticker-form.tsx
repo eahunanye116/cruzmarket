@@ -112,6 +112,7 @@ export function CreateTickerForm() {
 
     const userProfileRef = doc(firestore, "users", user.uid);
     const tickersCollectionRef = collection(firestore, 'tickers');
+    const activitiesCollection = collection(firestore, 'activities');
 
     try {
       const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
@@ -171,33 +172,30 @@ export function CreateTickerForm() {
             volume24h: ngnForCurve,
         });
 
+        // Add activities atomically within the transaction
+        transaction.set(doc(activitiesCollection), {
+            type: 'CREATE',
+            tickerId: newTickerRef.id,
+            tickerName: values.name,
+            tickerIcon: values.icon,
+            value: 0,
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+        });
+        transaction.set(doc(activitiesCollection), {
+            type: 'BUY',
+            tickerId: newTickerRef.id,
+            tickerName: values.name,
+            tickerIcon: values.icon,
+            value: initialBuyValue,
+            tokenAmount: tokensOut,
+            pricePerToken: avgBuyPrice,
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+        });
+
         return newTickerRef;
       });
-
-      const batch = writeBatch(firestore);
-      const activitiesCollection = collection(firestore, 'activities');
-      
-      batch.set(doc(activitiesCollection), {
-        type: 'CREATE',
-        tickerId: newTickerDocRef.id,
-        tickerName: values.name,
-        tickerIcon: values.icon,
-        value: 0,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      });
-
-      batch.set(doc(activitiesCollection), {
-        type: 'BUY',
-        tickerId: newTickerDocRef.id,
-        tickerName: values.name,
-        tickerIcon: values.icon,
-        value: initialBuyValue,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      
-      await batch.commit();
       
       toast({
         title: "🚀 Ticker Created!",
@@ -372,3 +370,5 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    

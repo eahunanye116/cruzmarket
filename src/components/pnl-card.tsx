@@ -12,6 +12,7 @@ interface PnlCardProps {
   totalCurrentValue: number;
   totalProfitOrLoss: number;
   totalProfitOrLossPercentage: number;
+  valueLabel?: string;
 }
 
 export function PnlCard({
@@ -21,6 +22,7 @@ export function PnlCard({
   totalCurrentValue,
   totalProfitOrLoss,
   totalProfitOrLossPercentage,
+  valueLabel = "Portfolio Value"
 }: PnlCardProps) {
   const isProfit = totalProfitOrLoss >= 0;
 
@@ -57,7 +59,7 @@ export function PnlCard({
                 {isProfit ? '+' : '-'}₦{Math.abs(totalProfitOrLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
              <p className="text-sm text-muted-foreground mt-2">
-                Portfolio Value: ₦{totalCurrentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {valueLabel}: ₦{totalCurrentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
         </div>
 
@@ -71,3 +73,5 @@ export function PnlCard({
     </div>
   );
 }
+
+    

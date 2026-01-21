@@ -41,7 +41,9 @@ export type Activity = {
   tickerId: string;
   tickerName: string;
   tickerIcon: string;
-  value: number;
+  value: number; // NGN value
+  tokenAmount?: number;
+  pricePerToken?: number;
   userId?: string;
   createdAt: Timestamp;
 };
@@ -53,3 +55,5 @@ export type UserProfile = {
   photoURL?: string;
   balance: number;
 };
+
+    
