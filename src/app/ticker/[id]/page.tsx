@@ -10,7 +10,7 @@ import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, calculateMarketCapChange } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow, sub } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
@@ -61,49 +61,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   };
   
   const change24h = useMemo(() => {
-    if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
-      return 0;
-    }
-
-    const now = new Date();
-    const currentMarketCap = ticker.marketCap;
-    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
-    const earliestDataPoint = ticker.chartData[0];
-    
-    const findPastMarketCap = () => {
-      const targetMinutes = 24 * 60;
-      const targetTime = sub(now, { minutes: targetMinutes });
-
-      // If the token was created within the last 24 hours, use the creation market cap.
-      if (tickerCreationTime > targetTime) {
-          if (!earliestDataPoint.marketCap || earliestDataPoint.marketCap === 0) return null;
-          return earliestDataPoint.marketCap;
-      }
-      
-      // Find the data point closest to 24 hours ago
-      let closestDataPoint = null;
-      for (const dataPoint of ticker.chartData) {
-          if (!dataPoint.marketCap) continue; // Skip points without market cap data
-          const dataPointTime = new Date(dataPoint.time);
-          if (dataPointTime <= targetTime) {
-              closestDataPoint = dataPoint;
-          } else {
-              // We've passed our target time, so the last point was the closest
-              break; 
-          }
-      }
-      
-      const mcToCompare = closestDataPoint || earliestDataPoint;
-
-      if (!mcToCompare.marketCap || mcToCompare.marketCap === 0) return null; // Avoid division by zero
-      return mcToCompare.marketCap;
-    };
-    
-    const pastMarketCap = findPastMarketCap();
-    
-    if (pastMarketCap === null || pastMarketCap === 0) return 0;
-
-    return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
+    return calculateMarketCapChange(ticker);
   }, [ticker]);
   
 

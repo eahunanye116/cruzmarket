@@ -7,7 +7,7 @@ import type { Ticker } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { TickerChangeBadge } from './ticker-change-badge';
 import { useMemo } from 'react';
-import { sub } from 'date-fns';
+import { calculateMarketCapChange } from '@/lib/utils';
 
 function isValidUrl(url: string) {
     try {
@@ -22,44 +22,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
 
   const change24h = useMemo(() => {
-    if (!ticker.chartData || ticker.chartData.length < 1) {
-      return 0;
-    }
-
-    const now = new Date();
-    const currentPrice = ticker.price;
-    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
-    const earliestDataPoint = ticker.chartData[0];
-    
-    const findPastPrice = () => {
-      const targetMinutes = 24 * 60;
-      const targetTime = sub(now, { minutes: targetMinutes });
-
-      if (tickerCreationTime > targetTime) {
-          if (earliestDataPoint.price === 0) return null;
-          return earliestDataPoint.price;
-      }
-      
-      let closestDataPoint = null;
-      for (const dataPoint of ticker.chartData) {
-          const dataPointTime = new Date(dataPoint.time);
-          if (dataPointTime <= targetTime) {
-              closestDataPoint = dataPoint;
-          } else {
-              break; 
-          }
-      }
-      
-      const priceToCompare = closestDataPoint || earliestDataPoint;
-
-      if (priceToCompare.price === 0) return null;
-      return priceToCompare.price;
-    };
-    
-    const pastPrice = findPastPrice();
-    
-    if (pastPrice === null || pastPrice === 0) return 0;
-    return ((currentPrice - pastPrice) / pastPrice) * 100;
+    return calculateMarketCapChange(ticker);
   }, [ticker]);
 
   return (
