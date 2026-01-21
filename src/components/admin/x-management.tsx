@@ -24,7 +24,7 @@ export function XManagement() {
   const handleGenerateGeneral = async () => {
     setIsGeneratingGeneral(true);
     setGeneralTweet('');
-    const result = await generateTweetAction({});
+    const result = await generateTweetAction({ topic: null });
     if (result.success && result.tweet) {
       setGeneralTweet(result.tweet);
     } else {

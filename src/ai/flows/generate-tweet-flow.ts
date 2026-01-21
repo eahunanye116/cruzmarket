@@ -11,7 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const GenerateTweetInputSchema = z.object({
-  topic: z.string().optional().describe('An optional trending topic to include in the tweet.'),
+  topic: z.string().optional().nullable().describe('An optional trending topic to include in the tweet.'),
 });
 export type GenerateTweetInput = z.infer<typeof GenerateTweetInputSchema>;
 
