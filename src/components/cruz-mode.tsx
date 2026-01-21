@@ -31,7 +31,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           muted
           playsInline
           className="w-full h-full object-cover"
-          src="https://c.tenor.com/7A_s-43jHkAAAAAM/lightning.mp4"
+          src="https://c.tenor.com/v6F3gD94lJAAAAAC/lightning-storm.mp4"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-card to-card/50"></div>
       </div>
@@ -76,7 +76,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             </div>
         </div>
 
-        <div className="my-6 flex items-center gap-8">
+        <div className="my-6 flex items-center justify-center gap-8">
             <div className="text-center">
                 <p className="font-bold text-lg">24h Trend</p>
                 <TickerSparkline ticker={ticker} className="h-10 w-24 mt-1" />
