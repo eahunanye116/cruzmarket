@@ -30,6 +30,16 @@ import { toPng, toBlob } from 'html-to-image';
 import { useToast } from '@/hooks/use-toast';
 
 
+function isValidUrl(url: string | undefined | null): url is string {
+    if (!url) return false;
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
@@ -299,11 +309,12 @@ export default function PortfolioPage() {
           <TableBody>
             {enrichedPortfolio.map((holding) => {
               if (!holding) return null;
+              const hasValidIcon = isValidUrl(holding.ticker.icon);
               return (
                 <TableRow key={holding.tickerId}>
                   <TableCell>
                     <div className="flex items-center gap-4">
-                      {holding.ticker.icon && (
+                      {hasValidIcon ? (
                         <Image
                           src={holding.ticker.icon}
                           alt={holding.ticker.name}
@@ -311,6 +322,8 @@ export default function PortfolioPage() {
                           height={32}
                           className="rounded-none border-2 aspect-square object-cover"
                         />
+                      ) : (
+                         <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted" />
                       )}
                       <div>
                         <p className="font-medium">{holding.ticker.name}</p>
