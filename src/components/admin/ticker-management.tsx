@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useCollection, useFirestore, useUser } from '@/firebase';
-import { collection, deleteDoc, doc, runTransaction, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { useCollection, useFirestore } from '@/firebase';
+import { collection, deleteDoc, doc } from 'firebase/firestore';
 import { Ticker } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -20,16 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import Image from 'next/image';
@@ -53,8 +43,6 @@ export function TickerManagement() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState<Ticker | null>(null);
-  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-  const [tickerToDelete, setTickerToDelete] = useState<Ticker | null>(null);
 
   const handleEdit = (ticker: Ticker) => {
     setSelectedTicker(ticker);
@@ -66,23 +54,17 @@ export function TickerManagement() {
     setDialogOpen(true);
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (tickerToDelete: Ticker) => {
     if (!firestore || !tickerToDelete) return;
     try {
       await deleteDoc(doc(firestore, 'tickers', tickerToDelete.id));
-      toast({
-        title: 'Ticker Deleted',
-        description: `"${tickerToDelete.name}" has been removed.`,
-      });
+      // Success toast removed for instant feedback. The list will update automatically.
     } catch (e: any) {
       toast({
         variant: 'destructive',
         title: 'Error Deleting Ticker',
         description: e.message,
       });
-    } finally {
-      setDeleteAlertOpen(false);
-      setTickerToDelete(null);
     }
   };
 
@@ -146,10 +128,7 @@ export function TickerManagement() {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               className="text-destructive"
-                              onClick={() => {
-                                setTickerToDelete(ticker);
-                                setDeleteAlertOpen(true);
-                              }}>
+                              onClick={() => handleDelete(ticker)}>
                               <Trash2 className="mr-2" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -168,23 +147,6 @@ export function TickerManagement() {
         setIsOpen={setDialogOpen}
         ticker={selectedTicker}
       />
-
-       <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this ticker?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the ticker "{tickerToDelete?.name}". This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 }
