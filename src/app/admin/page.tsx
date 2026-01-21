@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
 import Link from 'next/link';
+import { PrivacyManagement } from '@/components/admin/privacy-management';
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -53,20 +54,24 @@ export default function AdminPage() {
         </div>
         <h1 className="text-4xl font-bold font-headline">Admin Control Panel</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Manage tickers and users across the platform.
+          Manage tickers, users, and platform settings.
         </p>
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="tickers">Ticker Management</TabsTrigger>
-          <TabsTrigger value="users">User Management</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="tickers">Tickers</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="privacy">Privacy</TabsTrigger>
         </TabsList>
         <TabsContent value="tickers" className="mt-6">
           <TickerManagement />
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="privacy" className="mt-6">
+          <PrivacyManagement />
         </TabsContent>
       </Tabs>
     </div>

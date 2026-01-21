@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { ReactNode } from 'react';
 import { doc } from 'firebase/firestore';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -40,6 +40,14 @@ export function Header() {
   const pathname = usePathname();
   const { signOut } = useAuth();
   const user = useUser();
+  const firestore = useFirestore();
+
+  const settingsRef = firestore ? doc(firestore, 'settings', 'privacy') : null;
+  const { data: settings } = useDoc<PlatformSettings>(settingsRef);
+  
+  // Default to true if not set
+  const signupEnabled = settings === null || settings?.signupEnabled !== false;
+
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
@@ -172,9 +180,11 @@ export function Header() {
               <Button variant="ghost" asChild>
                 <Link href="/login">Sign In</Link>
               </Button>
-              <Button asChild>
-                <Link href="/signup">Sign Up</Link>
-              </Button>
+              {signupEnabled && (
+                <Button asChild>
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              )}
             </>
           )}
         </div>

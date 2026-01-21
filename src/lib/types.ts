@@ -57,4 +57,8 @@ export type UserProfile = {
   balance: number;
 };
 
+export type PlatformSettings = {
+  id?: string;
+  signupEnabled: boolean;
+};
     

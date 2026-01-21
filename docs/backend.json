@@ -22,12 +22,16 @@
             "properties": {
               "time": { "type": "string", "format": "date" },
               "price": { "type": "number" },
-              "volume": { "type": "number" }
+              "volume": { "type": "number" },
+              "marketCap": { "type": "number" }
             }
           }
         },
         "createdAt": { "type": "string", "format": "date-time" },
-        "creatorId": { "type": "string" }
+        "creatorId": { "type": "string" },
+        "trendingScore": { "type": "number" },
+        "volume24h": { "type": "number" },
+        "priceChange24h": { "type": "number" }
       },
       "required": ["name", "slug", "tickerAddress", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
     },
@@ -40,6 +44,9 @@
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
         "value": { "type": "number" },
+        "tokenAmount": { "type": "number" },
+        "pricePerToken": { "type": "number" },
+        "realizedPnl": { "type": "number" },
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -67,6 +74,18 @@
         "avgBuyPrice": { "type": "number" }
       },
       "required": ["tickerId", "amount", "avgBuyPrice"]
+    },
+    "platformSettings": {
+      "title": "Platform Settings",
+      "description": "Stores global settings for the platform.",
+      "type": "object",
+      "properties": {
+        "signupEnabled": { 
+          "type": "boolean",
+          "description": "Controls whether new user registration is open."
+        }
+      },
+      "required": ["signupEnabled"]
     }
   },
   "auth": {
@@ -88,8 +107,11 @@
     "/users/{userId}/portfolio/{holdingId}": {
       "schema": { "$ref": "#/entities/portfolioHolding" },
       "description": "Sub-collection for a user's portfolio holdings."
+    },
+    "/settings/privacy": {
+      "schema": { "$ref": "#/entities/platformSettings" },
+      "description": "Stores privacy and registration settings for the platform."
     }
   }
 }
-
     

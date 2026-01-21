@@ -17,9 +17,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@/firebase/auth/use-auth";
+import { useAuth, useDoc, useFirestore } from "@/firebase";
+import { doc } from 'firebase/firestore';
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PlatformSettings } from "@/lib/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -31,6 +33,14 @@ export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
+  
+  const firestore = useFirestore();
+  const settingsRef = firestore ? doc(firestore, 'settings', 'privacy') : null;
+  const { data: settings } = useDoc<PlatformSettings>(settingsRef);
+  
+  // Default to true if not set
+  const signupEnabled = settings === null || settings?.signupEnabled !== false;
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -106,12 +116,14 @@ export function LoginForm() {
           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Sign In
         </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link href="/signup" className="underline font-semibold hover:text-primary">
-            Sign up
-          </Link>
-        </p>
+        {signupEnabled && (
+          <p className="text-center text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/signup" className="underline font-semibold hover:text-primary">
+              Sign up
+            </Link>
+          </p>
+        )}
       </form>
     </Form>
   );
