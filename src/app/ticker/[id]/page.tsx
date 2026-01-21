@@ -73,7 +73,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             <Skeleton className="h-8 w-32" />
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-6">
              <Skeleton className="h-48 w-full" />
              <Skeleton className="h-32 w-full mt-8" />
@@ -103,7 +103,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-8">
         <div className="lg:col-span-2">
            <Card className="h-full overflow-hidden">
             <div className="relative h-48 w-full">
@@ -178,7 +178,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <Card>
             <CardHeader>

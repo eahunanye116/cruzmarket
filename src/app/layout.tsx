@@ -30,23 +30,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <div className="relative flex min-h-dvh flex-col">
             <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">
-                <iframe 
-                    src="https://streamable.com/e/pajpzq?autoplay=1&muted=1&loop=1" 
-                    allow="fullscreen;autoplay" 
-                    allowFullScreen 
-                    style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        width: '100vw',
-                        height: '100vh',
-                        transform: 'translate(-50%, -50%)',
-                        minWidth: '100%',
-                        minHeight: '100%',
-                        border: 'none',
-                        objectFit: 'cover'
-                    }}
-                ></iframe>
+                <div className="absolute top-0 left-0 w-full h-full animated-gradient"></div>
                 <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm"></div>
             </div>
             <Header />

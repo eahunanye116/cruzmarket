@@ -9,7 +9,7 @@ import { Search } from 'lucide-react';
 import { Button } from './ui/button';
 
 type SortKey = 'createdAt' | 'price' ;
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 export function TickerList({ tickers }: { tickers: Ticker[] }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,7 +76,7 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {visibleTickers.map(ticker => (
           <TickerCard key={ticker.id} ticker={ticker} />
         ))}

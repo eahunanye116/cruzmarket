@@ -12,7 +12,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
     <section>
       <h2 className="text-3xl font-bold tracking-tight font-headline mb-2">Trending Now</h2>
       <p className="text-muted-foreground mb-6">Top moving meme tickers in the market.</p>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {trendingTickers.map((ticker) => {
           const change24h = calculateMarketCapChange(ticker);
           return (
