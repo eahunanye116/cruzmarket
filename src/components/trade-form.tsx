@@ -279,7 +279,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const newMarketCap = currentTickerData.marketCap + ngnForCurve;
             const newSupply = k / newMarketCap;
             const tokensOut = currentTickerData.supply - newSupply;
-            const finalPrice = newMarketCap / newSupply; 
+            const finalPrice = k / (newSupply * newSupply); 
 
             if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
             if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
@@ -445,7 +445,23 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               name="ngnAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Receive Amount (before fee)</FormLabel>
+                  <FormLabel className="flex justify-between items-center">
+                    <span>Receive Amount (before fee)</span>
+                     <Button 
+                      type="button" 
+                      variant="link" 
+                      size="sm" 
+                      className="h-auto px-1 py-0 text-xs text-primary"
+                      onClick={() => {
+                        // Round down to avoid precision errors that might cause the transaction to fail
+                        const maxSellValue = Math.floor(positionPnl.currentValue);
+                        sellForm.setValue('ngnAmount', maxSellValue, { shouldValidate: true });
+                      }}
+                      disabled={!hasPosition || positionPnl.currentValue <= 0}
+                    >
+                      Max
+                    </Button>
+                  </FormLabel>
                   <FormControl>
                      <div className="relative">
                       <Input type="number" placeholder="0.00" {...field} className="pr-12" />
