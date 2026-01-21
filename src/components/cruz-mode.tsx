@@ -20,16 +20,15 @@ function isValidUrl(url: string) {
 export function CruzMode({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
   const change24h = calculateMarketCapChange(ticker);
-  const youtubeVideoId = 'r2IzYkxmRHI';
 
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6">
       <div className="absolute inset-0 -z-10">
          <iframe
           className="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto -translate-x-1/2 -translate-y-1/2"
-          src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&mute=1&loop=1&playlist=${youtubeVideoId}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1`}
+          src="https://streamable.com/e/xtiibj?autoplay=1&mute=1&loop=1&nocontrols=1"
           frameBorder="0"
-          allow="autoplay; encrypted-media"
+          allow="autoplay"
           title="Cruz Mode Background"
         ></iframe>
         <div className="absolute inset-0 bg-black/60"></div>
