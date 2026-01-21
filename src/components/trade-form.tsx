@@ -449,19 +449,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 <FormItem>
                   <div className="flex justify-between items-center mb-2">
                     <FormLabel>Amount to Sell</FormLabel>
-                    <div className="flex items-center gap-2">
-                        {[10, 25, 50, 75].map(p => (
+                     <div className="flex items-center gap-2">
+                        {[25, 50, 75, 100].map(p => (
                            <Button key={p} type="button" variant="outline" size="sm" className="text-xs h-6 px-2" onClick={() => setSellAmountPercentage(p)}>{p}%</Button>
                         ))}
                     </div>
                   </div>
                   <FormControl>
-                    <div className="relative">
-                      <Input type="number" placeholder="0.00" {...field} className="pr-20" />
-                      <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-                         <Button type="button" variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => sellForm.setValue('tokenAmount', userHolding?.amount ?? 0)}>Max</Button>
-                         <span className="text-sm font-bold text-muted-foreground">${ticker.name.split(' ')[0]}</span>
-                      </div>
+                     <div className="relative">
+                      <Input type="number" placeholder="0.00" {...field} className="pr-12" />
+                      <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">${ticker.name.split(' ')[0]}</span>
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -526,4 +523,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   );
 }
 
-    
