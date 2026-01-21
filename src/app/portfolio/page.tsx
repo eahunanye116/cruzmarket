@@ -23,6 +23,9 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PnlCard } from '@/components/pnl-card';
@@ -261,6 +264,12 @@ export default function PortfolioPage() {
               </Button>
           </DialogTrigger>
           <DialogContent className="max-w-fit p-0 bg-transparent border-none">
+             <DialogHeader className="sr-only">
+              <DialogTitle>Share your PnL Card</DialogTitle>
+              <DialogDescription>
+                Download or share your trading performance on social media.
+              </DialogDescription>
+            </DialogHeader>
             <div className="relative pb-20">
                 <div ref={pnlCardRef} className="bg-background">
                     <PnlCard 
