@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, sub } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { TickerTransactions } from '@/components/ticker-transactions';
@@ -19,6 +19,7 @@ import { TokenAnalysis } from '@/components/token-analysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { PriceChart } from '@/components/price-chart';
+import { TickerChangeBadge } from '@/components/ticker-change-badge';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -57,6 +58,48 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       setTimeout(() => setIsCopied(false), 2000);
     }
   };
+  
+  const priceChange24h = useMemo(() => {
+    if (!ticker || !ticker.chartData || ticker.chartData.length < 1) {
+      return 0;
+    }
+
+    const now = new Date();
+    const currentPrice = ticker.price;
+    const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
+    const earliestDataPoint = ticker.chartData[0];
+    
+    const findPastPrice = () => {
+      const targetMinutes = 24 * 60;
+      const targetTime = sub(now, { minutes: targetMinutes });
+
+      if (tickerCreationTime > targetTime) {
+          if (earliestDataPoint.price === 0) return null;
+          return earliestDataPoint.price;
+      }
+      
+      let closestDataPoint = null;
+      for (const dataPoint of ticker.chartData) {
+          const dataPointTime = new Date(dataPoint.time);
+          if (dataPointTime <= targetTime) {
+              closestDataPoint = dataPoint;
+          } else {
+              break; 
+          }
+      }
+      
+      const priceToCompare = closestDataPoint || earliestDataPoint;
+
+      if (priceToCompare.price === 0) return null; // Avoid division by zero
+      return priceToCompare.price;
+    };
+    
+    const pastPrice = findPastPrice();
+    
+    if (pastPrice === null || pastPrice === 0) return 0;
+
+    return ((currentPrice - pastPrice) / pastPrice) * 100;
+  }, [ticker]);
   
 
   if (loading) {
@@ -135,9 +178,12 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                                 🌱 {tokenAge}
                            </div>
                         </div>
-                        <CardDescription className="text-2xl font-semibold text-primary mt-1 mb-3">
-                            ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
-                        </CardDescription>
+                        <div className="flex items-end gap-3 mt-1 mb-3">
+                            <p className="text-2xl font-semibold text-primary leading-none">
+                                ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                            </p>
+                            <TickerChangeBadge change={priceChange24h} />
+                        </div>
                          <div className="flex items-center gap-2">
                            <p className="text-xs font-mono text-muted-foreground truncate">
                             {ticker.tickerAddress}

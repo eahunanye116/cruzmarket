@@ -5,6 +5,14 @@ import { Badge } from './ui/badge';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 
 export function TickerChangeBadge({ change }: { change: number }) {
+  if (typeof change !== 'number' || !isFinite(change)) {
+    return (
+       <Badge variant="outline" className="border-2 font-semibold text-muted-foreground">
+        --%
+       </Badge>
+    );
+  }
+
   return (
     <Badge variant="outline" className={cn(
       "border-2 font-semibold",
