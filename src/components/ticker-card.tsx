@@ -4,10 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Ticker } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { TickerChangeBadge } from './ticker-change-badge';
-import { useMemo } from 'react';
-import { calculateMarketCapChange } from '@/lib/utils';
+import { TickerSparkline } from './ticker-sparkline';
 
 function isValidUrl(url: string) {
     try {
@@ -20,10 +17,6 @@ function isValidUrl(url: string) {
 
 export function TickerCard({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
-
-  const change24h = useMemo(() => {
-    return calculateMarketCapChange(ticker);
-  }, [ticker]);
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg group block">
@@ -46,7 +39,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                 ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
             </div>
           </div>
-          <TickerChangeBadge change={change24h} />
+          <TickerSparkline ticker={ticker} />
         </CardContent>
       </Card>
     </Link>

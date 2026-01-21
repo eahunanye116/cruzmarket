@@ -2,7 +2,7 @@
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
@@ -19,7 +19,6 @@ import { TokenAnalysis } from '@/components/token-analysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { PriceChart } from '@/components/price-chart';
-import { TickerChangeBadge } from '@/components/ticker-change-badge';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -144,7 +143,17 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                             <p className="text-2xl font-semibold text-primary leading-none">
                                 ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                             </p>
-                            <TickerChangeBadge change={change24h} />
+                            <div className={cn("flex items-center font-semibold text-sm", change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive")}>
+                                {change24h !== null ? (
+                                    <>
+                                        {change24h >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                                        <span className="ml-1">{change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%</span>
+                                    </>
+                                ) : (
+                                    <span>--%</span>
+                                )}
+                                <span className="ml-2 text-muted-foreground font-normal">(24h)</span>
+                            </div>
                         </div>
                          <div className="flex items-center gap-2">
                            <p className="text-xs font-mono text-muted-foreground truncate">

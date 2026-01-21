@@ -2,12 +2,10 @@
 'use client';
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
-import { TickerChangeBadge } from './ticker-change-badge';
 import { Button } from './ui/button';
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { calculateMarketCapChange } from '@/lib/utils';
+import { TickerSparkline } from './ticker-sparkline';
 
 function isValidUrl(url: string) {
     try {
@@ -21,10 +19,6 @@ function isValidUrl(url: string) {
 
 export function CruzMode({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
-
-  const change24h = useMemo(() => {
-    return calculateMarketCapChange(ticker);
-  }, [ticker]);
 
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 bg-card">
@@ -67,14 +61,14 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             </div>
         </div>
 
-        <div className="my-6 flex items-center gap-4">
+        <div className="my-6 flex items-center gap-8">
             <div className="text-center">
-                <p className="font-bold text-lg">24h Change</p>
-                <TickerChangeBadge change={change24h} />
+                <p className="font-bold text-lg">24h Trend</p>
+                <TickerSparkline ticker={ticker} className="h-10 w-24 mt-1" />
             </div>
              <div className="text-center">
                 <p className="font-bold text-lg">Market Cap</p>
-                <p className="font-semibold text-muted-foreground">₦{ticker.marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="font-semibold text-muted-foreground mt-1">₦{ticker.marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
         </div>
 
@@ -87,5 +81,3 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
     </section>
   );
 }
-
-    
