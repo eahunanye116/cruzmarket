@@ -1,3 +1,4 @@
+
 'use client';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { Activity, Ticker, PortfolioHolding } from '@/lib/types';
@@ -35,15 +36,6 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   const [ticker, setTicker] = useState<Ticker | null>(null);
   const [tickerLoading, setTickerLoading] = useState(true);
   
-  const portfolioQuery = useMemo(() => {
-    if (!user || !firestore || !ticker) return null;
-    return query(collection(firestore, `users/${user.uid}/portfolio`), where('tickerId', '==', ticker.id));
-  }, [user, firestore, ticker]);
-
-  const { data: portfolioData, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
-  const userHolding = useMemo(() => (portfolioData && portfolioData.length > 0 ? portfolioData[0] : null) as (PortfolioHolding & { id: string }) | null, [portfolioData]);
-
-
   useEffect(() => {
     if (activity?.tickerId && firestore) {
       setTickerLoading(true);
@@ -86,17 +78,21 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
     };
   }, [activity, ticker]);
   
-  const positionPnl = useMemo(() => {
-    if (!userHolding || !ticker) return null;
-    
-    const currentValue = calculateReclaimableValue(userHolding.amount, ticker);
-    const initialCost = userHolding.amount * userHolding.avgBuyPrice;
-    const pnl = currentValue - initialCost;
-    const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
-    return { pnl, pnlPercent, currentValue, initialCost };
-  }, [userHolding, ticker]);
+  const realizedPnlDetails = useMemo(() => {
+    if (!activity || activity.type !== 'SELL' || activity.realizedPnl == null || activity.value == null) {
+        return null;
+    }
+    const costBasis = activity.value - activity.realizedPnl;
+    const pnlPercent = costBasis > 0 ? (activity.realizedPnl / costBasis) * 100 : 0;
 
-  const isLoading = activityLoading || tickerLoading || (!!ticker && portfolioLoading);
+    return {
+        costBasis,
+        pnl: activity.realizedPnl,
+        pnlPercent,
+    }
+  }, [activity]);
+
+  const isLoading = activityLoading || tickerLoading;
   
   if (isLoading) {
     return (
@@ -244,37 +240,33 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
                   </ul>
               </div>
               
-              <div>
-                 <h3 className="text-sm font-medium text-muted-foreground mb-2">Current Position Status</h3>
-                 {userHolding && positionPnl ? (
-                     <div className="border rounded-lg p-4 space-y-3">
-                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Tokens Held</span>
-                            <span className="font-semibold">{userHolding.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${ticker.name.split(' ')[0]}</span>
+              {realizedPnlDetails ? (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Realized Profit / Loss</h3>
+                    <div className="border rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">NGN Received (before fee)</span>
+                            <span className="font-semibold">₦{activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Average Buy Price</span>
-                            <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
+                            <span className="text-muted-foreground">Cost Basis of Tokens Sold</span>
+                            <span className="font-semibold">₦{realizedPnlDetails.costBasis.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
-                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Current Value</span>
-                            <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                         <div className="flex justify-between items-center text-lg font-bold">
-                            <span className="text-muted-foreground">Unrealized P/L</span>
-                            <div className={cn("flex items-center", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
-                                {positionPnl.pnl >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
-                                <span>{positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                <span className="ml-2 text-base">({positionPnl.pnlPercent.toFixed(2)}%)</span>
+                        <div className="flex justify-between items-center text-lg font-bold">
+                            <span className="text-muted-foreground">Realized P/L</span>
+                            <div className={cn("flex items-center", realizedPnlDetails.pnl >= 0 ? "text-accent" : "text-destructive")}>
+                                {realizedPnlDetails.pnl >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
+                                <span>{realizedPnlDetails.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="ml-2 text-base">({realizedPnlDetails.pnlPercent.toFixed(2)}%)</span>
                             </div>
                         </div>
-                     </div>
-                 ) : (
-                    <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
-                        You no longer hold any ${ticker.name}.
                     </div>
-                 )}
-              </div>
+                  </div>
+              ) : (
+                <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
+                    Realized P/L data is not available for this older transaction.
+                </div>
+              )}
           </CardContent>
         </Card>
       </div>
@@ -284,3 +276,4 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   // Fallback, should not be reached if validation at the top is correct
   notFound();
 }
+    

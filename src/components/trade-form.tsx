@@ -160,7 +160,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     const ngnToGetBeforeFee = values.ngnAmount;
 
     try {
-        const { ngnToUser } = await runTransaction(firestore, async (transaction) => {
+        const { ngnToUser, realizedPnl } = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', user.uid);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -182,6 +182,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 throw new Error(`Insufficient tokens. You have ${userHolding.amount.toLocaleString()}, but ${tokenAmount.toLocaleString()} are required.`);
             }
             
+            const costBasisOfSoldTokens = tokenAmount * userHolding.avgBuyPrice;
+            const realizedPnl = ngnToGetBeforeFee - costBasisOfSoldTokens;
+
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
             const pricePerToken = ngnToGetBeforeFee / tokenAmount;
@@ -234,14 +237,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 value: ngnToGetBeforeFee,
                 tokenAmount: tokenAmount,
                 pricePerToken: pricePerToken,
+                realizedPnl: realizedPnl,
                 userId: user.uid,
                 createdAt: serverTimestamp(),
             });
 
-            return { ngnToUser };
+            return { ngnToUser, realizedPnl };
         });
 
-        toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}` });
+        toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}. Realized P/L: ₦${realizedPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
         sellForm.reset();
 
     } catch (e: any) {
@@ -537,5 +541,4 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-
     

@@ -44,6 +44,7 @@ export type Activity = {
   value: number; // NGN value
   tokenAmount?: number;
   pricePerToken?: number;
+  realizedPnl?: number;
   userId?: string;
   createdAt: Timestamp;
 };
