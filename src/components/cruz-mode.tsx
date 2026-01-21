@@ -3,9 +3,10 @@
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from './ui/button';
-import { Zap } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { TickerSparkline } from './ticker-sparkline';
+import { calculateMarketCapChange, cn } from '@/lib/utils';
 
 function isValidUrl(url: string) {
     try {
@@ -19,6 +20,7 @@ function isValidUrl(url: string) {
 
 export function CruzMode({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
+  const change24h = calculateMarketCapChange(ticker);
 
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 bg-card">
@@ -55,9 +57,22 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             )}
             <div className="text-left">
                 <h3 className="font-headline text-4xl font-bold">${ticker.name}</h3>
-                <p className="text-primary text-2xl font-semibold mt-1">
-                    ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
-                </p>
+                <div className="flex items-end gap-3 mt-1">
+                    <p className="text-primary text-2xl font-semibold leading-none">
+                        ₦{ticker.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                    </p>
+                    <div className={cn("flex items-center font-semibold text-sm", change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive")}>
+                        {change24h !== null ? (
+                            <>
+                                {change24h >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                                <span className="ml-1">{change24h.toFixed(2)}%</span>
+                                <span className="ml-2 text-muted-foreground font-normal">(24h)</span>
+                            </>
+                        ) : (
+                            <span>--%</span>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
 
