@@ -11,26 +11,14 @@ import {
 } from "@/components/ui/table"
 import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { ArrowDown, ArrowUp, Ban, Wallet, Share, Download, Loader2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query } from 'firebase/firestore';
 import { PortfolioHolding, Ticker } from '@/lib/types';
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { PnlCard } from '@/components/pnl-card';
-import { toPng, toBlob } from 'html-to-image';
-import { useToast } from '@/hooks/use-toast';
 
 
 function isValidUrl(url: string | undefined | null): url is string {
@@ -46,12 +34,6 @@ function isValidUrl(url: string | undefined | null): url is string {
 export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
-
-  const [isPnlCardOpen, setIsPnlCardOpen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const pnlCardRef = useRef<HTMLDivElement>(null);
 
   const portfolioPath = user ? `users/${user.uid}/portfolio` : '';
   const portfolioQuery = user ? query(collection(firestore, portfolioPath)) : null;
@@ -94,91 +76,6 @@ export default function PortfolioPage() {
   const totalProfitOrLoss = totals.currentValue - totals.initialCost;
   const totalProfitOrLossPercentage = totals.initialCost > 0 ? (totalProfitOrLoss / totals.initialCost) * 100 : 0;
 
-  const handleDownload = useCallback(() => {
-    if (pnlCardRef.current === null) {
-      return;
-    }
-
-    setIsDownloading(true);
-
-    toPng(pnlCardRef.current, { cacheBust: true, pixelRatio: 2 })
-      .then((dataUrl) => {
-        const link = document.createElement('a');
-        link.download = `cruzmarket-pnl-${user?.displayName || user?.email}.png`;
-        link.href = dataUrl;
-        link.click();
-        toast({
-          title: "Download Started",
-          description: "Your PnL card is being downloaded.",
-        });
-      })
-      .catch((err) => {
-        console.error(err);
-        toast({
-          variant: "destructive",
-          title: "Download Failed",
-          description: "Could not generate PnL card image.",
-        });
-      })
-      .finally(() => {
-        setIsDownloading(false);
-      });
-  }, [pnlCardRef, user, toast]);
-  
-  const handleShare = useCallback(async () => {
-    if (pnlCardRef.current === null) {
-      return;
-    }
-    
-    if (!navigator.share) {
-        toast({
-            variant: "destructive",
-            title: "Sharing Not Supported",
-            description: "Your browser does not support direct sharing. Try downloading the card.",
-        });
-        return;
-    }
-
-    setIsSharing(true);
-
-    try {
-        const blob = await toBlob(pnlCardRef.current, { cacheBust: true, pixelRatio: 2 });
-        if (!blob) {
-            throw new Error('Failed to create image blob.');
-        }
-
-        const fileName = `cruzmarket-pnl-${user?.displayName || user?.email}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
-        
-        const shareData = {
-            files: [file],
-            title: 'My CruzMarket PnL!',
-            text: 'Check out my trading performance on CruzMarket! #CruzMarket',
-        };
-
-        if (navigator.canShare && navigator.canShare(shareData)) {
-            await navigator.share(shareData);
-        } else {
-             toast({
-                variant: "destructive",
-                title: "Cannot Share",
-                description: "Your browser cannot share this file. Try downloading the card instead.",
-            });
-        }
-    } catch (err: any) {
-        if (err.name === 'AbortError') {
-          return; // User cancelled the share sheet
-        }
-        console.error(err);
-        toast({
-          variant: "destructive",
-          title: "Sharing Failed",
-          description: err.message || "Could not generate PnL card for sharing.",
-        });
-    } finally {
-        setIsSharing(false);
-    }
-}, [pnlCardRef, user, toast]);
 
   if (!user) {
     return (
@@ -256,52 +153,6 @@ export default function PortfolioPage() {
               </div>
           </div>
         </div>
-        <Dialog open={isPnlCardOpen} onOpenChange={setIsPnlCardOpen}>
-          <DialogTrigger asChild>
-             <Button variant="outline" className="mt-4 md:mt-0">
-                <Share className="mr-2 h-4 w-4" />
-                Share PnL Card
-              </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-fit p-0 bg-transparent border-none">
-             <DialogHeader className="sr-only">
-              <DialogTitle>Share your PnL Card</DialogTitle>
-              <DialogDescription>
-                Download or share your trading performance on social media.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="relative pb-20">
-                <div ref={pnlCardRef} className="bg-background">
-                    <PnlCard 
-                        userName={user?.displayName}
-                        userAvatar={user?.photoURL}
-                        userEmail={user?.email}
-                        totalCurrentValue={totals.currentValue}
-                        totalProfitOrLoss={totalProfitOrLoss}
-                        totalProfitOrLossPercentage={totalProfitOrLossPercentage}
-                    />
-                </div>
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4">
-                    <Button onClick={handleDownload} disabled={isDownloading || isSharing}>
-                        {isDownloading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Download className="mr-2 h-4 w-4" />
-                        )}
-                        {isDownloading ? 'Downloading...' : 'Download'}
-                    </Button>
-                    <Button onClick={handleShare} disabled={isSharing || isDownloading}>
-                        {isSharing ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Share className="mr-2 h-4 w-4" />
-                        )}
-                        {isSharing ? 'Sharing...' : 'Share'}
-                    </Button>
-                </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
       
       <Card className="overflow-hidden">
