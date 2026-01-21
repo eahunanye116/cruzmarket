@@ -73,17 +73,21 @@ export default function TickerPage({ params }: { params: { id: string } }) {
       const targetMinutes = 24 * 60;
       const targetTime = sub(now, { minutes: targetMinutes });
 
+      // If the token was created within the last 24 hours, use the creation price.
       if (tickerCreationTime > targetTime) {
+          // If creation price is 0, there's no change to calculate yet.
           if (earliestDataPoint.price === 0) return null;
           return earliestDataPoint.price;
       }
       
+      // Find the data point closest to 24 hours ago
       let closestDataPoint = null;
       for (const dataPoint of ticker.chartData) {
           const dataPointTime = new Date(dataPoint.time);
           if (dataPointTime <= targetTime) {
               closestDataPoint = dataPoint;
           } else {
+              // We've passed our target time, so the last point was the closest
               break; 
           }
       }
@@ -224,6 +228,10 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                     <span className={`font-semibold`}>{stat.value}</span>
                   </li>
                 ))}
+                 <li className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">24h Change</span>
+                    <TickerChangeBadge change={priceChange24h} />
+                  </li>
               </ul>
             </CardContent>
           </Card>
