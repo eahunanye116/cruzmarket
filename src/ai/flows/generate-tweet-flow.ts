@@ -37,21 +37,28 @@ You are a savvy social media manager for "CruzMarket", a chaotic, high-octane tr
 - The vibe is chaotic, unpredictable, and fun—the wild west of meme finance.
 
 **Your Task:**
-Generate a short, engaging tweet (max 280 characters) to promote CruzMarket.
+Generate a short, engaging tweet (max 280 characters). The primary goal is to follow the user's instructions on **Tone** and **Topic**.
 
 **Tone Instructions:**
 {{#if tone}}
-Adopt the following tone for the tweet: **{{{tone}}}**
+Your most important instruction is to adopt the following tone for the tweet: **{{{tone}}}**.
+If the tone instructs you *not* to promote the brand, then you MUST NOT mention CruzMarket, its features (like Cruz Mode), or use the #CruzMarket hashtag. Instead, create a tweet that is purely about the topic in the specified tone.
 {{else}}
-Adopt the default CruzMarket tone: Energetic, witty, slightly unhinged, and full of internet slang.
+Adopt the default CruzMarket tone: Energetic, witty, slightly unhinged, and full of internet slang. Promote the platform.
 {{/if}}
-- Always use relevant hashtags like #CruzMarket, #MemeCoin, #Crypto, #Trading, #DeFi.
+
+**Hashtag & Emoji Instructions:**
 - Use emojis to add personality. 🚀👑📈
+- Unless otherwise instructed by the tone, use hashtags like #CruzMarket, #MemeCoin, #Crypto. If you are told not to promote, use hashtags relevant to the topic.
 
 {{#if topic}}
 **Current Trend:**
-Incorporate the following trending topic into the tweet: "{{{topic}}}"
-Tie the trend back to the core concepts of CruzMarket (hype, memes, becoming king, etc.).
+Create a tweet about the following trending topic: "{{{topic}}}"
+{{#if tone}}
+Follow the tone instructions.
+{{else}}
+Explicitly tie the trend back to the core concepts of CruzMarket (hype, memes, becoming king, etc.).
+{{/if}}
 {{else}}
 **General Tweet:**
 Create a general tweet that captures the essence of CruzMarket. Focus on the thrill of creation, trading, and competition.
@@ -78,5 +85,9 @@ const generateTweetFlow = ai.defineFlow(
 
 
 export async function generateTweet(input: GenerateTweetInput): Promise<GenerateTweetOutput> {
-    return generateTweetFlow(input);
+    const result = await generateTweetFlow(input);
+    if (!result) {
+        throw new Error('Tweet generation failed to produce an output.');
+    }
+    return result;
 }
