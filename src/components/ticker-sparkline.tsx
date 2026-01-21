@@ -1,9 +1,11 @@
+
 'use client';
 
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
 import type { Ticker } from '@/lib/types';
 import { sub } from 'date-fns';
+import { calculateMarketCapChange } from '@/lib/utils';
 
 type TickerSparklineProps = {
   ticker: Ticker;
@@ -17,6 +19,8 @@ type ChartData = {
 };
 
 export function TickerSparkline({ ticker, className }: TickerSparklineProps) {
+  const change24h = useMemo(() => calculateMarketCapChange(ticker), [ticker]);
+  
   const twentyFourHourData = useMemo(() => {
     if (!ticker.chartData || ticker.chartData.length === 0) return [];
     const twentyFourHoursAgo = sub(new Date(), { hours: 24 });
@@ -29,9 +33,7 @@ export function TickerSparkline({ ticker, className }: TickerSparklineProps) {
   }, [twentyFourHourData, ticker.chartData]);
 
 
-  const startPrice = dataToRender[0]?.price ?? 0;
-  const endPrice = dataToRender[dataToRender.length - 1]?.price ?? 0;
-  const isUp = endPrice >= startPrice;
+  const isUp = change24h === null ? true : change24h >= 0;
   const color = isUp ? 'hsl(var(--chart-1))' : 'hsl(var(--destructive))';
   const gradientId = `colorSpark-${ticker.id.replace(/[^a-zA-Z0-9]/g, '')}`;
 
