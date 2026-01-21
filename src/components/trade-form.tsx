@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch, onSnapshot } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -64,36 +64,34 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const [userHolding, setUserHolding] = useState<(PortfolioHolding & { id: string }) | null>(null);
   const [holdingLoading, setHoldingLoading] = useState(true);
 
-  const fetchHolding = useCallback(async () => {
+  useEffect(() => {
     if (!user || !firestore) {
       setHoldingLoading(false);
+      setUserHolding(null);
       return;
     }
+
     setHoldingLoading(true);
     const portfolioQuery = query(
       collection(firestore, `users/${user.uid}/portfolio`),
       where('tickerId', '==', ticker.id)
     );
-    try {
-      const snapshot = await getDocs(portfolioQuery);
+
+    const unsubscribe = onSnapshot(portfolioQuery, (snapshot) => {
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
         setUserHolding({ id: doc.id, ...doc.data() } as PortfolioHolding & { id: string });
       } else {
         setUserHolding(null);
       }
-    } catch(e) {
-        console.error("Error fetching portfolio holding:", e);
-    } finally {
-        setHoldingLoading(false);
-    }
-  }, [user, firestore, ticker.id]);
+      setHoldingLoading(false);
+    }, (error) => {
+      console.error("Error listening to portfolio holding:", error);
+      setHoldingLoading(false);
+    });
 
-  useEffect(() => {
-    if(user) {
-      fetchHolding();
-    }
-  }, [user, fetchHolding]);
+    return () => unsubscribe();
+  }, [user, firestore, ticker.id]);
 
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
@@ -235,14 +233,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
         toast({ title: "Sale Successful!", description: `You sold ${tokenAmount.toLocaleString()} ${ticker.name.split(' ')[0]}` });
         sellForm.reset();
-        await fetchHolding();
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
     } finally {
         setIsSubmitting(false);
     }
-  }, [firestore, user, userHolding, ticker, toast, sellForm, fetchHolding]);
+  }, [firestore, user, userHolding, ticker, toast, sellForm]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!firestore || !user || !userProfile) return;
@@ -347,7 +344,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
         toast({ title: "Purchase Successful!", description: `You bought ${tokensOut.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
-        await fetchHolding();
 
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
@@ -522,4 +518,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
 
