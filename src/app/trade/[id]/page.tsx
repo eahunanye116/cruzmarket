@@ -3,7 +3,7 @@ import { useDoc, useFirestore } from '@/firebase';
 import { Activity, Ticker } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import { notFound } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, use } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
@@ -24,7 +24,8 @@ function isValidUrl(url: string | undefined | null): url is string {
 }
 
 export default function TradeDetailsPage({ params }: { params: { id: string } }) {
-  const id = params.id;
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
   const firestore = useFirestore();
 
   const activityRef = id ? doc(firestore, 'activities', id) : null;

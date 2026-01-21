@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Copy, Check, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { useFirestore, useDoc, useCollection } from '@/firebase';
+import { useDoc, useCollection, useFirestore } from '@/firebase';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -145,7 +145,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                                 {change24h !== null ? (
                                     <>
                                         {change24h >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                                        <span className="ml-1">{change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%</span>
+                                        <span className="ml-1">{change24h.toFixed(2)}%</span>
                                     </>
                                 ) : (
                                     <span>--%</span>
