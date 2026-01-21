@@ -8,6 +8,8 @@ import { FirebaseProvider, useFirebase, useFirebaseApp, useFirestore, useAuth as
 import { FirebaseClientProvider } from './client-provider';
 import { useUser } from './auth/use-user';
 import { useAuth } from './auth/use-auth';
+import { useDoc } from './firestore/use-doc';
+import { useCollection } from './firestore/use-collection';
 
 
 function initializeFirebase() {
@@ -39,4 +41,6 @@ export {
   useFirestore,
   useFirebaseAuthInstance,
   useAuth,
+  useDoc,
+  useCollection,
 };

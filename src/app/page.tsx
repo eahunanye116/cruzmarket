@@ -6,9 +6,8 @@ import { TrendingSection } from '@/components/trending-section';
 import { Suspense, useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ActivityFeed } from '@/components/activity-feed';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
 import { Ticker, Activity } from '@/lib/types';
 import { CruzMode } from '@/components/cruz-mode';
 

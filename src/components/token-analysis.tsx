@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useFirestore } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useFirestore, useCollection } from '@/firebase';
 import { collectionGroup, query, where } from 'firebase/firestore';
 import { useMemo } from 'react';
 import type { Ticker, PortfolioHolding } from '@/lib/types';

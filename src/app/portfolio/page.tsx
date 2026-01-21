@@ -1,6 +1,6 @@
 
 'use client';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useCollection } from '@/firebase';
 import {
   Table,
   TableBody,
@@ -13,7 +13,6 @@ import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query } from 'firebase/firestore';
 import { PortfolioHolding, Ticker } from '@/lib/types';
 import { useMemo } from 'react';
