@@ -1,15 +1,14 @@
-
 'use client';
-import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
-import { Activity, Ticker, PortfolioHolding } from '@/lib/types';
-import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
+import { useDoc, useFirestore, useUser } from '@/firebase';
+import { Activity, Ticker } from '@/lib/types';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { notFound } from 'next/navigation';
-import { useMemo, use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ShoppingCart, Calendar, Hash, CircleDollarSign, Banknote, Briefcase, Wallet } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, Hash, CircleDollarSign, Banknote, Briefcase, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -162,7 +161,7 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   if (activity.type === 'BUY') {
     const buyTradeStats = [
         { icon: Calendar, label: 'Trade Date', value: activity.createdAt ? format(activity.createdAt.toDate(), 'PPP p') : 'N/A' },
-        { icon: Banknote, label: 'Initial Investment', value: `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        { icon: Banknote, label: 'NGN In', value: `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
         { icon: Hash, label: 'Tokens Bought', value: `${activity.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${ticker.name.split(' ')[0]}` },
         { icon: CircleDollarSign, label: 'Avg. Price / Token', value: `₦${activity.pricePerToken?.toLocaleString('en-US', { maximumFractionDigits: 8 })}` },
     ];
@@ -276,4 +275,3 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   // Fallback, should not be reached if validation at the top is correct
   notFound();
 }
-    
