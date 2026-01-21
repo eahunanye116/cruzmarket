@@ -1,9 +1,9 @@
 'use client';
 import { useDoc, useFirestore } from '@/firebase';
 import { Activity, Ticker } from '@/lib/types';
-import { doc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { notFound } from 'next/navigation';
-import { useMemo, use } from 'react';
+import { useMemo, use, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
@@ -31,8 +31,32 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   const activityRef = id ? doc(firestore, 'activities', id) : null;
   const { data: activity, loading: activityLoading } = useDoc<Activity>(activityRef);
 
-  const tickerRef = activity?.tickerId ? doc(firestore, 'tickers', activity.tickerId) : null;
-  const { data: ticker, loading: tickerLoading } = useDoc<Ticker>(tickerRef);
+  const [ticker, setTicker] = useState<Ticker | null>(null);
+  const [tickerLoading, setTickerLoading] = useState(true);
+
+  useEffect(() => {
+    if (activity?.tickerId && firestore) {
+      setTickerLoading(true);
+      const tickerRef = doc(firestore, 'tickers', activity.tickerId);
+      const unsubscribe = onSnapshot(tickerRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setTicker({ id: docSnap.id, ...docSnap.data() } as Ticker);
+        } else {
+          setTicker(null);
+        }
+        setTickerLoading(false);
+      }, (error) => {
+        console.error("Error fetching ticker:", error);
+        setTicker(null);
+        setTickerLoading(false);
+      });
+      return () => unsubscribe();
+    } else {
+      if (!activityLoading) {
+        setTickerLoading(false);
+      }
+    }
+  }, [activity, firestore, activityLoading]);
   
   const pnlDetails = useMemo(() => {
     if (!activity || !ticker || activity.type !== 'BUY' || activity.tokenAmount == null || activity.pricePerToken == null) {
