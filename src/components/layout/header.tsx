@@ -53,7 +53,7 @@ export function Header() {
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <TrendingUp className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block font-headline text-lg">
-              CruiseMarket
+              CruzMarket
             </span>
           </Link>
           <nav className="flex items-center gap-6 text-base">

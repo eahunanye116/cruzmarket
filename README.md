@@ -1,8 +1,8 @@
-# CruiseMarket
+# CruzMarket
 
-**Welcome to CruiseMarket: The Premier Battleground for Meme Tickers.**
+**Welcome to CruzMarket: The Premier Battleground for Meme Tickers.**
 
-CruiseMarket isn't just another trading platform—it's a high-octane arena where internet culture becomes currency and hype is the ultimate asset. Dive into a volatile, fast-paced ecosystem of community-created tokens, each with its own narrative and explosive potential.
+CruzMarket isn't just another trading platform—it's a high-octane arena where internet culture becomes currency and hype is the ultimate asset. Dive into a volatile, fast-paced ecosystem of community-created tokens, each with its own narrative and explosive potential.
 
 **Key Features:**
 
@@ -11,4 +11,4 @@ CruiseMarket isn't just another trading platform—it's a high-octane arena wher
 *   **Become the King of the Hill:** In "Cruz Mode," only the most explosive tokens—those with meteoric 5x gains—can claim the throne. A king's reign is fleeting; they must defend their crown every minute against new challengers.
 *   **Live Arena:** Witness every buy, sell, and creation in the live activity feed.
 
-CruiseMarket is the wild west of meme finance. It's chaotic, it's unpredictable, and it's where the next legendary meme coin could be born.
+CruzMarket is the wild west of meme finance. It's chaotic, it's unpredictable, and it's where the next legendary meme coin could be born.

@@ -30,7 +30,7 @@ export default function CreateTickerPage() {
         </div>
         <h1 className="text-4xl font-bold font-headline">Create a New Meme Ticker</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Unleash the next big meme. Fill out the details to launch your ticker on CruiseMarket.
+          Unleash the next big meme. Fill out the details to launch your ticker on CruzMarket.
         </p>
       </div>
       <Card>

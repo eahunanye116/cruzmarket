@@ -7,7 +7,7 @@ import { Comic_Neue } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'CruiseMarket',
+  title: 'CruzMarket',
   description: 'The premier battleground for meme tickers. Create, trade, and conquer the market.',
 };
 

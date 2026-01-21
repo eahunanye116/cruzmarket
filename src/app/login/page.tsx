@@ -11,7 +11,7 @@ export default function LoginPage() {
         </div>
         <h1 className="text-4xl font-bold font-headline">Sign In</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Access your CruiseMarket account.
+          Access your CruzMarket account.
         </p>
       </div>
       <Card>

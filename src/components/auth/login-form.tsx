@@ -48,7 +48,7 @@ export function LoginForm() {
     if (userCredential) {
       toast({
         title: "Signed In!",
-        description: "Welcome back to CruiseMarket.",
+        description: "Welcome back to CruzMarket.",
       });
       router.push("/");
     } else if (error) {

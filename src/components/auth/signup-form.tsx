@@ -53,7 +53,7 @@ export function SignUpForm() {
     if (userCredential) {
       toast({
         title: "Account Created!",
-        description: "Welcome to CruiseMarket. You're now signed in.",
+        description: "Welcome to CruzMarket. You're now signed in.",
       });
       router.push("/");
     } else if (error) {

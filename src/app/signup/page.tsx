@@ -11,7 +11,7 @@ export default function SignUpPage() {
         </div>
         <h1 className="text-4xl font-bold font-headline">Create Account</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Join CruiseMarket and start trading memes.
+          Join CruzMarket and start trading memes.
         </p>
       </div>
       <Card>
