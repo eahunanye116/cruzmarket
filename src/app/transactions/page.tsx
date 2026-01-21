@@ -62,7 +62,7 @@ export default function TransactionsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [selectedActivity, setSelectedActivity] = useState<EnrichedActivity | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const pnlCardRef = useRef<HTMLDivElement>(null);
@@ -90,6 +90,11 @@ export default function TransactionsPage() {
     });
   }, [activities, tickers]);
   
+  const selectedActivity = useMemo(() => {
+    if (!selectedActivityId || !enrichedActivities) return null;
+    return enrichedActivities.find(a => a.id === selectedActivityId) ?? null;
+  }, [selectedActivityId, enrichedActivities]);
+
   const pnlData = useMemo(() => {
     if (!selectedActivity || !selectedActivity.ticker || selectedActivity.tokenAmount == null || selectedActivity.pricePerToken == null || selectedActivity.type !== 'BUY') return null;
     
@@ -218,6 +223,7 @@ export default function TransactionsPage() {
             <TableBody>
                 {enrichedActivities.map((activity) => {
                   const hasValidIcon = isValidUrl(activity.tickerIcon);
+                  const canShowPnl = activity.type === 'BUY' && activity.pricePerToken != null && activity.tokenAmount != null;
                   return (
                       <TableRow key={activity.id}>
                         <TableCell>
@@ -254,7 +260,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {activity.type === 'BUY' && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedActivity(activity)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedActivityId(activity.id)}>
                                 <Share className="h-4 w-4" />
                             </Button>
                           )}
@@ -278,7 +284,7 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
       
-       <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => !isOpen && setSelectedActivity(null)}>
+       <Dialog open={!!selectedActivityId} onOpenChange={(isOpen) => !isOpen && setSelectedActivityId(null)}>
           <DialogContent className="sm:max-w-md">
              <DialogHeader>
               <DialogTitle>Share Trade PnL</DialogTitle>
@@ -286,7 +292,11 @@ export default function TransactionsPage() {
                 Download or share your trade performance on social media.
               </DialogDescription>
             </DialogHeader>
-            {pnlData ? (
+            {!selectedActivity ? (
+              <div className="flex justify-center items-center h-48">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : pnlData ? (
                 <div className="flex flex-col items-center gap-4 pt-4">
                     <div ref={pnlCardRef}>
                         <PnlCard 
@@ -326,4 +336,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
