@@ -13,7 +13,7 @@ import Image from 'next/image';
 import { Ban, History, Plus, Minus, Share, Download, Loader2, FileX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import { Activity, Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -62,11 +62,11 @@ export default function TransactionsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [isPnlDialogOpen, setIsPnlDialogOpen] = useState(false);
-  
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
+  const [pnlCardInfo, setPnlCardInfo] = useState<{ activity: Activity; ticker: Ticker } | null>(null);
+  const [pnlDialogIsLoading, setPnlDialogIsLoading] = useState(false);
+  const [pnlDialogError, setPnlDialogError] = useState<string | null>(null);
+
   const pnlCardRef = useRef<HTMLDivElement>(null);
 
   // --- Data for the main transaction list ---
@@ -94,46 +94,90 @@ export default function TransactionsPage() {
   
 
   // --- Data for the PnL Dialog (fetched on-demand) ---
-  const activityRef = useMemo(() => {
-    if (!firestore || !selectedActivityId) return null;
-    return doc(firestore, 'activities', selectedActivityId);
-  }, [firestore, selectedActivityId]);
-  const { data: selectedActivity, loading: activityDialogLoading } = useDoc<Activity>(activityRef);
-
-  const dialogTickerRef = useMemo(() => {
-    if (!firestore || !selectedActivity?.tickerId) return null;
-    return doc(firestore, 'tickers', selectedActivity.tickerId);
-  }, [firestore, selectedActivity]);
-  const { data: dialogTicker, loading: dialogTickerLoading } = useDoc<Ticker>(dialogTickerRef);
-
-
   const pnlData = useMemo(() => {
-    if (!selectedActivity || !dialogTicker || selectedActivity.tokenAmount == null || selectedActivity.pricePerToken == null) return null;
+    if (!pnlCardInfo) return null;
     
-    const { tokenAmount, pricePerToken } = selectedActivity;
+    const { activity, ticker } = pnlCardInfo;
+
+    if (activity.tokenAmount == null || activity.pricePerToken == null) {
+      // This case is handled during data fetch, but as a safeguard:
+      return null;
+    }
+    
+    const { tokenAmount, pricePerToken } = activity;
     
     const initialCost = tokenAmount * pricePerToken;
-    const currentValue = calculateReclaimableValue(tokenAmount, dialogTicker);
+    const currentValue = calculateReclaimableValue(tokenAmount, ticker);
     const profitOrLoss = currentValue - initialCost;
     const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
     
     return {
       currentValue,
       profitOrLoss,
-      profitOrLossPercentage
+      profitOrLossPercentage,
+      tickerName: ticker.name,
     };
-  }, [selectedActivity, dialogTicker]);
+  }, [pnlCardInfo]);
 
-  const handleShareClick = (activityId: string) => {
-    setSelectedActivityId(activityId);
+  const handleShareClick = useCallback(async (activityId: string) => {
+    if (!firestore || !user) return;
+    
     setIsPnlDialogOpen(true);
-  };
+    setPnlDialogIsLoading(true);
+    setPnlCardInfo(null);
+    setPnlDialogError(null);
+
+    try {
+      // 1. Fetch Activity
+      const activityRef = doc(firestore, 'activities', activityId);
+      const activitySnap = await getDoc(activityRef);
+
+      if (!activitySnap.exists()) {
+        throw new Error("Transaction data not found.");
+      }
+      
+      const activityData = { id: activitySnap.id, ...activitySnap.data() } as Activity;
+
+      // 2. Check for necessary fields before fetching ticker
+      if (activityData.tokenAmount == null || activityData.pricePerToken == null) {
+          setPnlDialogError("Detailed PnL data is not available for this older transaction.");
+          setPnlDialogIsLoading(false);
+          return;
+      }
+      
+      if (!activityData.tickerId) {
+          throw new Error("Ticker ID missing from transaction.");
+      }
+
+      // 3. Fetch Ticker
+      const tickerRef = doc(firestore, 'tickers', activityData.tickerId);
+      const tickerSnap = await getDoc(tickerRef);
+
+      if (!tickerSnap.exists()) {
+        throw new Error("Associated ticker could not be found.");
+      }
+      
+      const tickerData = { id: tickerSnap.id, ...tickerSnap.data() } as Ticker;
+
+      // 4. Set state
+      setPnlCardInfo({ activity: activityData, ticker: tickerData });
+
+    } catch (e: any) {
+      console.error("Failed to generate PnL card:", e);
+      setPnlDialogError(e.message || "An unexpected error occurred.");
+    } finally {
+      setPnlDialogIsLoading(false);
+    }
+  }, [firestore, user]);
+
 
   const handleDialogClose = (open: boolean) => {
     setIsPnlDialogOpen(open);
     if (!open) {
-      // Important: Reset the activity ID when dialog closes to allow re-fetching next time
-      setSelectedActivityId(null);
+      // Reset everything on close
+      setPnlCardInfo(null);
+      setPnlDialogIsLoading(false);
+      setPnlDialogError(null);
     }
   }
   
@@ -315,11 +359,11 @@ export default function TransactionsPage() {
                 Download or share your trade performance on social media.
               </DialogDescription>
             </DialogHeader>
-            {activityDialogLoading || dialogTickerLoading ? (
+            {pnlDialogIsLoading ? (
               <div className="flex justify-center items-center h-48">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : pnlData ? (
+            ) : pnlData && pnlCardInfo ? (
                 <div className="flex flex-col items-center gap-4 pt-4">
                     <div ref={pnlCardRef}>
                         <PnlCard 
@@ -329,7 +373,7 @@ export default function TransactionsPage() {
                             totalCurrentValue={pnlData.currentValue}
                             totalProfitOrLoss={pnlData.profitOrLoss}
                             totalProfitOrLossPercentage={pnlData.profitOrLossPercentage}
-                            valueLabel={`Value of ${dialogTicker?.name} trade`}
+                            valueLabel={`Value of ${pnlData.tickerName} trade`}
                         />
                     </div>
                     <div className="flex items-center gap-4">
@@ -350,7 +394,7 @@ export default function TransactionsPage() {
                   </div>
                   <h3 className="text-lg font-semibold">Unable to Generate PnL Card</h3>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Detailed PnL data is not available for this older transaction.
+                    {pnlDialogError || "Could not retrieve trade details."}
                   </p>
               </div>
             )}
@@ -359,3 +403,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    
