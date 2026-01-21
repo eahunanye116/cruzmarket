@@ -32,7 +32,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           allow="autoplay; encrypted-media"
           title="Cruz Mode Background"
         ></iframe>
-        <div className="absolute inset-0 bg-card/80 backdrop-blur-sm"></div>
+        <div className="absolute inset-0 bg-black/60"></div>
       </div>
       <div className="relative z-10 flex flex-col items-center text-center">
         <div className="flex items-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
