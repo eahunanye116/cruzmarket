@@ -1,4 +1,3 @@
-
 'use client';
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
@@ -31,7 +30,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           muted
           playsInline
           className="w-full h-full object-cover"
-          src="https://c.tenor.com/v6F3gD94lJAAAAAC/lightning-storm.mp4"
+          src="https://c.tenor.com/VpDR3T3g2WcAAAPo/lightning-storm.mp4"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-card to-card/50"></div>
       </div>
