@@ -39,43 +39,72 @@ export function calculateMarketCapChange(ticker: Ticker | null | undefined): num
     return null;
   }
 
+  // Defensively sort chartData to be safe
+  const sortedChartData = [...ticker.chartData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  const hasMarketCapData = sortedChartData.some(d => d.marketCap !== undefined && d.marketCap > 0);
+
   const now = new Date();
-  const currentMarketCap = ticker.marketCap;
   const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
-  const earliestDataPoint = ticker.chartData[0];
+  const earliestDataPoint = sortedChartData[0];
+  const targetTime = sub(now, { hours: 24 });
   
-  const findPastMarketCap = () => {
-    const targetMinutes = 24 * 60;
-    const targetTime = sub(now, { minutes: targetMinutes });
+  if (hasMarketCapData) {
+      // --- Preferred Method: Market Cap Change ---
+      const currentMarketCap = ticker.marketCap;
 
-    // If the token was created within the last 24 hours, use the creation market cap.
-    if (tickerCreationTime > targetTime) {
-        if (!earliestDataPoint.marketCap || earliestDataPoint.marketCap === 0) return null;
-        return earliestDataPoint.marketCap;
-    }
-    
-    // Find the data point closest to 24 hours ago
-    let closestDataPoint = null;
-    for (const dataPoint of ticker.chartData) {
-        if (!dataPoint.marketCap) continue; // Skip points without market cap data
-        const dataPointTime = new Date(dataPoint.time);
-        if (dataPointTime <= targetTime) {
-            closestDataPoint = dataPoint;
-        } else {
-            // We've passed our target time, so the last point was the closest
-            break; 
-        }
-    }
-    
-    const mcToCompare = closestDataPoint || earliestDataPoint;
+      const findPastMarketCap = () => {
+          if (tickerCreationTime > targetTime) {
+              if (!earliestDataPoint || !earliestDataPoint.marketCap || earliestDataPoint.marketCap === 0) return null;
+              return earliestDataPoint.marketCap;
+          }
+          
+          let closestDataPoint = null;
+          for (const dataPoint of sortedChartData) {
+              if (!dataPoint.marketCap) continue;
+              const dataPointTime = new Date(dataPoint.time);
+              if (dataPointTime <= targetTime) {
+                  closestDataPoint = dataPoint;
+              } else {
+                  break; 
+              }
+          }
+          
+          const pointToCompare = closestDataPoint || earliestDataPoint;
+          if (!pointToCompare || !pointToCompare.marketCap || pointToCompare.marketCap === 0) return null;
+          return pointToCompare.marketCap;
+      };
+      
+      const pastMarketCap = findPastMarketCap();
+      if (pastMarketCap === null || pastMarketCap === 0) return null;
+      return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
 
-    if (!mcToCompare.marketCap || mcToCompare.marketCap === 0) return null; // Avoid division by zero
-    return mcToCompare.marketCap;
-  };
-  
-  const pastMarketCap = findPastMarketCap();
-  
-  if (pastMarketCap === null || pastMarketCap === 0) return null;
-
-  return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
+  } else {
+      // --- Fallback Method: Price Change for older tokens ---
+      const currentPrice = ticker.price;
+      
+      const findPastPrice = () => {
+          if (tickerCreationTime > targetTime) {
+              if (!earliestDataPoint || earliestDataPoint.price === 0) return null;
+              return earliestDataPoint.price;
+          }
+          
+          let closestDataPoint = null;
+          for (const dataPoint of sortedChartData) {
+              const dataPointTime = new Date(dataPoint.time);
+              if (dataPointTime <= targetTime) {
+                  closestDataPoint = dataPoint;
+              } else {
+                  break; 
+              }
+          }
+          
+          const pointToCompare = closestDataPoint || earliestDataPoint;
+          if (!pointToCompare || pointToCompare.price === 0) return null;
+          return pointToCompare.price;
+      };
+      
+      const pastPrice = findPastPrice();
+      if (pastPrice === null || pastPrice === 0) return null;
+      return ((currentPrice - pastPrice) / pastPrice) * 100;
+  }
 }
