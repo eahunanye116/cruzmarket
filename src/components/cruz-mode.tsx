@@ -23,8 +23,8 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
   const youtubeVideoId = 'r2IzYkxmRHI';
 
   return (
-    <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 bg-card">
-      <div className="absolute inset-0 w-full h-full -z-10 opacity-20">
+    <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6">
+      <div className="absolute inset-0 -z-10">
          <iframe
           className="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto -translate-x-1/2 -translate-y-1/2"
           src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&mute=1&loop=1&playlist=${youtubeVideoId}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1`}
@@ -32,7 +32,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           allow="autoplay; encrypted-media"
           title="Cruz Mode Background"
         ></iframe>
-        <div className="absolute inset-0 bg-gradient-to-t from-card to-card/50"></div>
+        <div className="absolute inset-0 bg-card/80 backdrop-blur-sm"></div>
       </div>
       <div className="relative z-10 flex flex-col items-center text-center">
         <div className="flex items-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
