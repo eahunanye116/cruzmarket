@@ -39,72 +39,74 @@ export function calculateMarketCapChange(ticker: Ticker | null | undefined): num
     return null;
   }
 
-  // Defensively sort chartData to be safe
   const sortedChartData = [...ticker.chartData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-  const hasMarketCapData = sortedChartData.some(d => d.marketCap !== undefined && d.marketCap > 0);
 
   const now = new Date();
-  const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
-  const earliestDataPoint = sortedChartData[0];
   const targetTime = sub(now, { hours: 24 });
+  const tickerCreationTime = ticker.createdAt ? ticker.createdAt.toDate() : now;
+
+  const currentMarketCap = ticker.marketCap;
+  const currentPrice = ticker.price;
+  const earliestDataPoint = sortedChartData[0];
+
+  // --- Attempt 1: Calculate using Market Cap ---
   
-  if (hasMarketCapData) {
-      // --- Preferred Method: Market Cap Change ---
-      const currentMarketCap = ticker.marketCap;
-
-      const findPastMarketCap = () => {
-          if (tickerCreationTime > targetTime) {
-              if (!earliestDataPoint || !earliestDataPoint.marketCap || earliestDataPoint.marketCap === 0) return null;
-              return earliestDataPoint.marketCap;
-          }
-          
-          let closestDataPoint = null;
-          for (const dataPoint of sortedChartData) {
-              if (!dataPoint.marketCap) continue;
-              const dataPointTime = new Date(dataPoint.time);
-              if (dataPointTime <= targetTime) {
-                  closestDataPoint = dataPoint;
-              } else {
-                  break; 
-              }
-          }
-          
-          const pointToCompare = closestDataPoint || earliestDataPoint;
-          if (!pointToCompare || !pointToCompare.marketCap || pointToCompare.marketCap === 0) return null;
-          return pointToCompare.marketCap;
-      };
-      
-      const pastMarketCap = findPastMarketCap();
-      if (pastMarketCap === null || pastMarketCap === 0) return null;
-      return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
-
+  // Find the data point to compare against for market cap
+  let pastMarketCap: number | null = null;
+  
+  if (tickerCreationTime > targetTime) {
+    // Token is newer than 24 hours, use the very first data point's market cap
+    if (earliestDataPoint.marketCap && earliestDataPoint.marketCap > 0) {
+      pastMarketCap = earliestDataPoint.marketCap;
+    }
   } else {
-      // --- Fallback Method: Price Change for older tokens ---
-      const currentPrice = ticker.price;
+    // Token is older than 24 hours, find the closest point to 24h ago
+    const point24hAgo = sortedChartData
+      .filter(p => p.marketCap && p.marketCap > 0 && new Date(p.time) <= targetTime)
+      .pop(); // Get the last element that fits the criteria
       
-      const findPastPrice = () => {
-          if (tickerCreationTime > targetTime) {
-              if (!earliestDataPoint || earliestDataPoint.price === 0) return null;
-              return earliestDataPoint.price;
-          }
-          
-          let closestDataPoint = null;
-          for (const dataPoint of sortedChartData) {
-              const dataPointTime = new Date(dataPoint.time);
-              if (dataPointTime <= targetTime) {
-                  closestDataPoint = dataPoint;
-              } else {
-                  break; 
-              }
-          }
-          
-          const pointToCompare = closestDataPoint || earliestDataPoint;
-          if (!pointToCompare || pointToCompare.price === 0) return null;
-          return pointToCompare.price;
-      };
+    if (point24hAgo) {
+      pastMarketCap = point24hAgo.marketCap;
+    } else if (earliestDataPoint.marketCap && earliestDataPoint.marketCap > 0) {
+      // Fallback to earliest point if no suitable 24h point is found
+      pastMarketCap = earliestDataPoint.marketCap;
+    }
+  }
+
+  // If we found a valid past market cap, calculate and return the change
+  if (pastMarketCap && pastMarketCap > 0 && currentMarketCap > 0) {
+    return ((currentMarketCap - pastMarketCap) / pastMarketCap) * 100;
+  }
+
+  // --- Attempt 2: Fallback to calculating using Price ---
+
+  // Find the data point to compare against for price
+  let pastPrice: number | null = null;
+  
+  if (tickerCreationTime > targetTime) {
+      // Token is newer than 24 hours, use the very first data point's price
+      if (earliestDataPoint.price && earliestDataPoint.price > 0) {
+          pastPrice = earliestDataPoint.price;
+      }
+  } else {
+      // Token is older than 24 hours, find the closest point to 24h ago
+      const point24hAgo = sortedChartData
+          .filter(p => p.price && p.price > 0 && new Date(p.time) <= targetTime)
+          .pop(); // Get the last element that fits the criteria
       
-      const pastPrice = findPastPrice();
-      if (pastPrice === null || pastPrice === 0) return null;
+      if (point24hAgo) {
+          pastPrice = point24hAgo.price;
+      } else if (earliestDataPoint.price && earliestDataPoint.price > 0) {
+          // Fallback to earliest point if no suitable 24h point is found
+          pastPrice = earliestDataPoint.price;
+      }
+  }
+
+  // If we found a valid past price, calculate and return the change
+  if (pastPrice && pastPrice > 0 && currentPrice > 0) {
       return ((currentPrice - pastPrice) / pastPrice) * 100;
   }
+
+  // If both methods fail, return null
+  return null;
 }
