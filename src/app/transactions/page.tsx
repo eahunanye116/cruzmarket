@@ -13,7 +13,7 @@ import Image from 'next/image';
 import { Ban, History, Plus, Minus, Share, Download, Loader2, FileX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -32,6 +32,7 @@ import { PnlCard } from '@/components/pnl-card';
 import { toPng, toBlob } from 'html-to-image';
 import { useToast } from '@/hooks/use-toast';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
+import { useDoc } from '@/firebase/firestore/use-doc';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -54,7 +55,6 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
   }
 }
 
-// We need to extend the Activity type locally to include the enriched ticker
 type EnrichedActivity = Activity & { ticker?: Ticker };
 
 export default function TransactionsPage() {
@@ -62,11 +62,12 @@ export default function TransactionsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [selectedActivityForPnl, setSelectedActivityForPnl] = useState<EnrichedActivity | null>(null);
+  const [isPnlDialogOpen, setIsPnlDialogOpen] = useState(false);
+  
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const pnlCardRef = useRef<HTMLDivElement>(null);
-
 
   const activitiesQuery = useMemo(() => {
     if (!user || !firestore) return null;
@@ -90,18 +91,20 @@ export default function TransactionsPage() {
     });
   }, [activities, tickers]);
   
-  const selectedActivity = useMemo(() => {
-    if (!selectedActivityId || !enrichedActivities) return null;
-    return enrichedActivities.find(a => a.id === selectedActivityId) ?? null;
-  }, [selectedActivityId, enrichedActivities]);
+  const dialogTickerRef = useMemo(() => {
+    if (!firestore || !selectedActivityForPnl?.tickerId) return null;
+    return doc(firestore, 'tickers', selectedActivityForPnl.tickerId);
+  }, [firestore, selectedActivityForPnl]);
+
+  const { data: dialogTicker, loading: dialogTickerLoading } = useDoc<Ticker>(dialogTickerRef);
 
   const pnlData = useMemo(() => {
-    if (!selectedActivity || !selectedActivity.ticker || selectedActivity.tokenAmount == null || selectedActivity.pricePerToken == null || selectedActivity.type !== 'BUY') return null;
+    if (!selectedActivityForPnl || !dialogTicker || selectedActivityForPnl.tokenAmount == null || selectedActivityForPnl.pricePerToken == null) return null;
     
-    const { ticker, tokenAmount, pricePerToken } = selectedActivity;
+    const { tokenAmount, pricePerToken } = selectedActivityForPnl;
     
     const initialCost = tokenAmount * pricePerToken;
-    const currentValue = calculateReclaimableValue(tokenAmount, ticker);
+    const currentValue = calculateReclaimableValue(tokenAmount, dialogTicker);
     const profitOrLoss = currentValue - initialCost;
     const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
     
@@ -110,7 +113,12 @@ export default function TransactionsPage() {
       profitOrLoss,
       profitOrLossPercentage
     };
-  }, [selectedActivity]);
+  }, [selectedActivityForPnl, dialogTicker]);
+
+  const handleShareClick = (activity: EnrichedActivity) => {
+    setSelectedActivityForPnl(activity);
+    setIsPnlDialogOpen(true);
+  };
   
   const handleDownload = useCallback(() => {
     if (pnlCardRef.current === null) return;
@@ -158,7 +166,6 @@ export default function TransactionsPage() {
         setIsSharing(false);
     }
 }, [pnlCardRef, toast]);
-
 
   if (!user && !loading) {
     return (
@@ -260,7 +267,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {activity.type === 'BUY' && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedActivityId(activity.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShareClick(activity)}>
                                 <Share className="h-4 w-4" />
                             </Button>
                           )}
@@ -284,7 +291,7 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
       
-       <Dialog open={!!selectedActivityId} onOpenChange={(isOpen) => !isOpen && setSelectedActivityId(null)}>
+      <Dialog open={isPnlDialogOpen} onOpenChange={setIsPnlDialogOpen}>
           <DialogContent className="sm:max-w-md">
              <DialogHeader>
               <DialogTitle>Share Trade PnL</DialogTitle>
@@ -292,7 +299,7 @@ export default function TransactionsPage() {
                 Download or share your trade performance on social media.
               </DialogDescription>
             </DialogHeader>
-            {!selectedActivity ? (
+            {dialogTickerLoading || !selectedActivityForPnl ? (
               <div className="flex justify-center items-center h-48">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
@@ -306,7 +313,7 @@ export default function TransactionsPage() {
                             totalCurrentValue={pnlData.currentValue}
                             totalProfitOrLoss={pnlData.profitOrLoss}
                             totalProfitOrLossPercentage={pnlData.profitOrLossPercentage}
-                            valueLabel={`Value of ${selectedActivity?.tickerName} trade`}
+                            valueLabel={`Value of ${dialogTicker?.name} trade`}
                         />
                     </div>
                     <div className="flex items-center gap-4">
@@ -336,3 +343,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    
