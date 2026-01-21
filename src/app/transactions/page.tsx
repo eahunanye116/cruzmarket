@@ -21,6 +21,16 @@ import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMemo } from 'react';
 
+function isValidUrl(url: string | undefined | null): url is string {
+    if (!url) return false;
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
     case 'BUY':
@@ -117,40 +127,43 @@ export default function TransactionsPage() {
             </TableHeader>
             <TableBody>
                 {enrichedActivities.map((activity) => {
-                return (
-                    <TableRow key={activity.id}>
-                    <TableCell>
-                        <div className="flex items-center gap-4">
-                        {activity.tickerIcon && (
-                            <Image
-                            src={activity.tickerIcon}
-                            alt={activity.tickerName}
-                            width={32}
-                            height={32}
-                            className="rounded-none border-2 aspect-square object-cover"
-                            />
-                        )}
-                        <div>
-                            <p className="font-medium">{activity.tickerName}</p>
-                        </div>
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                         <Badge variant={
-                            activity.type === 'BUY' ? 'default' : 'destructive'
-                            } className="text-xs">
-                            <ActivityIcon type={activity.type}/>
-                            <span className="ml-1">{activity.type}</span>
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                        {activity.type !== 'CREATE' ? `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                        {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
-                    </TableCell>
-                    </TableRow>
-                );
+                  const hasValidIcon = isValidUrl(activity.tickerIcon);
+                  return (
+                      <TableRow key={activity.id}>
+                      <TableCell>
+                          <div className="flex items-center gap-4">
+                          {hasValidIcon ? (
+                              <Image
+                              src={activity.tickerIcon}
+                              alt={activity.tickerName}
+                              width={32}
+                              height={32}
+                              className="rounded-none border-2 aspect-square object-cover"
+                              />
+                          ) : (
+                              <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted" />
+                          )}
+                          <div>
+                              <p className="font-medium">{activity.tickerName}</p>
+                          </div>
+                          </div>
+                      </TableCell>
+                      <TableCell>
+                          <Badge variant={
+                              activity.type === 'BUY' ? 'default' : 'destructive'
+                              } className="text-xs">
+                              <ActivityIcon type={activity.type}/>
+                              <span className="ml-1">{activity.type}</span>
+                          </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                          {activity.type !== 'CREATE' ? `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                          {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
+                      </TableCell>
+                      </TableRow>
+                  );
                 })}
             </TableBody>
             </Table>
