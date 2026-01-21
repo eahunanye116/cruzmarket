@@ -141,25 +141,6 @@ export function XManagement() {
           </div>
         </CardContent>
       </Card>
-       <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle>Connect to X (Twitter)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 border-l-4 border-primary bg-primary/10">
-            <h4 className="font-bold">Developer Note</h4>
-            <p className="text-sm text-muted-foreground">
-              Posting to X is currently simulated. To enable automatic posting, you need to:
-            </p>
-            <ol className="list-decimal list-inside text-sm text-muted-foreground mt-2 space-y-1">
-              <li>Create a new X Developer App with v1.1 and v2 access on <a href="https://developer.twitter.com" target="_blank" rel="noopener noreferrer" className="underline">developer.twitter.com</a>.</li>
-              <li>Obtain your App Key, App Secret, Access Token, and Access Secret.</li>
-              <li>Store these credentials securely as environment variables on your server.</li>
-              <li>Implement the `postTweetToX` function in `src/app/actions/x-actions.ts` using a library like `twitter-api-v2`.</li>
-            </ol>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
