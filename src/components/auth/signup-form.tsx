@@ -23,6 +23,11 @@ import Link from "next/link";
 import { FirebaseError } from "firebase/app";
 
 const formSchema = z.object({
+  displayName: z.string().min(3, {
+    message: "Username must be at least 3 characters.",
+  }).max(20, {
+    message: "Username cannot be more than 20 characters."
+  }),
   email: z.string().email({
     message: "Please enter a valid email.",
   }),
@@ -40,6 +45,7 @@ export function SignUpForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      displayName: "",
       email: "",
       password: "",
     },
@@ -48,7 +54,7 @@ export function SignUpForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    const { userCredential, error } = await signUp(values.email, values.password);
+    const { userCredential, error } = await signUp(values.email, values.password, values.displayName);
 
     if (userCredential) {
       toast({
@@ -85,6 +91,19 @@ export function SignUpForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="displayName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input placeholder="cruzmaster" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="email"

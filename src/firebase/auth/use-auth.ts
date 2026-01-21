@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -5,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  updateProfile,
   UserCredential,
   FirebaseError
 } from 'firebase/auth';
@@ -20,15 +22,17 @@ export function useAuth() {
   const auth = getAuth();
   const firestore = getFirestore();
 
-  const signUp = async (email: string, password: string): Promise<AuthResult> => {
+  const signUp = async (email: string, password: string, displayName: string): Promise<AuthResult> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
+      await updateProfile(user, { displayName });
       
       const userProfileRef = doc(firestore, 'users', user.uid);
       const newUserProfile = {
         email: user.email,
-        displayName: user.displayName,
+        displayName: displayName,
         photoURL: user.photoURL,
         balance: 1000000,
       };

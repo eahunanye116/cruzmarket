@@ -62,7 +62,7 @@
         "photoURL": { "type": "string", "format": "uri" },
         "balance": { "type": "number" }
       },
-      "required": ["email", "balance"]
+      "required": ["email", "displayName", "balance"]
     },
     "portfolioHolding": {
       "title": "Portfolio Holding",
@@ -74,6 +74,18 @@
         "avgBuyPrice": { "type": "number" }
       },
       "required": ["tickerId", "amount", "avgBuyPrice"]
+    },
+    "platformSettings": {
+      "title": "Platform Settings",
+      "description": "Stores global settings for the platform.",
+      "type": "object",
+      "properties": {
+        "signupEnabled": { 
+          "type": "boolean",
+          "description": "Controls whether new user registration is open."
+        }
+      },
+      "required": ["signupEnabled"]
     }
   },
   "auth": {
@@ -95,6 +107,10 @@
     "/users/{userId}/portfolio/{holdingId}": {
       "schema": { "$ref": "#/entities/portfolioHolding" },
       "description": "Sub-collection for a user's portfolio holdings."
+    },
+    "/settings/privacy": {
+      "schema": { "$ref": "#/entities/platformSettings" },
+      "description": "Stores privacy and registration settings for the platform."
     }
   }
 }

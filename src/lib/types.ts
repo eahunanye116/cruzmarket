@@ -52,7 +52,7 @@ export type Activity = {
 export type UserProfile = {
   id?: string;
   email: string;
-  displayName?: string;
+  displayName: string;
   photoURL?: string;
   balance: number;
 };
