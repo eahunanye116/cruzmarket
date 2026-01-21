@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, Share, Download, Loader2 } from 'lucide-react';
+import { Ban, History, Plus, Minus, Share, Download, Loader2, FileX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, where, orderBy } from 'firebase/firestore';
@@ -91,10 +91,11 @@ export default function TransactionsPage() {
   }, [activities, tickers]);
   
   const pnlData = useMemo(() => {
-    if (!selectedActivity || !selectedActivity.ticker || selectedActivity.tokenAmount == null || selectedActivity.type !== 'BUY') return null;
+    if (!selectedActivity || !selectedActivity.ticker || selectedActivity.tokenAmount == null || selectedActivity.pricePerToken == null || selectedActivity.type !== 'BUY') return null;
     
-    const { ticker, tokenAmount, value: initialCost } = selectedActivity;
+    const { ticker, tokenAmount, pricePerToken } = selectedActivity;
     
+    const initialCost = tokenAmount * pricePerToken;
     const currentValue = calculateReclaimableValue(tokenAmount, ticker);
     const profitOrLoss = currentValue - initialCost;
     const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
@@ -252,7 +253,7 @@ export default function TransactionsPage() {
                             {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
                         </TableCell>
                         <TableCell className="text-right">
-                          {activity.type === 'BUY' && activity.tokenAmount != null && (
+                          {activity.type === 'BUY' && (
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedActivity(activity)}>
                                 <Share className="h-4 w-4" />
                             </Button>
@@ -278,16 +279,16 @@ export default function TransactionsPage() {
       </Card>
       
        <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => !isOpen && setSelectedActivity(null)}>
-          <DialogContent className="max-w-fit p-0 bg-transparent border-none">
-             <DialogHeader className="sr-only">
-              <DialogTitle>Share your Trade PnL</DialogTitle>
+          <DialogContent className="sm:max-w-md">
+             <DialogHeader>
+              <DialogTitle>Share Trade PnL</DialogTitle>
               <DialogDescription>
                 Download or share your trade performance on social media.
               </DialogDescription>
             </DialogHeader>
-            {pnlData && (
-                 <div className="relative pb-20">
-                    <div ref={pnlCardRef} className="bg-background">
+            {pnlData ? (
+                <div className="flex flex-col items-center gap-4 pt-4">
+                    <div ref={pnlCardRef}>
                         <PnlCard 
                             userName={user?.displayName}
                             userAvatar={user?.photoURL}
@@ -298,7 +299,7 @@ export default function TransactionsPage() {
                             valueLabel={`Value of ${selectedActivity?.tickerName} trade`}
                         />
                     </div>
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <Button onClick={handleDownload} disabled={isDownloading || isSharing}>
                             {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             {isDownloading ? 'Downloading...' : 'Download'}
@@ -309,6 +310,16 @@ export default function TransactionsPage() {
                         </Button>
                     </div>
                 </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center text-center py-8">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-destructive/10 border-2 mx-auto">
+                    <FileX className="h-8 w-8 text-destructive" />
+                  </div>
+                  <h3 className="text-lg font-semibold">Unable to Generate PnL Card</h3>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Detailed PnL data is not available for this older transaction.
+                  </p>
+              </div>
             )}
           </DialogContent>
         </Dialog>
@@ -316,4 +327,3 @@ export default function TransactionsPage() {
   );
 }
 
-    
