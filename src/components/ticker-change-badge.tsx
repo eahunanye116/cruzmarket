@@ -22,9 +22,7 @@ export function TickerChangeBadge({ change }: { change: number }) {
         <ArrowUpRight className="h-4 w-4 mr-1" /> :
         <ArrowDownRight className="h-4 w-4 mr-1" />
       }
-      {change.toFixed(2)}%
+      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
     </Badge>
   );
 }
-
-    
