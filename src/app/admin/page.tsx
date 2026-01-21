@@ -1,11 +1,12 @@
 'use client';
 import { useUser } from '@/firebase';
-import { Ban, ShieldCheck } from 'lucide-react';
+import { Ban, ShieldCheck, Twitter } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
 import Link from 'next/link';
 import { PrivacyManagement } from '@/components/admin/privacy-management';
+import { XManagement } from '@/components/admin/x-management';
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -59,10 +60,11 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="tickers">Tickers</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          <TabsTrigger value="x">X</TabsTrigger>
         </TabsList>
         <TabsContent value="tickers" className="mt-6">
           <TickerManagement />
@@ -72,6 +74,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="privacy" className="mt-6">
           <PrivacyManagement />
+        </TabsContent>
+        <TabsContent value="x" className="mt-6">
+          <XManagement />
         </TabsContent>
       </Tabs>
     </div>
