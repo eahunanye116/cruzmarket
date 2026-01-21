@@ -87,4 +87,9 @@
     background-size: 400% 400%;
     animation: gradient-move 30s ease infinite;
   }
+  .abstract-bg {
+    background-color: hsl(var(--background));
+    background-image: linear-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px), linear-gradient(to right, hsl(var(--foreground) / 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
 }

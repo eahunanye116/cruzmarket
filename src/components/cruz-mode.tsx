@@ -22,18 +22,8 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
   const change24h = calculateMarketCapChange(ticker);
 
   return (
-    <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6">
-      <div className="absolute inset-0 -z-10">
-         <iframe
-          className="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto -translate-x-1/2 -translate-y-1/2"
-          src="https://streamable.com/e/xtiibj?autoplay=1&mute=1&loop=1&nocontrols=1"
-          frameBorder="0"
-          allow="autoplay"
-          title="Cruz Mode Background"
-        ></iframe>
-        <div className="absolute inset-0 bg-black/40"></div>
-      </div>
-      <div className="relative z-10 flex flex-col items-center text-center">
+    <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 abstract-bg">
+      <div className="flex flex-col items-center text-center">
         <div className="flex items-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
           <Zap className="h-6 w-6 animate-pulse" />
           CRUZ MODE
