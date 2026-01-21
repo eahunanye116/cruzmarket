@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, TrendingUp, Repeat, Wallet, Sparkles, History } from 'lucide-react';
+import { Menu, TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
@@ -13,6 +13,9 @@ import { ReactNode } from 'react';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+
+// IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
+const ADMIN_UID = 'YOUR_ADMIN_UID_HERE'; 
 
 function UserBalance() {
   const user = useUser();
@@ -44,6 +47,10 @@ export function Header() {
     { href: '/transactions', label: 'Transactions', icon: <History className="h-5 w-5" /> },
     { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
   ];
+  
+  const adminNavItem = { href: '/admin', label: 'Admin', icon: <ShieldCheck className="h-5 w-5" /> };
+  
+  const isAdmin = user?.uid === ADMIN_UID;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b-2 border-border/40 bg-background/0 backdrop-blur supports-[backdrop-filter]:bg-background/0">
@@ -69,6 +76,18 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
+             {isAdmin && (
+               <Link
+                href={adminNavItem.href}
+                className={cn(
+                  "transition-colors hover:text-foreground/80 flex items-center gap-2",
+                  pathname === adminNavItem.href ? "text-foreground font-bold" : "text-foreground/60"
+                )}
+              >
+                {adminNavItem.icon}
+                {adminNavItem.label}
+              </Link>
+             )}
           </nav>
         </div>
         <div className="md:hidden">
@@ -103,6 +122,18 @@ export function Header() {
                     {item.label}
                   </Link>
                 ))}
+                 {isAdmin && (
+                   <Link
+                    href={adminNavItem.href}
+                    className={cn(
+                      "text-xl font-medium transition-colors hover:text-foreground flex items-center gap-4",
+                      pathname === adminNavItem.href ? "text-foreground font-bold" : "text-foreground/60"
+                    )}
+                  >
+                    {adminNavItem.icon}
+                    {adminNavItem.label}
+                  </Link>
+                 )}
               </nav>
             </SheetContent>
           </Sheet>
