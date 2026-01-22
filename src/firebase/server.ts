@@ -5,19 +5,15 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { firebaseConfig } from './config';
 
 // This function ensures Firebase is initialized only once on the server.
-function getFirebaseServerApp() {
-    // Check if an app named 'firebase-server' already exists.
+function getFirebaseServerApp(): FirebaseApp {
     const serverApp = getApps().find(app => app.name === 'firebase-server');
     if (serverApp) {
         return serverApp;
     }
-    // If not, initialize it.
     return initializeApp(firebaseConfig, 'firebase-server');
 }
 
-const firestoreInstance = getFirestore(getFirebaseServerApp());
-
-// This function returns the singleton Firestore instance.
+// This function returns a Firestore instance from the server app.
 export function getFirestoreInstance(): Firestore {
-  return firestoreInstance;
+  return getFirestore(getFirebaseServerApp());
 }
