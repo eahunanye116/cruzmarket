@@ -11,32 +11,25 @@ import { TrendingBlogPosts } from '@/components/blog/trending-blog-posts';
 
 function BlogPostCard({ post }: { post: BlogPost }) {
     return (
-        <Link href={`/blog/${post.slug}`} className="group block">
-            {/* On mobile (default), it's a row. On md and up, it becomes a column. */}
-            <Card className="flex flex-row md:flex-col h-full overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
+        <Link href={`/blog/${post.slug}`} className="group block h-full">
+            <Card className="flex flex-col h-full overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
                 {/* Image container */}
-                <div className="relative w-1/3 md:w-full flex-shrink-0">
-                    {/* On mobile, square aspect ratio. On desktop, 16:9 */}
-                    <div className="w-full aspect-square md:aspect-[16/9]">
+                <div className="relative w-full">
+                    <div className="w-full aspect-video">
                         <Image
                             src={post.coverImage}
                             alt={post.title}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 767px) 33vw, (max-width: 1023px) 50vw, 33vw"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />
                     </div>
                 </div>
 
                 {/* Content container */}
-                <div className="flex flex-col flex-1 justify-center">
-                    <CardHeader className="p-4 md:p-6 pb-2">
-                        <CardTitle className="text-base md:text-xl font-bold font-headline leading-tight line-clamp-3 md:line-clamp-none">{post.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 flex-grow md:p-6 md:pt-0">
-                        {/* Excerpt is hidden on mobile for compactness */}
-                        <CardDescription className="hidden md:block">{post.excerpt}</CardDescription>
-                    </CardContent>
+                <div className="flex flex-col flex-1 p-4">
+                    <CardTitle className="text-lg font-bold font-headline leading-tight line-clamp-2 mb-2">{post.title}</CardTitle>
+                    <CardDescription className="text-sm line-clamp-3 flex-1">{post.excerpt}</CardDescription>
                 </div>
             </Card>
         </Link>
@@ -80,11 +73,14 @@ export default function BlogIndexPage() {
             {loading ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                      {[...Array(6)].map((_, i) => (
-                         <Card key={i}>
-                             <Skeleton className="w-full aspect-[16/9]" />
-                             <CardHeader><Skeleton className="h-8 w-3/4" /></CardHeader>
-                             <CardContent><Skeleton className="h-16 w-full" /></CardContent>
-                         </Card>
+                        <Card key={i} className="flex flex-col">
+                            <Skeleton className="w-full aspect-video" />
+                            <div className="p-4 flex-1 flex flex-col">
+                                <Skeleton className="h-6 w-3/4 mb-2" />
+                                <Skeleton className="h-4 w-full mb-1" />
+                                <Skeleton className="h-4 w-5/6" />
+                            </div>
+                        </Card>
                      ))}
                  </div>
             ) : regularPosts && regularPosts.length > 0 ? (
