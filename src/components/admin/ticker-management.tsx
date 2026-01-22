@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, deleteDoc, doc } from 'firebase/firestore';
 import { Ticker } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -74,9 +74,6 @@ export function TickerManagement() {
         <div className="flex justify-between items-start">
           <div>
             <CardTitle>Tickers</CardTitle>
-            <CardDescription>
-              View, create, edit, and delete tickers on the platform. Found {tickers?.length ?? 0} tickers.
-            </CardDescription>
           </div>
           <Button onClick={handleCreate}><PlusCircle className="mr-2" /> Create Ticker</Button>
         </div>
