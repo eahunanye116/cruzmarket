@@ -90,7 +90,7 @@
     },
     "savedTone": {
       "title": "Saved Tone",
-      "description": "Represents a custom AI tone saved by a user for generating tweets.",
+      "description": "Represents a custom AI tone saved by a user for generating content.",
       "type": "object",
       "properties": {
         "tone": { "type": "string" },

@@ -7,6 +7,7 @@ import { z } from 'genkit';
 
 const GenerateBlogPostInputSchema = z.object({
   topic: z.string().describe('The topic for the blog post.'),
+  tone: z.string().optional().nullable().describe('The desired tone for the blog post (e.g., "Humorous", "Formal").'),
 });
 export type GenerateBlogPostInput = z.infer<typeof GenerateBlogPostInputSchema>;
 
@@ -36,12 +37,18 @@ You are an expert financial journalist and meme culture analyst, writing for the
 **Your Task:**
 Write a full, engaging, and SEO-friendly blog post about the following topic: **"{{{topic}}}"**.
 
+**Tone Instructions:**
+{{#if tone}}
+Your most important instruction is to adopt the following tone for the blog post: **{{{tone}}}**.
+{{else}}
+Adopt the default CruzMarket tone: Authoritative yet accessible, mixing financial insights with meme culture references.
+{{/if}}
+
 **Output Requirements:**
 Your output MUST be a JSON object that strictly follows the provided schema.
 1.  **title**: Create a catchy, attention-grabbing title.
 2.  **excerpt**: Write a short summary (200-300 characters) that hooks the reader.
 3.  **content**: Write the full blog post in **Markdown format**.
-    - The tone should be authoritative yet accessible, mixing financial insights with meme culture references.
     - Structure the post with headings ('##'), subheadings ('###'), bullet points ('-'), and bold text ('**...**') for readability.
     - The post should be at least 500 words long.
     - End with a call to action encouraging readers to check out CruzMarket.

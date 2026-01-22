@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import { BlogPost } from '@/lib/types';
+import { addDoc, collection, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
+import { BlogPost, SavedTone } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, PlusCircle, Trash2, Loader2, Wand2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, PlusCircle, Trash2, Loader2, Wand2, Save, X as XIcon } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -14,21 +14,32 @@ import { format } from 'date-fns';
 import { deleteBlogPostAction, generateBlogPostAction } from '@/app/actions/blog-actions';
 import { Input } from '../ui/input';
 import { EditBlogPostDialog } from './edit-blog-post-dialog';
-import { GenerateBlogPostOutput } from '@/ai/flows/generate-blog-post-flow';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
+
 
 export function BlogManagement() {
     const firestore = useFirestore();
     const user = useUser();
     const { toast } = useToast();
 
-    const blogQuery = firestore ? query(collection(firestore, 'blogPosts'), orderBy('createdAt', 'desc')) : null;
-    const { data: posts, loading } = useCollection<BlogPost>(blogQuery);
-
+    // Blog Post State
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState<Partial<BlogPost> | null>(null);
-
     const [topic, setTopic] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    
+    // AI Tone State
+    const [tone, setTone] = useState('Default');
+    const [customTone, setCustomTone] = useState('');
+    
+    // Data Fetching
+    const blogQuery = firestore ? query(collection(firestore, 'blogPosts'), orderBy('createdAt', 'desc')) : null;
+    const { data: posts, loading } = useCollection<BlogPost>(blogQuery);
+    
+    const savedTonesQuery = user && firestore ? collection(firestore, `users/${user.uid}/savedTones`) : null;
+    const { data: savedTones, loading: tonesLoading } = useCollection<SavedTone>(savedTonesQuery);
 
     const handleCreate = () => {
         setSelectedPost(null);
@@ -49,13 +60,67 @@ export function BlogManagement() {
         }
     };
     
+    // --- Tone Management Functions ---
+    const handleSaveTone = async () => {
+        if (!customTone) {
+            toast({ variant: 'destructive', title: 'Cannot Save', description: 'Custom tone field is empty.' });
+            return;
+        }
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Must be signed in to save tones.' });
+            return;
+        }
+        if (savedTones?.some(t => t.tone === customTone)) {
+            toast({ variant: 'destructive', title: 'Already Saved', description: 'This tone is already in your saved list.' });
+            return;
+        }
+
+        try {
+            await addDoc(collection(firestore, `users/${user.uid}/savedTones`), {
+                tone: customTone,
+                userId: user.uid,
+            });
+            toast({ title: 'Tone Saved!', description: `"${customTone}" has been added to your saved tones.` });
+            setCustomTone(''); // Clear input after saving
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+        }
+    };
+
+    const handleDeleteTone = async (toneId: string) => {
+        if (!firestore || !user) return;
+        try {
+            await deleteDoc(doc(firestore, `users/${user.uid}/savedTones`, toneId));
+            toast({ title: 'Tone Deleted!' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+        }
+    };
+    
+    const handleUseSavedTone = (savedTone: string) => {
+        setTone('Custom');
+        setCustomTone(savedTone);
+    };
+
+    const getFinalTone = () => {
+        if (tone === 'Custom' && !customTone) {
+            toast({ variant: 'destructive', title: 'Missing Tone', description: 'Please enter a custom tone.' });
+            return null;
+        }
+        return tone === 'Custom' ? customTone : tone === 'Default' ? null : tone;
+    }
+
     const handleGenerate = async () => {
         if (!topic) {
             toast({ variant: 'destructive', title: 'Missing Topic', description: 'Please enter a topic to generate a blog post.' });
             return;
         }
+
+        const finalTone = getFinalTone();
+        if (tone === 'Custom' && !finalTone) return;
+
         setIsGenerating(true);
-        const result = await generateBlogPostAction({ topic });
+        const result = await generateBlogPostAction({ topic, tone: finalTone });
         setIsGenerating(false);
 
         if (result.success && result.post && user) {
@@ -75,19 +140,72 @@ export function BlogManagement() {
             <Card>
                 <CardHeader>
                     <CardTitle>AI Blog Post Generator</CardTitle>
-                    <CardDescription>Generate a new blog post using AI. Just provide a topic.</CardDescription>
+                    <CardDescription>Generate a new blog post using AI. Just provide a topic and optionally a tone.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row gap-4">
-                    <Input
-                        placeholder="e.g., The future of meme coins"
-                        value={topic}
-                        onChange={(e) => setTopic(e.target.value)}
-                        disabled={isGenerating}
-                    />
-                    <Button onClick={handleGenerate} disabled={isGenerating || !topic} className="w-full sm:w-auto">
-                        {isGenerating ? <Loader2 className="mr-2 animate-spin" /> : <Wand2 className="mr-2" />}
-                        Generate Post
-                    </Button>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>Tone</Label>
+                            <Select value={tone} onValueChange={setTone}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a tone" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Default">Default (Witty & Un-hinged)</SelectItem>
+                                    <SelectItem value="Authoritative">Authoritative</SelectItem>
+                                    <SelectItem value="Humorous">Humorous</SelectItem>
+                                    <SelectItem value="Formal">Formal</SelectItem>
+                                    <SelectItem value="Custom">Custom</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {tone === 'Custom' && (
+                            <div className="space-y-2">
+                                <Label>Custom Tone</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="e.g., 'Like a seasoned historian...'"
+                                        value={customTone}
+                                        onChange={(e) => setCustomTone(e.target.value)}
+                                    />
+                                    <Button variant="outline" size="icon" onClick={handleSaveTone} disabled={!customTone}>
+                                        <Save className="h-4 w-4" />
+                                        <span className="sr-only">Save Tone</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {tonesLoading ? <Skeleton className="h-6 w-full" /> : (savedTones && savedTones.length > 0) && (
+                        <div className="space-y-2 pt-4 border-t">
+                            <Label>Saved Tones</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {savedTones.map((savedToneDoc) => (
+                                    <Badge key={savedToneDoc.id} variant="secondary" className="cursor-pointer pl-2 pr-1 py-1 text-sm">
+                                        <button onClick={() => handleUseSavedTone(savedToneDoc.tone)} className="hover:underline pr-2">
+                                            {savedToneDoc.tone}
+                                        </button>
+                                        <button onClick={() => handleDeleteTone(savedToneDoc.id)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                            <XIcon className="h-3 w-3" />
+                                            <span className="sr-only">Delete tone</span>
+                                        </button>
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
+                        <Input
+                            placeholder="e.g., The future of meme coins"
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            disabled={isGenerating}
+                        />
+                        <Button onClick={handleGenerate} disabled={isGenerating || !topic} className="w-full sm:w-auto">
+                            {isGenerating ? <Loader2 className="mr-2 animate-spin" /> : <Wand2 className="mr-2" />}
+                            Generate Post
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
