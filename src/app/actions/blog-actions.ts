@@ -3,7 +3,7 @@
 import { generateBlogPost, GenerateBlogPostInput } from '@/ai/flows/generate-blog-post-flow';
 import { revalidatePath } from 'next/cache';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, runTransaction, query, where } from 'firebase/firestore';
-import { firestore } from '@/firebase/server';
+import { getFirestoreInstance } from '@/firebase/server';
 
 export async function generateBlogPostAction(input: GenerateBlogPostInput) {
   try {
@@ -28,6 +28,7 @@ type SavePostPayload = {
 }
 
 export async function saveBlogPostAction(payload: SavePostPayload) {
+    const firestore = getFirestoreInstance();
     try {
         const { id, ...postData } = payload;
         const dataToSave = {
@@ -62,6 +63,7 @@ export async function saveBlogPostAction(payload: SavePostPayload) {
 }
 
 export async function deleteBlogPostAction(postId: string, postSlug: string) {
+    const firestore = getFirestoreInstance();
     try {
         await deleteDoc(doc(firestore, 'blogPosts', postId));
         revalidatePath('/blog');
@@ -75,13 +77,13 @@ export async function deleteBlogPostAction(postId: string, postSlug: string) {
 }
 
 export async function setPostTrendingStatusAction(postId: string, newStatus: boolean) {
+    const firestore = getFirestoreInstance();
     try {
         await runTransaction(firestore, async (transaction) => {
             const postsCollection = collection(firestore, 'blogPosts');
             
             if (newStatus === true) {
                 const trendingQuery = query(postsCollection, where('isTrending', '==', true));
-                // Note: getDocs cannot be used inside a transaction, so we get the snapshot from the transaction object
                 const trendingSnapshot = await transaction.get(trendingQuery);
                 if (trendingSnapshot.docs.length >= 5) {
                     throw new Error('You can only have a maximum of 5 trending posts.');
