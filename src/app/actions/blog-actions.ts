@@ -3,10 +3,7 @@
 import { generateBlogPost, GenerateBlogPostInput } from '@/ai/flows/generate-blog-post-flow';
 import { revalidatePath } from 'next/cache';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
-
-// Since this is a server action, we can't use hooks. We need to initialize firebase here.
-const { firestore } = initializeFirebase();
+import { firestore } from '@/firebase/server';
 
 export async function generateBlogPostAction(input: GenerateBlogPostInput) {
   try {
@@ -31,8 +28,6 @@ type SavePostPayload = {
 }
 
 export async function saveBlogPostAction(payload: SavePostPayload) {
-    if (!firestore) return { success: false, error: "Firestore not initialized." };
-
     try {
         const { id, ...postData } = payload;
         const dataToSave = {
@@ -66,8 +61,6 @@ export async function saveBlogPostAction(payload: SavePostPayload) {
 }
 
 export async function deleteBlogPostAction(postId: string, postSlug: string) {
-    if (!firestore) return { success: false, error: "Firestore not initialized." };
-
     try {
         await deleteDoc(doc(firestore, 'blogPosts', postId));
         revalidatePath('/blog');

@@ -1,5 +1,5 @@
 import 'server-only';
-import { initializeFirebase } from "@/firebase";
+import { firestore } from "@/firebase/server";
 import { BlogPost } from "@/lib/types";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { notFound } from "next/navigation";
@@ -8,8 +8,6 @@ import { format } from "date-fns";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Metadata } from 'next';
-
-const { firestore } = initializeFirebase();
 
 type Props = {
   params: { slug: string };
