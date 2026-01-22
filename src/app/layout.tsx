@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { Comic_Neue } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { BottomNav } from '@/components/layout/bottom-nav';
 
 export const metadata: Metadata = {
   title: 'CruzMarket',
@@ -34,8 +35,9 @@ export default function RootLayout({
                 <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm"></div>
             </div>
             <Header />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 pb-16 md:pb-0">{children}</main>
           </div>
+          <BottomNav />
           <Toaster />
         </FirebaseClientProvider>
       </body>
