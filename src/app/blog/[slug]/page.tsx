@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, Timestamp } from "firebase/firestore
 import { notFound } from "next/navigation";
 import Image from 'next/image';
 import { format } from "date-fns";
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Metadata } from 'next';
 
@@ -22,6 +22,12 @@ async function getPostBySlug(slug: string): Promise<(Omit<BlogPost, 'createdAt' 
     }
     const doc = snapshot.docs[0];
     const data = doc.data();
+
+    // Defensive check for timestamps
+    if (!data.createdAt || !data.updatedAt) {
+      console.warn(`Post with slug "${slug}" is missing timestamp fields.`);
+      return null;
+    }
 
     return {
         id: doc.id,
@@ -73,6 +79,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+// Custom component renderer for ReactMarkdown to solve the duplicate title issue.
+const markdownComponents: Components = {
+    h1: ({node, ...props}) => {
+        // If the h1 is the first thing in the document, don't render it.
+        // We already have a dedicated <h1> in the header for the title.
+        // This prevents the title from appearing twice.
+        if (node && node.position && node.position.start.line === 1) {
+            return null;
+        }
+        // For any other h1 in the body, render it as normal.
+        // eslint-disable-next-line jsx-a11y/heading-has-content
+        return <h1 {...props} />;
+    }
+};
+
+
 export default async function BlogPostPage({ params }: Props) {
     const post = await getPostBySlug(params.slug);
 
@@ -83,7 +105,7 @@ export default async function BlogPostPage({ params }: Props) {
     return (
         <article className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-4xl">
             <header className="mb-8 text-center">
-                <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4">{post.title}</h1>
+                <h1 className="text-3xl md:text-5xl font-bold font-headline mb-4">{post.title}</h1>
                 <p className="text-muted-foreground text-lg">{post.excerpt}</p>
                  <time dateTime={post.createdAt.toISOString()} className="text-sm text-muted-foreground mt-4 block">
                     Published on {format(post.createdAt, 'MMMM d, yyyy')}
@@ -102,7 +124,7 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
 
             <div className="prose dark:prose-invert">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {post.content}
                 </ReactMarkdown>
             </div>
