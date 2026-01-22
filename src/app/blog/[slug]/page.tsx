@@ -1,5 +1,6 @@
+
 import 'server-only';
-import { firestore } from "@/firebase/server";
+import { getFirestoreInstance } from "@/firebase/server";
 import { BlogPost } from "@/lib/types";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { notFound } from "next/navigation";
@@ -15,6 +16,7 @@ type Props = {
 
 // Helper function to fetch post data
 async function getPostBySlug(slug: string): Promise<(Omit<BlogPost, 'createdAt' | 'updatedAt'> & { createdAt: Date, updatedAt: Date }) | null> {
+    const firestore = getFirestoreInstance();
     const postsQuery = query(collection(firestore, 'blogPosts'), where('slug', '==', slug));
     const snapshot = await getDocs(postsQuery);
     if (snapshot.empty) {
@@ -44,6 +46,7 @@ async function getPostBySlug(slug: string): Promise<(Omit<BlogPost, 'createdAt' 
 
 // This function will be used by Next.js to pre-render pages at build time
 export async function generateStaticParams() {
+    const firestore = getFirestoreInstance();
     const postsCollection = collection(firestore, 'blogPosts');
     const postsSnapshot = await getDocs(postsCollection);
     return postsSnapshot.docs.map(doc => ({
