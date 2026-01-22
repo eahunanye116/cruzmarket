@@ -15,7 +15,7 @@ export function TrendingBlogPosts({ posts }: { posts: BlogPost[] }) {
 
     return (
         <section className="mb-12">
-            <h2 className="text-3xl font-bold font-headline mb-6">Top Stories</h2>
+            <h2 className="text-3xl font-bold font-headline mb-6">Top 5 Trending</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Featured Post */}
                 <div className="lg:col-span-1">
@@ -26,7 +26,7 @@ export function TrendingBlogPosts({ posts }: { posts: BlogPost[] }) {
                                  <div className="absolute top-4 left-4">
                                     <Badge>
                                         <Star className="h-3 w-3 mr-1.5 fill-current" />
-                                        Top Story
+                                        Trending
                                     </Badge>
                                  </div>
                             </div>
