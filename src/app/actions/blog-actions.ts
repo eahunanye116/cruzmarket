@@ -2,7 +2,7 @@
 
 import { generateBlogPost, GenerateBlogPostInput } from '@/ai/flows/generate-blog-post-flow';
 import { revalidatePath } from 'next/cache';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, runTransaction, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import { getFirestoreInstance } from '@/firebase/server';
 
 export async function generateBlogPostAction(input: GenerateBlogPostInput) {
@@ -79,26 +79,29 @@ export async function deleteBlogPostAction(postId: string, postSlug: string) {
 export async function setPostTrendingStatusAction(postId: string, newStatus: boolean) {
     const firestore = getFirestoreInstance();
     try {
-        await runTransaction(firestore, async (transaction) => {
+        // If we are setting a post to be trending, first check if we have space.
+        if (newStatus === true) {
             const postsCollection = collection(firestore, 'blogPosts');
+            const trendingQuery = query(postsCollection, where('isTrending', '==', true));
+            const trendingSnapshot = await getDocs(trendingQuery);
             
-            if (newStatus === true) {
-                const trendingQuery = query(postsCollection, where('isTrending', '==', true));
-                const trendingSnapshot = await transaction.get(trendingQuery);
-                if (trendingSnapshot.docs.length >= 5) {
-                    throw new Error('You can only have a maximum of 5 trending posts.');
-                }
+            // If we already have 5 or more trending posts, prevent adding another.
+            if (trendingSnapshot.size >= 5) {
+                throw new Error('You can only have a maximum of 5 trending posts.');
             }
+        }
 
-            const postRef = doc(firestore, 'blogPosts', postId);
-            transaction.update(postRef, { isTrending: newStatus });
-        });
+        // Proceed with the update.
+        const postRef = doc(firestore, 'blogPosts', postId);
+        await updateDoc(postRef, { isTrending: newStatus });
 
+        // Revalidate caches and return success.
         revalidatePath('/admin');
         revalidatePath('/blog');
         return { success: true, message: `Post trending status updated.` };
+
     } catch (error: any) {
-        console.error(error);
+        console.error("Failed to set trending status:", error);
         return { success: false, error: error.message || 'Failed to update status.' };
     }
 }
