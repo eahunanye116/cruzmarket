@@ -65,7 +65,7 @@ export default function BlogIndexPage() {
                 <TrendingBlogPosts posts={trendingPosts} />
             )}
             
-            <h2 className="text-3xl font-bold font-headline mb-6 border-t pt-12">All Articles</h2>
+            <h2 className="text-3xl font-bold font-headline mb-6 border-t pt-12">TRENDS</h2>
             
             {loading ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
