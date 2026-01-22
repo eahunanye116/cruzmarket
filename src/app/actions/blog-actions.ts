@@ -2,7 +2,7 @@
 
 import { generateBlogPost, GenerateBlogPostInput } from '@/ai/flows/generate-blog-post-flow';
 import { revalidatePath } from 'next/cache';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, runTransaction, query, where } from 'firebase/firestore';
 import { firestore } from '@/firebase/server';
 
 export async function generateBlogPostAction(input: GenerateBlogPostInput) {
@@ -46,6 +46,7 @@ export async function saveBlogPostAction(payload: SavePostPayload) {
             await addDoc(collectionRef, {
                 ...dataToSave,
                 createdAt: serverTimestamp(),
+                isTrending: false, // Default to not trending
             });
         }
         revalidatePath('/blog');
@@ -70,5 +71,32 @@ export async function deleteBlogPostAction(postId: string, postSlug: string) {
     } catch (error: any) {
         console.error(error);
         return { success: false, error: error.message || 'Failed to delete post.' };
+    }
+}
+
+export async function setPostTrendingStatusAction(postId: string, newStatus: boolean) {
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const postsCollection = collection(firestore, 'blogPosts');
+            
+            if (newStatus === true) {
+                const trendingQuery = query(postsCollection, where('isTrending', '==', true));
+                // Note: getDocs cannot be used inside a transaction, so we get the snapshot from the transaction object
+                const trendingSnapshot = await transaction.get(trendingQuery);
+                if (trendingSnapshot.docs.length >= 5) {
+                    throw new Error('You can only have a maximum of 5 trending posts.');
+                }
+            }
+
+            const postRef = doc(firestore, 'blogPosts', postId);
+            transaction.update(postRef, { isTrending: newStatus });
+        });
+
+        revalidatePath('/admin');
+        revalidatePath('/blog');
+        return { success: true, message: `Post trending status updated.` };
+    } catch (error: any) {
+        console.error(error);
+        return { success: false, error: error.message || 'Failed to update status.' };
     }
 }

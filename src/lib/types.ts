@@ -78,4 +78,5 @@ export type BlogPost = {
   authorId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  isTrending?: boolean;
 };

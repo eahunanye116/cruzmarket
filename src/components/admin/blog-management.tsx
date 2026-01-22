@@ -1,22 +1,24 @@
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
-import { addDoc, collection, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, orderBy, query, updateDoc } from 'firebase/firestore';
 import { BlogPost, SavedTone } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, PlusCircle, Trash2, Loader2, Wand2, Save, X as XIcon } from 'lucide-react';
+import { MoreHorizontal, Pencil, PlusCircle, Trash2, Loader2, Wand2, Save, X as XIcon, Star } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { format } from 'date-fns';
-import { deleteBlogPostAction, generateBlogPostAction } from '@/app/actions/blog-actions';
+import { deleteBlogPostAction, generateBlogPostAction, setPostTrendingStatusAction } from '@/app/actions/blog-actions';
 import { Input } from '../ui/input';
 import { EditBlogPostDialog } from './edit-blog-post-dialog';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
+import { Switch } from '../ui/switch';
+import { cn } from '@/lib/utils';
 
 
 export function BlogManagement() {
@@ -29,6 +31,7 @@ export function BlogManagement() {
     const [selectedPost, setSelectedPost] = useState<Partial<BlogPost> | null>(null);
     const [topic, setTopic] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [updatingTrend, setUpdatingTrend] = useState<string | null>(null);
     
     // AI Tone State
     const [tone, setTone] = useState('Default');
@@ -40,6 +43,8 @@ export function BlogManagement() {
     
     const savedTonesQuery = user && firestore ? collection(firestore, `users/${user.uid}/savedTones`) : null;
     const { data: savedTones, loading: tonesLoading } = useCollection<SavedTone>(savedTonesQuery);
+
+    const trendingCount = posts?.filter(p => p.isTrending).length ?? 0;
 
     const handleCreate = () => {
         setSelectedPost(null);
@@ -58,6 +63,17 @@ export function BlogManagement() {
         } else {
             toast({ variant: 'destructive', title: 'Error Deleting Post', description: result.error });
         }
+    };
+
+    const handleTrendingToggle = async (postId: string, newStatus: boolean) => {
+        setUpdatingTrend(postId);
+        const result = await setPostTrendingStatusAction(postId, newStatus);
+        if (result.success) {
+            toast({ title: 'Status Updated', description: `Post is now ${newStatus ? 'trending' : 'not trending'}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
+        }
+        setUpdatingTrend(null);
     };
     
     // --- Tone Management Functions ---
@@ -215,7 +231,7 @@ export function BlogManagement() {
                         <div>
                             <CardTitle>Blog Posts</CardTitle>
                             <CardDescription>
-                                View, create, edit, and delete blog posts. Found {posts?.length ?? 0} posts.
+                                You can feature up to 5 trending posts. Currently featuring {trendingCount}/5.
                             </CardDescription>
                         </div>
                         <Button onClick={handleCreate}><PlusCircle className="mr-2" /> New Post</Button>
@@ -232,16 +248,31 @@ export function BlogManagement() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Title</TableHead>
-                                        <TableHead>Slug</TableHead>
+                                        <TableHead>Trending</TableHead>
                                         <TableHead>Created</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {posts?.map((post) => (
-                                        <TableRow key={post.id}>
-                                            <TableCell className="font-medium">{post.title}</TableCell>
-                                            <TableCell>/blog/{post.slug}</TableCell>
+                                        <TableRow key={post.id} className={cn(post.isTrending && "bg-primary/5")}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {post.isTrending && <Star className="h-4 w-4 text-primary fill-primary" />}
+                                                    {post.title}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {updatingTrend === post.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Switch
+                                                        checked={!!post.isTrending}
+                                                        onCheckedChange={(checked) => handleTrendingToggle(post.id, checked)}
+                                                        disabled={trendingCount >= 5 && !post.isTrending}
+                                                    />
+                                                )}
+                                            </TableCell>
                                             <TableCell>{format(post.createdAt.toDate(), 'PPP')}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>

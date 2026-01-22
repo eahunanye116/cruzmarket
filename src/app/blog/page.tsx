@@ -6,7 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { TrendingUp } from 'lucide-react';
+import { useMemo } from 'react';
+import { TrendingBlogPosts } from '@/components/blog/trending-blog-posts';
 
 function BlogPostCard({ post }: { post: BlogPost }) {
     return (
@@ -37,21 +38,38 @@ export default function BlogIndexPage() {
     const blogQuery = firestore ? query(collection(firestore, 'blogPosts'), orderBy('createdAt', 'desc')) : null;
     const { data: posts, loading } = useCollection<BlogPost>(blogQuery);
 
+    const { trendingPosts, regularPosts } = useMemo(() => {
+        if (!posts) return { trendingPosts: [], regularPosts: [] };
+        const trending = posts.filter(p => p.isTrending);
+        const regular = posts.filter(p => !p.isTrending);
+        return { trendingPosts: trending, regularPosts: regular };
+    }, [posts]);
+
     return (
         <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col items-center text-center mb-12">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-                    <TrendingUp className="h-8 w-8 text-primary" />
+            
+            {loading ? (
+                <div className='mb-12'>
+                    <Skeleton className="h-9 w-48 mb-6" />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <Skeleton className="aspect-[16/9] lg:aspect-auto h-96 lg:h-full" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <Skeleton className="aspect-[16/9] h-full" />
+                            <Skeleton className="aspect-[16/9] h-full" />
+                            <Skeleton className="aspect-[16/9] h-full" />
+                            <Skeleton className="aspect-[16/9] h-full" />
+                        </div>
+                    </div>
                 </div>
-                <h1 className="text-4xl font-bold font-headline">Market Trends & News</h1>
-                <p className="mt-2 text-lg text-muted-foreground">
-                    The latest analysis, insights, and top performers in the CruzMarket arena.
-                </p>
-            </div>
+            ) : (
+                <TrendingBlogPosts posts={trendingPosts} />
+            )}
+            
+            <h2 className="text-3xl font-bold font-headline mb-6 border-t pt-12">All Articles</h2>
             
             {loading ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                     {[...Array(3)].map((_, i) => (
+                     {[...Array(6)].map((_, i) => (
                          <Card key={i}>
                              <Skeleton className="w-full aspect-[16/9]" />
                              <CardHeader><Skeleton className="h-8 w-3/4" /></CardHeader>
@@ -59,13 +77,13 @@ export default function BlogIndexPage() {
                          </Card>
                      ))}
                  </div>
-            ) : posts && posts.length > 0 ? (
+            ) : regularPosts && regularPosts.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {posts.map(post => <BlogPostCard key={post.id} post={post} />)}
+                    {regularPosts.map(post => <BlogPostCard key={post.id} post={post} />)}
                 </div>
             ) : (
                 <div className="text-center text-muted-foreground py-16">
-                    <p>No articles found. Check back soon!</p>
+                    <p>No more articles found. Check back soon!</p>
                 </div>
             )}
         </div>
