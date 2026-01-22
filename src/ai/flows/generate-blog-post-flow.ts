@@ -59,12 +59,28 @@ Generate the blog post now.
 `,
 });
 
+const generateBlogPostFlow = ai.defineFlow(
+    {
+      name: 'generateBlogPostFlow',
+      inputSchema: GenerateBlogPostInputSchema,
+      outputSchema: GenerateBlogPostOutputSchema,
+    },
+    async (input) => {
+      const { output } = await prompt(input);
+      if (!output) {
+        throw new Error("The AI model failed to return a valid blog post structure.");
+      }
+      // The AI sometimes generates slugs with spaces, so we'll fix that.
+      output.slug = output.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      return output;
+    }
+);
+
+
 export async function generateBlogPost(input: GenerateBlogPostInput): Promise<GenerateBlogPostOutput> {
-  const { output } = await prompt(input);
-  if (!output) {
-    throw new Error("Failed to generate blog post");
+  const result = await generateBlogPostFlow(input);
+  if (!result) {
+    throw new Error('Blog post generation failed to produce a final output.');
   }
-  // The AI sometimes generates slugs with spaces, so we'll fix that.
-  output.slug = output.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return output;
+  return result;
 }
