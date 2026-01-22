@@ -1,0 +1,11 @@
+# Tells search engine crawlers which pages to crawl or not.
+# See https://www.robotstxt.org/robotstxt.html for documentation.
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Point to the sitemap for crawlers to discover all pages.
+# The domain should be updated to match your production domain.
+Sitemap: https://cruzmarket.com/sitemap.xml

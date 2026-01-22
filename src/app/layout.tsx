@@ -8,8 +8,34 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BottomNav } from '@/components/layout/bottom-nav';
 
 export const metadata: Metadata = {
+  // Add a metadataBase for absolute URLs in sitemaps and social sharing.
+  // IMPORTANT: The user should replace this with their actual domain.
+  metadataBase: new URL('https://cruzmarket.com'),
   title: 'CruzMarket',
   description: 'The premier battleground for meme tickers. Create, trade, and conquer the market.',
+  openGraph: {
+    title: 'CruzMarket: The Meme Ticker Arena',
+    description: 'Create, trade, and conquer the market on the premier battleground for meme tickers.',
+    url: 'https://cruzmarket.com',
+    siteName: 'CruzMarket',
+    images: [
+      {
+        url: '/cruzmarket-og.png', // This image should be placed in the `public` folder.
+        width: 1200,
+        height: 630,
+        alt: 'CruzMarket Logo and Tagline',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CruzMarket: The Meme Ticker Arena',
+    description: 'Create, trade, and conquer the market on the premier battleground for meme tickers.',
+    // creator: '@cruzmarket', // Uncomment and add X handle when available
+    images: ['/cruzmarket-og.png'], // This image should be placed in the `public` folder.
+  },
 };
 
 const comicNeue = Comic_Neue({
