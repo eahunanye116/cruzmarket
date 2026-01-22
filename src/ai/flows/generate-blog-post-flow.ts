@@ -5,12 +5,12 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const GenerateBlogPostInputSchema = z.object({
+const GenerateBlogPostInputSchema = z.object({
   topic: z.string().describe('The topic for the blog post.'),
 });
 export type GenerateBlogPostInput = z.infer<typeof GenerateBlogPostInputSchema>;
 
-export const GenerateBlogPostOutputSchema = z.object({
+const GenerateBlogPostOutputSchema = z.object({
   title: z.string().describe('A catchy, SEO-friendly title for the blog post.'),
   excerpt: z.string().max(300).describe('A short, engaging summary of the blog post, around 200-300 characters.'),
   content: z.string().describe('The full blog post content, formatted in Markdown. It should be well-structured with headings, lists, and bold text where appropriate. It must be engaging and informative.'),
