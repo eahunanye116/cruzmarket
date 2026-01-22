@@ -25,7 +25,7 @@ export type PortfolioHolding = {
   tickerId: string;
   amount: number;
   avgBuyPrice: number;
-  userId?: string; // Add this to identify owner in collectionGroup queries
+  userId: string; 
 };
 
 export type EnrichedPortfolioHolding = PortfolioHolding & {
@@ -79,4 +79,11 @@ export type BlogPost = {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   isTrending?: boolean;
+};
+
+export type AIToneTrainingData = {
+    id: string;
+    name: string;
+    content: string;
+    userId: string;
 };

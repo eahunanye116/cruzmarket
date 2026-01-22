@@ -13,6 +13,7 @@ import { z } from 'genkit';
 const GenerateTweetInputSchema = z.object({
   topic: z.string().optional().nullable().describe('An optional trending topic to include in the tweet.'),
   tone: z.string().optional().nullable().describe('The desired tone for the tweet (e.g., "Hype", "Professional").'),
+  trainingData: z.string().optional().nullable().describe("A sample text to guide the AI's tone and style."),
 });
 export type GenerateTweetInput = z.infer<typeof GenerateTweetInputSchema>;
 
@@ -37,11 +38,21 @@ You are a savvy social media manager for "CruzMarket", a chaotic, high-octane tr
 - The vibe is chaotic, unpredictable, and fun—the wild west of meme finance.
 
 **Your Task:**
-Generate a short, engaging tweet (max 280 characters). The primary goal is to follow the user's instructions on **Tone** and **Topic**.
+Generate a short, engaging tweet (max 280 characters). The primary goal is to follow the user's instructions.
+
+{{#if trainingData}}
+**CRITICAL TONE TRAINING:**
+Your highest priority is to learn from the following example. Analyze its style, voice, and vocabulary, and then adopt that exact tone for the tweet you generate.
+
+**Training Example:**
+\'\'\'
+{{{trainingData}}}
+\'\'\'
+{{/if}}
 
 **Tone Instructions:**
 {{#if tone}}
-Your most important instruction is to adopt the following tone for the tweet: **{{{tone}}}**.
+Your next instruction is to adopt the following tone for the tweet: **{{{tone}}}**.
 If the tone instructs you *not* to promote the brand, then you MUST NOT mention CruzMarket, its features (like Cruz Mode), or use the #CruzMarket hashtag. Instead, create a tweet that is purely about the topic in the specified tone.
 {{else}}
 Adopt the default CruzMarket tone: Energetic, witty, slightly unhinged, and full of internet slang. Promote the platform.

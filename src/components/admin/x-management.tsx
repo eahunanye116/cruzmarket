@@ -6,15 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wand2, Twitter, Save, X as XIcon } from 'lucide-react';
+import { Loader2, Wand2, Twitter, Save, X as XIcon, Trash2, PlusCircle } from 'lucide-react';
 import { generateTweetAction, postTweetAction } from '@/app/actions/x-actions';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
-import { SavedTone } from '@/lib/types';
+import { SavedTone, AIToneTrainingData } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export function XManagement() {
   const { toast } = useToast();
@@ -25,7 +35,7 @@ export function XManagement() {
   const [tone, setTone] = useState('Default');
   const [customTone, setCustomTone] = useState('');
   
-  // Firestore-backed saved tones
+  // Saved Tones (prompts)
   const savedTonesQuery = user && firestore ? collection(firestore, `users/${user.uid}/savedTones`) : null;
   const { data: savedTones, loading: tonesLoading } = useCollection<SavedTone>(savedTonesQuery);
 
@@ -40,6 +50,18 @@ export function XManagement() {
   const [isGeneratingTrend, setIsGeneratingTrend] = useState(false);
   const [isPostingTrend, setIsPostingTrend] = useState(false);
 
+  // --- NEW: Tone Training Data State ---
+  const [newTrainingDataName, setNewTrainingDataName] = useState('');
+  const [newTrainingDataContent, setNewTrainingDataContent] = useState('');
+  const [selectedTrainingDataId, setSelectedTrainingDataId] = useState<string | 'none'>('none');
+  const [isSavingTrainingData, setIsSavingTrainingData] = useState(false);
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [dataToDelete, setDataToDelete] = useState<AIToneTrainingData | null>(null);
+
+  const trainingDataQuery = firestore ? collection(firestore, 'aiToneTrainingData') : null;
+  const { data: trainingData, loading: trainingDataLoading } = useCollection<AIToneTrainingData>(trainingDataQuery);
+  
+  // Tone (prompt) management
   const handleSaveTone = async () => {
     if (!customTone) {
         toast({ variant: 'destructive', title: 'Cannot Save', description: 'Custom tone field is empty.' });
@@ -87,7 +109,52 @@ export function XManagement() {
         return null;
     }
     return tone === 'Custom' ? customTone : tone === 'Default' ? null : tone;
-  }
+  };
+  
+  // NEW: Training Data Management
+  const handleSaveTrainingData = async () => {
+    if (!newTrainingDataName || !newTrainingDataContent) {
+      toast({ variant: 'destructive', title: 'Missing Fields', description: 'Please provide a name and content for the training data.' });
+      return;
+    }
+    if (!firestore || !user) return;
+    setIsSavingTrainingData(true);
+    try {
+      await addDoc(collection(firestore, 'aiToneTrainingData'), {
+        name: newTrainingDataName,
+        content: newTrainingDataContent,
+        userId: user.uid,
+      });
+      toast({ title: 'Training Data Saved' });
+      setNewTrainingDataName('');
+      setNewTrainingDataContent('');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Save Failed', description: e.message });
+    } finally {
+      setIsSavingTrainingData(false);
+    }
+  };
+
+  const handleDeleteTrainingData = async () => {
+    if (!firestore || !dataToDelete) return;
+    try {
+      await deleteDoc(doc(firestore, 'aiToneTrainingData', dataToDelete.id));
+      toast({ title: 'Training Data Deleted' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    } finally {
+      setDeleteAlertOpen(false);
+      setDataToDelete(null);
+    }
+  };
+  
+  const getSelectedTrainingDataContent = () => {
+    if (selectedTrainingDataId === 'none' || !trainingData) {
+      return null;
+    }
+    const selectedData = trainingData.find(d => d.id === selectedTrainingDataId);
+    return selectedData?.content ?? null;
+  };
 
   const handleGenerateGeneral = async () => {
     setIsGeneratingGeneral(true);
@@ -97,7 +164,8 @@ export function XManagement() {
         setIsGeneratingGeneral(false);
         return;
     }
-    const result = await generateTweetAction({ topic: null, tone: finalTone });
+    const trainingContent = getSelectedTrainingDataContent();
+    const result = await generateTweetAction({ topic: null, tone: finalTone, trainingData: trainingContent });
     if (result.success && result.tweet) {
       setGeneralTweet(result.tweet);
     } else {
@@ -130,7 +198,8 @@ export function XManagement() {
         setIsGeneratingTrend(false);
         return;
     }
-    const result = await generateTweetAction({ topic: trendTopic, tone: finalTone });
+    const trainingContent = getSelectedTrainingDataContent();
+    const result = await generateTweetAction({ topic: trendTopic, tone: finalTone, trainingData: trainingContent });
     if (result.success && result.tweet) {
       setTrendTweet(result.tweet);
     } else {
@@ -195,7 +264,7 @@ export function XManagement() {
                  </div>
                  {(savedTones && savedTones.length > 0) && (
                     <div className="space-y-2 pt-4 border-t">
-                        <Label>Saved Tones</Label>
+                        <Label>Saved Tones (Prompts)</Label>
                         <div className="flex flex-wrap gap-2">
                             {tonesLoading ? <Skeleton className="h-6 w-full" /> : savedTones.map((savedToneDoc) => (
                                 <Badge key={savedToneDoc.id} variant="secondary" className="cursor-pointer pl-2 pr-1 py-1 text-sm">
@@ -213,6 +282,46 @@ export function XManagement() {
                  )}
             </CardContent>
         </Card>
+        
+        {/* NEW CARD FOR TRAINING DATA */}
+        <Card>
+          <CardHeader>
+            <CardTitle>AI Tone Training Data</CardTitle>
+            <CardDescription>Add text samples from real people to train the AI's voice and style. The AI will learn from the selected sample.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="training-data-name">Sample Name</Label>
+              <Input id="training-data-name" placeholder="e.g., 'Elon Musk - Tech Bro'" value={newTrainingDataName} onChange={e => setNewTrainingDataName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="training-data-content">Sample Content</Label>
+              <Textarea id="training-data-content" placeholder="Paste the text sample here..." value={newTrainingDataContent} onChange={e => setNewTrainingDataContent(e.target.value)} rows={4} />
+            </div>
+            <Button onClick={handleSaveTrainingData} disabled={isSavingTrainingData || !newTrainingDataName || !newTrainingDataContent}>
+              {isSavingTrainingData ? <Loader2 className="mr-2 animate-spin" /> : <PlusCircle className="mr-2" />}
+              Save Training Sample
+            </Button>
+            
+            {trainingDataLoading ? <Skeleton className="h-10 w-full" /> : (trainingData && trainingData.length > 0) && (
+              <div className="space-y-2 pt-4 border-t">
+                <Label>Saved Samples</Label>
+                <div className="space-y-2">
+                  {trainingData.map(data => (
+                    <div key={data.id} className="flex justify-between items-center p-2 rounded-md border">
+                        <span className="font-medium text-sm">{data.name}</span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { setDataToDelete(data); setDeleteAlertOpen(true); }}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete sample</span>
+                        </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-6 md:grid-cols-2">
             <Card>
                 <CardHeader>
@@ -222,25 +331,39 @@ export function XManagement() {
                 </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                <Button onClick={handleGenerateGeneral} disabled={isGeneratingGeneral} className="w-full">
-                    {isGeneratingGeneral ? <Loader2 className="animate-spin" /> : <Wand2 />}
-                    Generate General Tweet
-                </Button>
-                <Textarea
-                    placeholder="Generated tweet will appear here..."
-                    value={generalTweet}
-                    onChange={(e) => setGeneralTweet(e.target.value)}
-                    rows={5}
-                />
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={handleGenerateGeneral} disabled={isGeneratingGeneral || isPostingGeneral}>
-                        Regenerate
-                    </Button>
-                    <Button onClick={handlePostGeneral} disabled={!generalTweet || isPostingGeneral || isGeneratingGeneral}>
-                    {isPostingGeneral ? <Loader2 className="animate-spin" /> : <Twitter />}
-                    Approve & Post
-                    </Button>
-                </div>
+                  <div className="space-y-2">
+                    <Label>Use Training Data (Optional)</Label>
+                    <Select value={selectedTrainingDataId} onValueChange={setSelectedTrainingDataId} disabled={trainingDataLoading}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a training sample..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (Use Tone Prompt Only)</SelectItem>
+                        {trainingData?.map(data => (
+                          <SelectItem key={data.id} value={data.id}>{data.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleGenerateGeneral} disabled={isGeneratingGeneral} className="w-full">
+                      {isGeneratingGeneral ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                      Generate General Tweet
+                  </Button>
+                  <Textarea
+                      placeholder="Generated tweet will appear here..."
+                      value={generalTweet}
+                      onChange={(e) => setGeneralTweet(e.target.value)}
+                      rows={5}
+                  />
+                  <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={handleGenerateGeneral} disabled={isGeneratingGeneral || isPostingGeneral}>
+                          Regenerate
+                      </Button>
+                      <Button onClick={handlePostGeneral} disabled={!generalTweet || isPostingGeneral || isGeneratingGeneral}>
+                      {isPostingGeneral ? <Loader2 className="animate-spin" /> : <Twitter />}
+                      Approve & Post
+                      </Button>
+                  </div>
                 </CardContent>
             </Card>
 
@@ -252,35 +375,66 @@ export function XManagement() {
                 </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <Input
-                    placeholder="e.g., #NewProfilePic"
-                    value={trendTopic}
-                    onChange={(e) => setTrendTopic(e.target.value)}
-                    />
-                    <Button onClick={handleGenerateTrend} disabled={isGeneratingTrend} className="w-full">
-                    {isGeneratingTrend ? <Loader2 className="animate-spin" /> : <Wand2 />}
-                    Generate Tweet from Trend
-                    </Button>
-                </div>
-                <Textarea
-                    placeholder="Generated tweet based on the trend will appear here..."
-                    value={trendTweet}
-                    onChange={(e) => setTrendTweet(e.target.value)}
-                    rows={5}
-                />
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={handleGenerateTrend} disabled={isGeneratingTrend || isPostingTrend}>
-                        Regenerate
-                    </Button>
-                    <Button onClick={handlePostTrend} disabled={!trendTweet || isPostingTrend || isGeneratingTrend}>
-                    {isPostingTrend ? <Loader2 className="animate-spin" /> : <Twitter />}
-                    Approve & Post
-                    </Button>
-                </div>
+                  <div className="space-y-2">
+                    <Label>Use Training Data (Optional)</Label>
+                    <Select value={selectedTrainingDataId} onValueChange={setSelectedTrainingDataId} disabled={trainingDataLoading}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a training sample..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (Use Tone Prompt Only)</SelectItem>
+                        {trainingData?.map(data => (
+                          <SelectItem key={data.id} value={data.id}>{data.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                      <Input
+                      placeholder="e.g., #NewProfilePic"
+                      value={trendTopic}
+                      onChange={(e) => setTrendTopic(e.target.value)}
+                      />
+                      <Button onClick={handleGenerateTrend} disabled={isGeneratingTrend} className="w-full">
+                      {isGeneratingTrend ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                      Generate Tweet from Trend
+                      </Button>
+                  </div>
+                  <Textarea
+                      placeholder="Generated tweet based on the trend will appear here..."
+                      value={trendTweet}
+                      onChange={(e) => setTrendTweet(e.target.value)}
+                      rows={5}
+                  />
+                  <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={handleGenerateTrend} disabled={isGeneratingTrend || isPostingTrend}>
+                          Regenerate
+                      </Button>
+                      <Button onClick={handlePostTrend} disabled={!trendTweet || isPostingTrend || isGeneratingTrend}>
+                      {isPostingTrend ? <Loader2 className="animate-spin" /> : <Twitter />}
+                      Approve & Post
+                      </Button>
+                  </div>
                 </CardContent>
             </Card>
         </div>
+        
+         <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Training Sample?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete the sample "{dataToDelete?.name}". This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTrainingData} className="bg-destructive hover:bg-destructive/90">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

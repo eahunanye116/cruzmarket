@@ -72,9 +72,10 @@
       "properties": {
         "tickerId": { "type": "string" },
         "amount": { "type": "number" },
-        "avgBuyPrice": { "type": "number" }
+        "avgBuyPrice": { "type": "number" },
+        "userId": { "type": "string" }
       },
-      "required": ["tickerId", "amount", "avgBuyPrice"]
+      "required": ["tickerId", "amount", "avgBuyPrice", "userId"]
     },
     "platformSettings": {
       "title": "Platform Settings",
@@ -110,9 +111,21 @@
         "coverImage": { "type": "string", "format": "uri" },
         "authorId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "isTrending": { "type": "boolean", "description": "Whether this post is featured in the 'Top Stories' section." }
       },
       "required": ["title", "slug", "content", "excerpt", "coverImage", "authorId", "createdAt", "updatedAt"]
+    },
+    "aiToneTrainingData": {
+      "title": "AI Tone Training Data",
+      "description": "A piece of text content used to train the AI's tone.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "A name for this training data set." },
+        "content": { "type": "string", "description": "The text content for training." },
+        "userId": { "type": "string", "description": "The user who added this data." }
+      },
+      "required": ["name", "content", "userId"]
     }
   },
   "auth": {
@@ -146,6 +159,10 @@
     "/blogPosts/{postId}": {
       "schema": { "$ref": "#/entities/blogPost" },
       "description": "Collection of all blog posts."
+    },
+    "/aiToneTrainingData/{dataId}": {
+      "schema": { "$ref": "#/entities/aiToneTrainingData" },
+      "description": "Collection of text samples to train the AI's tone."
     }
   }
 }
