@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, BookOpen } from 'lucide-react';
+import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
@@ -50,7 +50,7 @@ export function Header() {
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
-    { href: '/blog', label: 'Blog', icon: <BookOpen className="h-5 w-5" /> },
+    { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-5 w-5" /> },
     { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
     { href: '/transactions', label: 'Transactions', icon: <History className="h-5 w-5" /> },
     { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },

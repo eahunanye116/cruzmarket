@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { BookOpen } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 function BlogPostCard({ post }: { post: BlogPost }) {
     return (
@@ -41,11 +41,11 @@ export default function BlogIndexPage() {
         <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center text-center mb-12">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-                    <BookOpen className="h-8 w-8 text-primary" />
+                    <TrendingUp className="h-8 w-8 text-primary" />
                 </div>
-                <h1 className="text-4xl font-bold font-headline">The CruzMarket Chronicle</h1>
+                <h1 className="text-4xl font-bold font-headline">Market Trends & News</h1>
                 <p className="mt-2 text-lg text-muted-foreground">
-                    Your source for meme finance madness, insights, and alpha.
+                    The latest analysis, insights, and top performers in the CruzMarket arena.
                 </p>
             </div>
             
@@ -65,7 +65,7 @@ export default function BlogIndexPage() {
                 </div>
             ) : (
                 <div className="text-center text-muted-foreground py-16">
-                    <p>No blog posts found. Check back soon!</p>
+                    <p>No articles found. Check back soon!</p>
                 </div>
             )}
         </div>

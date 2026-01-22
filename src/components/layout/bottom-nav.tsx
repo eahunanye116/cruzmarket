@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, BookOpen } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
-  { href: '/blog', label: 'Blog', icon: <BookOpen className="h-6 w-6" /> },
+  { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-6 w-6" /> },
   { href: '/transactions', label: 'History', icon: <History className="h-6 w-6" /> },
