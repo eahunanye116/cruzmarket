@@ -50,7 +50,7 @@ Your output MUST be a JSON object that strictly follows the provided schema.
 2.  **excerpt**: Write a short summary (200-300 characters) that hooks the reader.
 3.  **content**: Write the full blog post in **Markdown format**.
     - Structure the post with headings ('##'), subheadings ('###'), bullet points ('-'), and bold text ('**...**') for readability.
-    - The post should be at least 500 words long.
+    - The post should be around 300-400 words long.
     - End with a call to action encouraging readers to check out CruzMarket.
 4.  **slug**: Generate a URL-friendly slug from the title (e.g., 'this-is-a-title').
 5.  **coverImageQuery**: Provide a simple 2-3 word search query for Unsplash to find a relevant cover image. For example, if the topic is about crypto volatility, a good query would be 'rollercoaster chart'.

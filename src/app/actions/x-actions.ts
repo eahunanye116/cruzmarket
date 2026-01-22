@@ -43,9 +43,9 @@ export async function generateTweetAction(input: GenerateTweetInput) {
   try {
     const output = await generateTweet(input);
     return { success: true, tweet: output.tweet };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: 'Failed to generate tweet.' };
+  } catch (error: any) {
+    console.error("Error generating tweet:", error);
+    return { success: false, error: error.message || 'Failed to generate tweet. Check server logs for details.' };
   }
 }
 

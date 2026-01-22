@@ -11,9 +11,9 @@ export async function generateBlogPostAction(input: GenerateBlogPostInput) {
     // Let's generate a placeholder image URL based on the query.
     const coverImage = `https://picsum.photos/seed/${output.slug}/1200/630`;
     return { success: true, post: {...output, coverImage } };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: 'Failed to generate blog post.' };
+  } catch (error: any) {
+    console.error("Error generating blog post:", error);
+    return { success: false, error: error.message || 'Failed to generate blog post. Check server logs for details.' };
   }
 }
 
