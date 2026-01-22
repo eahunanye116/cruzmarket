@@ -92,4 +92,49 @@
     background-image: linear-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px), linear-gradient(to right, hsl(var(--foreground) / 0.05) 1px, transparent 1px);
     background-size: 20px 20px;
   }
+  .prose {
+    @apply text-foreground text-base max-w-none;
+  }
+  .prose h1 {
+    @apply text-4xl font-bold mb-4 mt-8;
+  }
+  .prose h2 {
+    @apply text-3xl font-bold mb-4 mt-8 border-b pb-2;
+  }
+  .prose h3 {
+    @apply text-2xl font-bold mb-4 mt-6;
+  }
+  .prose p {
+    @apply leading-relaxed mb-4;
+  }
+  .prose a {
+    @apply text-primary hover:underline;
+  }
+  .prose blockquote {
+    @apply border-l-4 border-primary pl-4 italic text-muted-foreground my-6;
+  }
+  .prose ul {
+    @apply list-disc list-inside mb-4;
+  }
+  .prose ol {
+    @apply list-decimal list-inside mb-4;
+  }
+  .prose li {
+    @apply mb-2;
+  }
+  .prose code {
+    @apply bg-muted text-muted-foreground rounded-sm px-1 py-0.5 font-mono text-sm;
+  }
+  .prose pre {
+    @apply bg-muted p-4 rounded-md overflow-x-auto;
+  }
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose img {
+    @apply rounded-lg border;
+  }
+  .prose hr {
+    @apply my-8;
+  }
 }

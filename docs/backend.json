@@ -97,6 +97,22 @@
         "userId": { "type": "string" }
       },
       "required": ["tone", "userId"]
+    },
+    "blogPost": {
+      "title": "Blog Post",
+      "description": "Represents a single blog post.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "content": { "type": "string", "description": "Markdown content of the post." },
+        "excerpt": { "type": "string" },
+        "coverImage": { "type": "string", "format": "uri" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "slug", "content", "excerpt", "coverImage", "authorId", "createdAt", "updatedAt"]
     }
   },
   "auth": {
@@ -126,6 +142,10 @@
     "/settings/privacy": {
       "schema": { "$ref": "#/entities/platformSettings" },
       "description": "Stores privacy and registration settings for the platform."
+    },
+    "/blogPosts/{postId}": {
+      "schema": { "$ref": "#/entities/blogPost" },
+      "description": "Collection of all blog posts."
     }
   }
 }

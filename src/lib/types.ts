@@ -67,3 +67,15 @@ export type SavedTone = {
     tone: string;
     userId: string;
 };
+
+export type BlogPost = {
+  id: string;
+  slug: string;
+  title: string;
+  content: string; // Markdown content
+  excerpt: string;
+  coverImage: string;
+  authorId: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};

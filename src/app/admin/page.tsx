@@ -7,6 +7,7 @@ import { UserManagement } from '@/components/admin/user-management';
 import Link from 'next/link';
 import { PrivacyManagement } from '@/components/admin/privacy-management';
 import { XManagement } from '@/components/admin/x-management';
+import { BlogManagement } from '@/components/admin/blog-management';
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -60,9 +61,10 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="tickers">Tickers</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="blog">Blog</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="x">X</TabsTrigger>
         </TabsList>
@@ -71,6 +73,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="blog" className="mt-6">
+          <BlogManagement />
         </TabsContent>
         <TabsContent value="privacy" className="mt-6">
           <PrivacyManagement />
