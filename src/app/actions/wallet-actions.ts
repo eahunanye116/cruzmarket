@@ -1,8 +1,6 @@
 'use server';
 
-import { getFirestoreInstance } from '@/firebase/server';
-import { doc, runTransaction, collection, serverTimestamp } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
+import { processDeposit } from '@/lib/wallet';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -19,6 +17,7 @@ type PaystackVerificationResponse = {
         metadata: {
             userId: string;
         };
+        reference: string;
     }
 }
 
@@ -44,7 +43,7 @@ export async function verifyPaystackDepositAction(reference: string) {
             throw new Error(result.message || 'Transaction verification failed.');
         }
 
-        const { amount, metadata: { userId }, currency } = result.data;
+        const { amount, metadata: { userId }, currency, reference: transactionReference } = result.data;
 
         if (!userId) {
             throw new Error('User ID not found in transaction metadata.');
@@ -56,47 +55,8 @@ export async function verifyPaystackDepositAction(reference: string) {
         
         const amountInNaira = amount / 100;
 
-        const firestore = getFirestoreInstance();
-
-        // Use a transaction to ensure atomicity
-        await runTransaction(firestore, async (transaction) => {
-            const depositRef = doc(firestore, 'deposits', reference);
-            const depositDoc = await transaction.get(depositRef);
-            if (depositDoc.exists) {
-                throw new Error('This deposit has already been processed.');
-            }
-
-            const userDocRef = doc(firestore, 'users', userId);
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error('User profile does not exist.');
-            }
-
-            const currentBalance = userDoc.data().balance || 0;
-            const newBalance = currentBalance + amountInNaira;
-
-            // Update user's balance
-            transaction.update(userDocRef, { balance: newBalance });
-
-            // Log the deposit activity
-            const activityDocRef = doc(collection(firestore, 'activities'));
-            transaction.set(activityDocRef, {
-                type: 'DEPOSIT',
-                value: amountInNaira,
-                userId,
-                createdAt: serverTimestamp(),
-            });
-
-            // Mark this deposit as processed
-            transaction.set(depositRef, {
-                userId,
-                amount: amountInNaira,
-                processedAt: serverTimestamp(),
-            });
-        });
-
-        revalidatePath('/transactions'); // Revalidate the wallet page
-        revalidatePath('/portfolio'); 
+        // Use the new centralized function to process the deposit
+        await processDeposit(transactionReference, userId, amountInNaira);
         
         return { success: true, message: `Deposit of ₦${amountInNaira.toLocaleString()} was successful.` };
 
