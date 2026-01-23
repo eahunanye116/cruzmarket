@@ -40,7 +40,7 @@
       "description": "Represents a single trading or creation event in the activity feed.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT"] },
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
@@ -51,7 +51,7 @@
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["type", "tickerId", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
+      "required": ["type", "value", "createdAt", "userId"]
     },
     "userProfile": {
       "title": "User Profile",
@@ -126,6 +126,17 @@
         "userId": { "type": "string", "description": "The user who added this data." }
       },
       "required": ["name", "content", "userId"]
+    },
+    "deposit": {
+      "title": "Deposit",
+      "description": "Represents a successful Paystack deposit transaction to prevent duplicates.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "processedAt"]
     }
   },
   "auth": {
@@ -163,6 +174,10 @@
     "/aiToneTrainingData/{dataId}": {
       "schema": { "$ref": "#/entities/aiToneTrainingData" },
       "description": "Collection of text samples to train the AI's tone."
+    },
+    "/deposits/{transactionReference}": {
+      "schema": { "$ref": "#/entities/deposit" },
+      "description": "Collection to track processed Paystack deposits by their reference ID to prevent double-crediting."
     }
   }
 }

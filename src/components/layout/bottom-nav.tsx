@@ -11,7 +11,7 @@ const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-6 w-6" /> },
-  { href: '/transactions', label: 'History', icon: <History className="h-6 w-6" /> },
+  { href: '/transactions', label: 'Wallet', icon: <History className="h-6 w-6" /> },
 ];
 
 export function BottomNav() {

@@ -1,0 +1,10 @@
+--- a/node_modules/react-paystack/package.json
++++ b/node_modules/react-paystack/package.json
+@@ -65,6 +65,6 @@
+     "typescript": "^5.1.6"
+   },
+   "peerDependencies": {
+-    "react": "^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0"
++    "react": "^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"
+   }
+ }

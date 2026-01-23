@@ -37,10 +37,10 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE';
-  tickerId: string;
-  tickerName: string;
-  tickerIcon: string;
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT';
+  tickerId?: string;
+  tickerName?: string;
+  tickerIcon?: string;
   value: number; // NGN value
   tokenAmount?: number;
   pricePerToken?: number;
@@ -87,3 +87,9 @@ export type AIToneTrainingData = {
     content: string;
     userId: string;
 };
+
+export type Deposit = {
+  userId: string;
+  amount: number;
+  processedAt: Timestamp;
+}

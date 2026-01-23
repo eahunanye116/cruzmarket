@@ -52,7 +52,7 @@ export function Header() {
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
     { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-5 w-5" /> },
     { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
-    { href: '/transactions', label: 'Transactions', icon: <History className="h-5 w-5" /> },
+    { href: '/transactions', label: 'Wallet', icon: <History className="h-5 w-5" /> },
     { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
   ];
   
