@@ -217,7 +217,7 @@ export default function WalletPage() {
                     {profileLoading ? (
                         <Skeleton className="h-10 w-48" />
                     ) : (
-                        <p className="text-4xl font-bold font-headline text-primary">
+                        <p className="text-3xl font-semibold text-primary">
                             ₦{(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     )}
