@@ -1,4 +1,5 @@
 
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -97,7 +98,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
             });
             return;
         }
-        initializePayment({onSuccess: onPaymentSuccess, onClose: onPaymentClose});
+        initializePayment(onPaymentSuccess, onPaymentClose);
     };
 
     return (
