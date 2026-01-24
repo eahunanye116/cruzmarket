@@ -14,7 +14,7 @@ import { HandCoins, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 const formSchema = z.object({
-  amount: z.coerce.number().min(1000, "Minimum withdrawal is ₦1,000."),
+  amount: z.coerce.number().min(10000, "Minimum withdrawal is ₦10,000."),
   bankName: z.string().min(2, "Bank name is required."),
   accountNumber: z.string().regex(/^\d{10}$/, "Must be a 10-digit account number."),
   accountName: z.string().min(2, "Account name is required."),
@@ -73,7 +73,7 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
                 <FormItem>
                   <FormLabel>Amount (NGN)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 5000" {...field} />
+                    <Input type="number" placeholder="e.g., 10000" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
