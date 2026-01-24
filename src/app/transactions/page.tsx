@@ -63,7 +63,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
     const paystackConfig = {
         reference: new Date().getTime().toString(),
         email: user.email!,
-        amount: amount * 100, // Amount in kobo
+        amount: (amount || 0) * 100, // Amount in kobo
         publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
         metadata: {
             userId: user.uid,
@@ -100,7 +100,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
             });
             return;
         }
-        initializePayment({onSuccess: onPaymentSuccess, onClose: onPaymentClose});
+        initializePayment(onPaymentSuccess, onPaymentClose);
     };
 
     return (
