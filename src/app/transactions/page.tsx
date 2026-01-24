@@ -11,8 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 // Helper function to check for valid URLs
@@ -144,9 +145,16 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
   }
 }
 
+const ITEMS_PER_PAGE = 7;
+
 export default function WalletPage() {
   const user = useUser();
   const firestore = useFirestore();
+
+  // --- Filter and Pagination State ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
   // Fetch user profile for balance
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
@@ -184,6 +192,21 @@ export default function WalletPage() {
   
   const isLoading = profileLoading || activitiesLoading || tickersLoading;
 
+  // --- Filtering and Pagination Logic ---
+  const filteredActivities = useMemo(() => {
+    if (!enrichedActivities) return [];
+    return enrichedActivities.filter(activity => {
+        const typeMatch = filterType === 'all' || activity.type.toLowerCase() === filterType;
+        const searchMatch = !searchTerm || activity.tickerName?.toLowerCase().includes(searchTerm.toLowerCase());
+        return typeMatch && searchMatch;
+    });
+  }, [enrichedActivities, filterType, searchTerm]);
+
+  const visibleActivities = useMemo(() => {
+    return filteredActivities.slice(0, visibleCount);
+  }, [filteredActivities, visibleCount]);
+
+
   if (!user && !profileLoading) {
     return (
       <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
@@ -218,7 +241,7 @@ export default function WalletPage() {
                     {profileLoading ? (
                         <Skeleton className="h-10 w-48" />
                     ) : (
-                        <p className="text-3xl font-semibold text-primary">
+                        <p className="text-2xl font-semibold text-primary">
                             ₦{(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     )}
@@ -235,12 +258,43 @@ export default function WalletPage() {
                 <CardTitle>Transaction History</CardTitle>
                 <CardDescription>A record of all your trading and wallet activities.</CardDescription>
             </CardHeader>
+             <div className="p-4 border-y">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Search by asset name..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on search
+                            }}
+                            className="pl-10 w-full"
+                        />
+                    </div>
+                    <Select onValueChange={(value: 'all' | 'buy' | 'sell' | 'deposit') => {
+                        setFilterType(value);
+                        setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on filter
+                    }} defaultValue={filterType}>
+                        <SelectTrigger className="w-full md:w-[200px]">
+                            <SelectValue placeholder="Filter by type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem value="buy">Buys</SelectItem>
+                            <SelectItem value="sell">Sells</SelectItem>
+                            <SelectItem value="deposit">Deposits</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
             <CardContent className="p-0">
             {isLoading ? (
                 <div className="p-4">
                     <Skeleton className="h-40 w-full" />
                 </div>
-            ) : enrichedActivities && enrichedActivities.length > 0 ? (
+            ) : visibleActivities && visibleActivities.length > 0 ? (
                 <Table>
                 <TableHeader>
                     <TableRow>
@@ -252,7 +306,7 @@ export default function WalletPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {enrichedActivities.map((activity) => {
+                    {visibleActivities.map((activity) => {
                     const hasValidIcon = isValidUrl(activity.tickerIcon);
                     const isTrade = activity.type === 'BUY' || activity.type === 'SELL';
                     return (
@@ -310,13 +364,23 @@ export default function WalletPage() {
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2 mx-auto">
                     <History className="h-8 w-8 text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold font-headline">No Transactions Yet</h2>
+                <h2 className="text-2xl font-bold font-headline">No Transactions Found</h2>
                 <p className="mt-2 text-muted-foreground">
-                    Your transaction history will appear here once you start trading or deposit funds.
+                    Your transaction history is empty, or no items match your current filters.
                 </p>
                 </div>
             )}
             </CardContent>
+             {visibleCount < filteredActivities.length && (
+                <CardFooter className="justify-center border-t pt-6">
+                    <Button 
+                        onClick={() => setVisibleCount(prev => prev + ITEMS_PER_PAGE)}
+                        variant="outline"
+                    >
+                        Load More
+                    </Button>
+                </CardFooter>
+            )}
         </Card>
     </div>
   );
