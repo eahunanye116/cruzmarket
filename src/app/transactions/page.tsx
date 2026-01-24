@@ -46,7 +46,7 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 // Deposit Form Schema
 const depositSchema = z.object({
-    amount: z.coerce.number().min(1000, { message: 'Minimum deposit is ₦1,000.' }),
+    amount: z.coerce.number().min(100, { message: 'Minimum deposit is ₦100.' }),
 });
 
 // Deposit Component
