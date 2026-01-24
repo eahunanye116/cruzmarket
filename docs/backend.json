@@ -40,7 +40,7 @@
       "description": "Represents a single trading or creation event in the activity feed.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL"] },
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
@@ -137,6 +137,23 @@
         "processedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "amount", "processedAt"]
+    },
+    "withdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Represents a user's request to withdraw funds from their wallet.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["userId", "amount", "status", "bankName", "accountNumber", "accountName", "createdAt"]
     }
   },
   "auth": {
@@ -178,6 +195,10 @@
     "/deposits/{transactionReference}": {
       "schema": { "$ref": "#/entities/deposit" },
       "description": "Collection to track processed Paystack deposits by their reference ID to prevent double-crediting."
+    },
+    "/withdrawalRequests/{requestId}": {
+        "schema": { "$ref": "#/entities/withdrawalRequest" },
+        "description": "Collection of all user withdrawal requests."
     }
   }
 }

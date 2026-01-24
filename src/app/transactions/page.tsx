@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile } from '@/lib/types';
@@ -30,6 +30,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { WithdrawalForm } from '@/components/withdrawal-form';
 
 
 // Helper function to check for valid URLs
@@ -71,7 +72,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
 
     const initializePayment = usePaystackPayment(paystackConfig);
 
-    const onPaymentSuccess = async (reference: any) => {
+    const onPaymentSuccess = useCallback(async (reference: any) => {
         setIsProcessing(true);
         toast({ title: 'Processing Deposit...', description: 'Verifying your transaction. Please wait.' });
         
@@ -84,11 +85,11 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
             toast({ variant: 'destructive', title: 'Deposit Failed', description: result.error });
         }
         setIsProcessing(false);
-    };
+    }, [toast, form]);
 
-    const onPaymentClose = () => {
+    const onPaymentClose = useCallback(() => {
         // User closed the popup
-    };
+    }, []);
 
     const onSubmit = (values: z.infer<typeof depositSchema>) => {
         if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
@@ -99,7 +100,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
             });
             return;
         }
-        initializePayment(onPaymentSuccess, onPaymentClose);
+        initializePayment({onSuccess: onPaymentSuccess, onClose: onPaymentClose});
     };
 
     return (
@@ -140,7 +141,8 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
     case 'BUY': return <Plus className="h-4 w-4 text-accent-foreground" />;
     case 'SELL': return <Minus className="h-4 w-4 text-destructive-foreground" />;
-    case 'DEPOSIT': return <Landmark className="h-4 w-4 text-primary-foreground" />;
+    case 'DEPOSIT': return <Landmark className="h-4 w-4" />;
+    case 'WITHDRAWAL': return <ArrowDown className="h-4 w-4" />;
     default: return null;
   }
 }
@@ -173,19 +175,29 @@ export default function WalletPage() {
 
   const enrichedActivities = useMemo(() => {
     if (!activities) return [];
-    if (!tickers) { // If tickers haven't loaded, still show deposits
-        return activities.filter(act => act.type === 'DEPOSIT').map(activity => ({
-            ...activity,
-            tickerName: 'Wallet Deposit',
-        }));
+    
+    const getTickerName = (activity: Activity) => {
+        if (activity.type === 'DEPOSIT') return 'Wallet Deposit';
+        if (activity.type === 'WITHDRAWAL') return 'Wallet Withdrawal';
+        return activity.tickerName || 'Unknown';
     }
+
+    if (!tickers) { // If tickers haven't loaded, still show deposits/withdrawals
+        return activities
+            .filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL')
+            .map(activity => ({
+                ...activity,
+                tickerName: getTickerName(activity),
+            }));
+    }
+
     return activities.map(activity => {
       const ticker = tickers.find(t => t.id === activity.tickerId);
       return {
         ...activity,
         ticker,
         tickerIcon: ticker?.icon || '',
-        tickerName: activity.type === 'DEPOSIT' ? 'Wallet Deposit' : activity.tickerName,
+        tickerName: getTickerName(activity),
       };
     });
   }, [activities, tickers]);
@@ -231,25 +243,26 @@ export default function WalletPage() {
             <p className="mt-2 text-lg text-muted-foreground">View your balance, deposit funds, and see your transaction history.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            <Card className="md:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+             <Card className="lg:col-span-1">
                 <CardHeader>
                     <CardTitle>Your Balance</CardTitle>
-                    <CardDescription>Your available NGN balance for trading.</CardDescription>
+                    <CardDescription>Your available NGN balance.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? (
                         <Skeleton className="h-10 w-48" />
                     ) : (
-                        <p className="text-2xl font-semibold text-primary">
+                        <p className="text-4xl font-bold font-headline text-primary">
                             ₦{(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     )}
                 </CardContent>
             </Card>
 
-            <div className="md:col-span-2">
-                {user && <DepositForm user={user} />}
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+               {user && <DepositForm user={user} />}
+               {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
             </div>
         </div>
       
@@ -273,7 +286,7 @@ export default function WalletPage() {
                             className="pl-10 w-full"
                         />
                     </div>
-                    <Select onValueChange={(value: 'all' | 'buy' | 'sell' | 'deposit') => {
+                    <Select onValueChange={(value) => {
                         setFilterType(value);
                         setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on filter
                     }} defaultValue={filterType}>
@@ -285,6 +298,7 @@ export default function WalletPage() {
                             <SelectItem value="buy">Buys</SelectItem>
                             <SelectItem value="sell">Sells</SelectItem>
                             <SelectItem value="deposit">Deposits</SelectItem>
+                            <SelectItem value="withdrawal">Withdrawals</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -309,12 +323,26 @@ export default function WalletPage() {
                     {visibleActivities.map((activity) => {
                     const hasValidIcon = isValidUrl(activity.tickerIcon);
                     const isTrade = activity.type === 'BUY' || activity.type === 'SELL';
+                    const isWalletActivity = activity.type === 'DEPOSIT' || activity.type === 'WITHDRAWAL';
+                    
+                    const getBadgeVariant = () => {
+                        switch(activity.type) {
+                            case 'BUY': return 'default';
+                            case 'SELL': return 'destructive';
+                            case 'DEPOSIT': return 'secondary';
+                            case 'WITHDRAWAL': return 'outline';
+                            default: return 'secondary';
+                        }
+                    }
+
                     return (
                         <TableRow key={activity.id}>
                             <TableCell>
                                 <div className="flex items-center gap-4">
-                                {activity.type === 'DEPOSIT' ? (
-                                    <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted flex items-center justify-center"><Landmark className="h-5 w-5 text-muted-foreground"/></div>
+                                {isWalletActivity ? (
+                                    <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted flex items-center justify-center">
+                                        <ActivityIcon type={activity.type}/>
+                                    </div>
                                 ) : hasValidIcon ? (
                                     <Image
                                     src={activity.tickerIcon!}
@@ -332,9 +360,7 @@ export default function WalletPage() {
                                 </div>
                             </TableCell>
                             <TableCell>
-                                <Badge variant={
-                                    activity.type === 'BUY' ? 'default' : activity.type === 'SELL' ? 'destructive' : 'secondary'
-                                    } className="text-xs">
+                                <Badge variant={getBadgeVariant()} className="text-xs">
                                     <ActivityIcon type={activity.type}/>
                                     <span className="ml-1">{activity.type}</span>
                                 </Badge>

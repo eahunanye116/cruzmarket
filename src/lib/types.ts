@@ -37,7 +37,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
@@ -93,3 +93,17 @@ export type Deposit = {
   amount: number;
   processedAt: Timestamp;
 }
+
+export type WithdrawalRequest = {
+  id: string;
+  userId: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'rejected';
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  createdAt: Timestamp;
+  processedAt?: Timestamp;
+  rejectionReason?: string;
+  user?: UserProfile; // Only used for client-side enrichment
+};

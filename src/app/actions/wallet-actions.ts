@@ -1,6 +1,11 @@
+
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
+import { getFirestoreInstance } from '@/firebase/server';
+import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc } from 'firebase/firestore';
+import { revalidatePath } from 'next/cache';
+import type { UserProfile } from '@/lib/types';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -63,5 +68,114 @@ export async function verifyPaystackDepositAction(reference: string) {
     } catch (error: any) {
         console.error('Paystack verification error:', error);
         return { success: false, error: error.message || 'An unknown error occurred during verification.' };
+    }
+}
+
+type WithdrawalRequestPayload = {
+    userId: string;
+    amount: number;
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+}
+
+export async function requestWithdrawalAction(payload: WithdrawalRequestPayload) {
+    const firestore = getFirestoreInstance();
+    try {
+        const userDocRef = doc(firestore, 'users', payload.userId);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+            throw new Error('User profile not found.');
+        }
+        const userProfile = userDoc.data() as UserProfile;
+
+        if (userProfile.balance < payload.amount) {
+            throw new Error('Insufficient balance.');
+        }
+
+        const withdrawalRequestsRef = collection(firestore, 'withdrawalRequests');
+        await addDoc(withdrawalRequestsRef, {
+            ...payload,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+        });
+        
+        revalidatePath('/transactions');
+        return { success: true, message: 'Your withdrawal request has been submitted.' };
+    } catch (error: any) {
+        console.error('Withdrawal request error:', error);
+        return { success: false, error: error.message || 'Could not submit withdrawal request.' };
+    }
+}
+
+
+export async function approveWithdrawalAction(requestId: string) {
+    const firestore = getFirestoreInstance();
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const requestRef = doc(firestore, 'withdrawalRequests', requestId);
+            const requestDoc = await transaction.get(requestRef);
+            if (!requestDoc.exists() || requestDoc.data().status !== 'pending') {
+                throw new Error('Withdrawal request is not valid or has already been processed.');
+            }
+            const requestData = requestDoc.data();
+
+            const userRef = doc(firestore, 'users', requestData.userId);
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) {
+                throw new Error('User not found.');
+            }
+
+            const userBalance = userDoc.data().balance;
+            if (userBalance < requestData.amount) {
+                throw new Error('User has insufficient balance for this withdrawal.');
+            }
+
+            // Debit user balance
+            transaction.update(userRef, { balance: userBalance - requestData.amount });
+
+            // Update request status
+            transaction.update(requestRef, { status: 'completed', processedAt: serverTimestamp() });
+
+            // Create activity log
+            const activityRef = doc(collection(firestore, 'activities'));
+            transaction.set(activityRef, {
+                type: 'WITHDRAWAL',
+                value: requestData.amount,
+                userId: requestData.userId,
+                createdAt: serverTimestamp(),
+            });
+        });
+
+        revalidatePath('/admin');
+        revalidatePath('/transactions');
+        return { success: true, message: 'Withdrawal approved and processed.' };
+    } catch (error: any) {
+        console.error('Error approving withdrawal:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+
+export async function rejectWithdrawalAction(requestId: string, reason: string) {
+    if (!reason) {
+        return { success: false, error: 'A reason for rejection is required.' };
+    }
+    const firestore = getFirestoreInstance();
+    try {
+        const requestRef = doc(firestore, 'withdrawalRequests', requestId);
+        await updateDoc(requestRef, {
+            status: 'rejected',
+            rejectionReason: reason,
+            processedAt: serverTimestamp(),
+        });
+        
+        revalidatePath('/admin');
+        revalidatePath('/transactions');
+        return { success: true, message: 'Withdrawal request has been rejected.' };
+    } catch (error: any) {
+        console.error('Error rejecting withdrawal:', error);
+        return { success: false, error: error.message };
     }
 }
