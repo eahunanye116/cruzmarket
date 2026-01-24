@@ -7,6 +7,8 @@ import { processDeposit } from '@/lib/wallet';
 const PAYSTACK_WEBHOOK_SECRET = process.env.PAYSTACK_WEBHOOK_SECRET;
 
 export async function POST(req: NextRequest) {
+    console.log('Received Paystack webhook request.');
+
     if (!PAYSTACK_WEBHOOK_SECRET) {
         console.error('Paystack webhook secret is not set.');
         return new NextResponse('Webhook secret not configured.', { status: 500 });
@@ -22,13 +24,17 @@ export async function POST(req: NextRequest) {
         .digest('hex');
 
     if (hash !== paystackSignature) {
+        console.error('Invalid Paystack signature.');
         return new NextResponse('Invalid signature', { status: 401 });
     }
     
+    console.log('Paystack signature verified.');
     const event = JSON.parse(body);
+    console.log(`Received event type: ${event.event}`);
 
     // We are only interested in successful charges
     if (event.event === 'charge.success') {
+        console.log('Processing charge.success event.');
         const { reference, amount, currency, metadata } = event.data;
         const userId = metadata?.userId;
 

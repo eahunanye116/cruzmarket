@@ -10,13 +10,13 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 export const metadata: Metadata = {
   // Add a metadataBase for absolute URLs in sitemaps and social sharing.
   // IMPORTANT: The user should replace this with their actual domain.
-  metadataBase: new URL('https://cruzmarket.com'),
+  metadataBase: new URL('https://cruzmarket.fun'),
   title: 'CruzMarket',
   description: 'The premier battleground for meme tickers. Create, trade, and conquer the market.',
   openGraph: {
     title: 'CruzMarket: The Meme Ticker Arena',
     description: 'Create, trade, and conquer the market on the premier battleground for meme tickers.',
-    url: 'https://cruzmarket.com',
+    url: 'https://cruzmarket.fun',
     siteName: 'CruzMarket',
     images: [
       {

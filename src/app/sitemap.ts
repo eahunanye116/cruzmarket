@@ -8,7 +8,7 @@ interface BlogPostForSitemap {
 }
 
 // This should match the `metadataBase` in layout.tsx and be updated by the user to the actual production domain.
-const URL = 'https://cruzmarket.com'; 
+const URL = 'https://cruzmarket.fun'; 
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
