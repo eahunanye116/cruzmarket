@@ -4,13 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { processDeposit } from '@/lib/wallet';
 
-const PAYSTACK_WEBHOOK_SECRET = process.env.PAYSTACK_WEBHOOK_SECRET;
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 export async function POST(req: NextRequest) {
     console.log('Received Paystack webhook request.');
 
-    if (!PAYSTACK_WEBHOOK_SECRET) {
-        console.error('Paystack webhook secret is not set.');
+    if (!PAYSTACK_SECRET_KEY) {
+        console.error('Paystack secret key (PAYSTACK_SECRET_KEY) is not set in environment variables.');
         return new NextResponse('Webhook secret not configured.', { status: 500 });
     }
 
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.text();
 
     const hash = crypto
-        .createHmac('sha512', PAYSTACK_WEBHOOK_SECRET)
+        .createHmac('sha512', PAYSTACK_SECRET_KEY)
         .update(body)
         .digest('hex');
 
