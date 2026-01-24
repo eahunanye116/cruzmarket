@@ -73,7 +73,7 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
                 <FormItem>
                   <FormLabel>Amount (NGN)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 10000" {...field} />
+                    <Input type="number" placeholder="e.g., 10000" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
