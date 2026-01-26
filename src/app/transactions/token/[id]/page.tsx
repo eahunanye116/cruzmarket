@@ -126,20 +126,20 @@ export default function TokenTransactionHistoryPage() {
                     <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Realized P/L</CardTitle></CardHeader>
                     <CardContent>
                         <p className={cn("text-2xl font-bold", summary.realizedPnl > 0 ? "text-accent" : summary.realizedPnl < 0 ? "text-destructive" : "text-foreground")}>
-                           {summary.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto' })}
+                           {summary.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto', notation: 'compact' })}
                         </p>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Total Buy Volume</CardTitle></CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}</p>
+                        <p className="text-2xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Total Sell Volume</CardTitle></CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}</p>
+                        <p className="text-2xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
             </div>
