@@ -2,7 +2,7 @@
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from './ui/button';
-import { ArrowDownRight, ArrowUpRight, Zap, CheckCircle } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Zap, CircleCheckBig } from 'lucide-react';
 import Link from 'next/link';
 import { TickerSparkline } from './ticker-sparkline';
 import { calculateMarketCapChange, cn } from '@/lib/utils';
@@ -44,7 +44,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             <div className="text-left">
                  <div className="flex items-center gap-2">
                     <h3 className="font-headline text-4xl font-bold">${ticker.name}</h3>
-                    {ticker.isVerified && <CheckCircle className="h-6 w-6 text-primary" />}
+                    {ticker.isVerified && <CircleCheckBig className="h-6 w-6 text-accent" />}
                 </div>
                 <div className="flex items-end gap-3 mt-1">
                     <p className="text-primary text-2xl font-semibold leading-none">

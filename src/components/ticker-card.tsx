@@ -7,7 +7,7 @@ import type { Ticker } from '@/lib/types';
 import { TickerSparkline } from './ticker-sparkline';
 import { useMemo } from 'react';
 import { calculateMarketCapChange, cn } from '@/lib/utils';
-import { ArrowDownRight, ArrowUpRight, CheckCircle } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CircleCheckBig } from 'lucide-react';
 
 function isValidUrl(url: string) {
     try {
@@ -54,7 +54,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                         <div className="font-headline font-bold truncate" title={`$${ticker.name}`}>${ticker.name}</div>
-                        {ticker.isVerified && <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />}
+                        {ticker.isVerified && <CircleCheckBig className="h-4 w-4 text-accent flex-shrink-0" />}
                     </div>
                     <div className="flex items-end gap-2 flex-wrap">
                         <div className="text-primary font-semibold text-sm">
