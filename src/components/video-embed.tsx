@@ -48,7 +48,7 @@ export function VideoEmbed({ url }: { url: string }) {
                 </div>
                 <div key={replayKey} className="aspect-video w-full">
                     <iframe
-                        className="w-full h-full rounded-lg border"
+                        className="w-full h-full sm:rounded-lg border-y-2 sm:border-2"
                         src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
                         title="YouTube video player"
                         frameBorder="0"
@@ -70,9 +70,9 @@ export function VideoEmbed({ url }: { url: string }) {
                         Replay
                     </Button>
                 </div>
-                <div key={replayKey} className="aspect-[9/16] w-full max-w-sm mx-auto">
+                <div key={replayKey} className="aspect-[9/16] w-full">
                     <iframe
-                        className="w-full h-full rounded-lg border"
+                        className="w-full h-full sm:rounded-lg sm:border-2 border-y-2"
                         src={`https://www.tiktok.com/embed/v2/${tikTokId}`}
                         title="TikTok video player"
                         frameBorder="0"
@@ -94,9 +94,9 @@ export function VideoEmbed({ url }: { url: string }) {
                         Replay
                     </Button>
                 </div>
-                <div key={replayKey} className="aspect-square w-full max-w-sm mx-auto">
+                <div key={replayKey} className="aspect-square w-full sm:max-w-sm sm:mx-auto">
                     <iframe
-                        className="w-full h-full rounded-lg border"
+                        className="w-full h-full sm:rounded-lg sm:border-2 border-y-2"
                         src={`https://www.instagram.com/p/${instagramShortcode}/embed`}
                         title="Instagram post embed"
                         frameBorder="0"
