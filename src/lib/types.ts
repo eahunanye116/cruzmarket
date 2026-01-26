@@ -111,4 +111,6 @@ export type WithdrawalRequest = {
 export type PlatformStats = {
   id?: string;
   totalFeesGenerated: number;
+  totalUserFees: number;
+  totalAdminFees: number;
 };

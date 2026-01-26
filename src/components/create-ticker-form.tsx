@@ -55,6 +55,8 @@ const formSchema = z.object({
   initialBuyNgn: z.coerce.number().min(1000, { message: "Minimum initial buy is ₦1,000."}),
 });
 
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
+
 export function CreateTickerForm() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,13 +131,29 @@ export function CreateTickerForm() {
         }
         
         const statsDoc = await transaction.get(statsRef);
-        const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
+        const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
+        const currentUserFees = statsDoc.data()?.totalUserFees || 0;
+        const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
         
         const creationFee = marketCapOptions[selectedMarketCap]?.fee || 0;
         const initialBuyFee = values.initialBuyNgn * 0.002;
         const totalFeeForTx = creationFee + initialBuyFee;
 
-        transaction.set(statsRef, { totalFeesGenerated: currentFees + totalFeeForTx }, { merge: true });
+        let newUserFees = currentUserFees;
+        let newAdminFees = currentAdminFees;
+
+        if (user.uid === ADMIN_UID) {
+            newAdminFees += totalFeeForTx;
+        } else {
+            newUserFees += totalFeeForTx;
+        }
+
+        transaction.set(statsRef, { 
+            totalFeesGenerated: currentTotalFees + totalFeeForTx,
+            totalUserFees: newUserFees,
+            totalAdminFees: newAdminFees
+        }, { merge: true });
+
 
         const newBalance = userProfile.balance - totalCost;
         transaction.update(userProfileRef, { balance: newBalance });

@@ -90,6 +90,26 @@
       },
       "required": ["signupEnabled"]
     },
+    "platformStats": {
+      "title": "Platform Stats",
+      "description": "Stores global statistics for the platform, such as total fees generated.",
+      "type": "object",
+      "properties": {
+        "totalFeesGenerated": {
+          "type": "number",
+          "description": "The cumulative total of all fees (creation, buy, sell) collected in NGN. Sum of user and admin fees."
+        },
+        "totalUserFees": {
+            "type": "number",
+            "description": "The cumulative total of all fees generated from non-admin user trades."
+        },
+        "totalAdminFees": {
+            "type": "number",
+            "description": "The cumulative total of all fees generated from admin user trades."
+        }
+      },
+      "required": ["totalFeesGenerated", "totalUserFees", "totalAdminFees"]
+    },
     "savedTone": {
       "title": "Saved Tone",
       "description": "Represents a custom AI tone saved by a user for generating content.",
@@ -184,6 +204,10 @@
     "/settings/privacy": {
       "schema": { "$ref": "#/entities/platformSettings" },
       "description": "Stores privacy and registration settings for the platform."
+    },
+    "/stats/platform": {
+      "schema": { "$ref": "#/entities/platformStats" },
+      "description": "A singleton document to store global platform statistics."
     },
     "/blogPosts/{postId}": {
       "schema": { "$ref": "#/entities/blogPost" },

@@ -54,6 +54,8 @@ export function UserManagement() {
   
   const totalBalance = users?.reduce((acc, user) => acc + user.balance, 0) ?? 0;
   const totalFees = platformStats?.totalFeesGenerated ?? 0;
+  const userFees = platformStats?.totalUserFees ?? 0;
+  const adminFees = platformStats?.totalAdminFees ?? 0;
   
   const loading = usersLoading || statsLoading;
 
@@ -90,7 +92,12 @@ export function UserManagement() {
           View and manage all registered users. Found {users?.length ?? 0} users.
           <br/>
           Total platform balance: ₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
-          Total fees generated: ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+          <br />
+            <span className="font-semibold">Total Fees:</span> ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {' '}
+            (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
+            {' '}
+            <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
         </CardDescription>
       </CardHeader>
       <CardContent>

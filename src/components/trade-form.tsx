@@ -35,6 +35,7 @@ const sellSchema = z.object({
 
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002; // 0.2%
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 // Helper function to calculate trending score
 const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
@@ -175,9 +176,25 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             
             const statsRef = doc(firestore, 'stats', 'platform');
             const statsDoc = await transaction.get(statsRef);
-            const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
+            const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
+            const currentUserFees = statsDoc.data()?.totalUserFees || 0;
+            const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
-            transaction.set(statsRef, { totalFeesGenerated: currentFees + fee }, { merge: true });
+
+            let newUserFees = currentUserFees;
+            let newAdminFees = currentAdminFees;
+
+            if (user.uid === ADMIN_UID) {
+                newAdminFees += fee;
+            } else {
+                newUserFees += fee;
+            }
+            
+            transaction.set(statsRef, { 
+                totalFeesGenerated: currentTotalFees + fee,
+                totalUserFees: newUserFees,
+                totalAdminFees: newAdminFees
+            }, { merge: true });
 
             // Calculate tokens required based on desired NGN amount
             const k = currentTickerData.marketCap * currentTickerData.supply;
@@ -281,8 +298,25 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             
             const statsRef = doc(firestore, 'stats', 'platform');
             const statsDoc = await transaction.get(statsRef);
-            const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
-            transaction.set(statsRef, { totalFeesGenerated: currentFees + fee }, { merge: true });
+            const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
+            const currentUserFees = statsDoc.data()?.totalUserFees || 0;
+            const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
+
+            let newUserFees = currentUserFees;
+            let newAdminFees = currentAdminFees;
+
+            if (user.uid === ADMIN_UID) {
+                newAdminFees += fee;
+            } else {
+                newUserFees += fee;
+            }
+            
+            transaction.set(statsRef, { 
+                totalFeesGenerated: currentTotalFees + fee,
+                totalUserFees: newUserFees,
+                totalAdminFees: newAdminFees,
+            }, { merge: true });
+
 
             const tickerRef = doc(firestore, 'tickers', ticker.id);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
