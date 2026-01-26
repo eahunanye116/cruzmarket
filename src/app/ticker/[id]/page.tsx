@@ -139,9 +139,11 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                                   <span className="text-sm font-semibold">Verified</span>
                               </div>
                           )}
+                          {!ticker.isVerified && (
                            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">
                                 🌱 {tokenAge}
                            </div>
+                          )}
                         </div>
                         <div className="flex items-end gap-3 mt-1 mb-3">
                             <p className="text-2xl font-semibold text-primary leading-none">
