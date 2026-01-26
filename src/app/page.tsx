@@ -10,6 +10,9 @@ import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { CruzMode } from '@/components/cruz-mode';
+import { Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 
 export default function Home() {
@@ -98,7 +101,22 @@ export default function Home() {
         <div className="lg:col-span-2">
           {isLoading ? <Skeleton className="h-24" /> : <TrendingSection trendingTickers={trendingTickers} />}
           <div className="mt-12">
-            <h2 className="text-3xl font-bold tracking-tight font-headline mb-6">All Meme Tickers</h2>
+            <div className="flex items-center gap-2 mb-6">
+              <h2 className="text-3xl font-bold tracking-tight font-headline">All Meme Tickers</h2>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary">
+                    <Info className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="max-w-xs">
+                  <h4 className="font-bold mb-2">What is a Bonding Curve?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Instead of a traditional order book, prices are determined by a mathematical formula. When you buy, the price goes up. When you sell, the price goes down. This creates a liquid and dynamic market for every token from the moment it's created.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
             {tickersLoading ? <Skeleton className="h-96" /> : <TickerList tickers={tickers || []} />}
           </div>
         </div>

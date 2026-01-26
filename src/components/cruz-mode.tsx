@@ -2,10 +2,11 @@
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from './ui/button';
-import { ArrowDownRight, ArrowUpRight, Zap, CircleCheckBig } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Zap, CircleCheckBig, Info } from 'lucide-react';
 import Link from 'next/link';
 import { TickerSparkline } from './ticker-sparkline';
 import { calculateMarketCapChange, cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 function isValidUrl(url: string) {
     try {
@@ -24,8 +25,21 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 abstract-bg">
       <div className="flex flex-col items-center text-center">
-        <div className="flex items-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
+        <div className="flex items-center justify-center gap-2 text-2xl font-headline font-bold text-primary mb-2">
           CRUZ MODE
+           <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary">
+                <Info className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="max-w-xs">
+              <h4 className="font-bold mb-2">What is Cruz Mode?</h4>
+              <p className="text-sm text-muted-foreground">
+                Only tokens that achieve a 5x gain from their creation price can enter Cruz Mode and become the &quot;King of the Hill&quot;. The king&apos;s reign is fleeting; they must defend their crown every minute against new challengers or being dethroned if they lose their 5x status.
+              </p>
+            </PopoverContent>
+          </Popover>
         </div>
         <p className="text-muted-foreground mb-6">The undisputed King of the Hill.</p>
         

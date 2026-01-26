@@ -5,12 +5,29 @@ import type { Ticker } from "@/lib/types";
 import Link from "next/link";
 import { TickerSparkline } from "./ticker-sparkline";
 import { calculateMarketCapChange, cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Button } from "./ui/button";
 
 export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[] }) {
   return (
     <section>
-      <h2 className="text-3xl font-bold tracking-tight font-headline mb-2">Trending Now</h2>
+      <div className="flex items-center gap-2 mb-2">
+        <h2 className="text-3xl font-bold tracking-tight font-headline">Trending Now</h2>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary">
+              <Info className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="max-w-xs">
+            <h4 className="font-bold mb-2">How is Trending Calculated?</h4>
+            <p className="text-sm text-muted-foreground">
+              A ticker's trending score is based on a combination of its 24-hour trading volume and its 24-hour price change. High volume and positive price action boost the score.
+            </p>
+          </PopoverContent>
+        </Popover>
+      </div>
       <p className="text-muted-foreground mb-6">Top moving meme tickers in the market.</p>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {trendingTickers.map((ticker) => {

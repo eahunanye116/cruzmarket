@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -19,11 +18,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch, onSnapshot } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile, PlatformStats } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowDown, ArrowUp, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { differenceInMinutes, sub } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -445,7 +445,23 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               name="ngnAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount to Spend</FormLabel>
+                  <div className="flex items-center gap-1">
+                    <FormLabel>Amount to Spend</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 text-primary/80 hover:text-primary">
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="max-w-xs text-sm">
+                          <h4 className="font-bold mb-2">How Trading Works</h4>
+                          <div className="space-y-2 text-muted-foreground">
+                            <p>All trades happen on a bonding curve, which means the price changes with every buy and sell.</p>
+                            <p>A 0.2% fee is applied to every transaction to support the platform.</p>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                  </div>
                   <FormControl>
                     <div className="relative">
                       <Input type="number" placeholder="0.00" {...field} className="pr-12" />
