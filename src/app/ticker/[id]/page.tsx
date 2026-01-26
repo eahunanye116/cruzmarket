@@ -103,7 +103,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-8">
         <div className="lg:col-span-2">
-           <Card className="h-full overflow-hidden">
+           <Card className="overflow-hidden">
             <div className="relative h-48 w-full">
                  {hasValidCover ? (
                     <Image
