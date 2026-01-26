@@ -210,8 +210,10 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
           {ticker.videoUrl && (
             <Card className="mx-[-1rem] sm:mx-0 rounded-none sm:rounded-lg">
-              <CardHeader><CardTitle>Video</CardTitle></CardHeader>
-              <CardContent>
+              <CardHeader className="p-4">
+                <CardTitle className="text-xl">Video</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
                 <VideoEmbed url={ticker.videoUrl} />
               </CardContent>
             </Card>

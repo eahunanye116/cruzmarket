@@ -39,7 +39,7 @@ export function VideoEmbed({ url }: { url: string }) {
     const youtubeId = getYouTubeId(url);
     if (youtubeId) {
         return (
-            <div className="space-y-4">
+            <div className="space-y-2">
                 <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={handleReplay}>
                         <RefreshCw />
@@ -63,7 +63,7 @@ export function VideoEmbed({ url }: { url: string }) {
     const tikTokId = getTikTokVideoId(url);
     if (tikTokId) {
         return (
-            <div className="space-y-4 max-w-sm mx-auto">
+            <div className="space-y-2 max-w-sm mx-auto">
                  <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={handleReplay}>
                         <RefreshCw />
@@ -87,7 +87,7 @@ export function VideoEmbed({ url }: { url: string }) {
     const instagramShortcode = getInstagramShortcode(url);
     if (instagramShortcode) {
         return (
-             <div className="space-y-4 max-w-sm mx-auto">
+             <div className="space-y-2 max-w-sm mx-auto">
                 <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={handleReplay}>
                         <RefreshCw />
