@@ -95,6 +95,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Trade Form for Mobile */}
+      <div className="lg:hidden mb-8">
+        <Card>
+          <CardHeader><CardTitle>Trade ${ticker.name}</CardTitle></CardHeader>
+          <CardContent>
+            <TradeForm ticker={ticker} />
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           {/* Ticker Header */}
@@ -232,9 +242,9 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           </Card>
         </div>
 
-        {/* Right Column (Trade Form) */}
+        {/* Right Column (Trade Form for Desktop) */}
         <div className="lg:col-span-1">
-          <div className="lg:sticky lg:top-20 space-y-8">
+          <div className="hidden lg:block lg:sticky lg:top-20 space-y-8">
             <Card>
               <CardHeader><CardTitle>Trade ${ticker.name}</CardTitle></CardHeader>
               <CardContent>
