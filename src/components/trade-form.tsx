@@ -144,13 +144,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   }, [ngnAmountToSell, sellFee]);
   
   const positionPnl = useMemo(() => {
-    if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
+    if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0, reclaimableValue: 0 };
     
-    const currentValue = calculateReclaimableValue(userHolding.amount, ticker);
+    const reclaimableValue = calculateReclaimableValue(userHolding.amount, ticker);
+    const fee = reclaimableValue * TRANSACTION_FEE_PERCENTAGE;
+    const currentValue = reclaimableValue - fee; // This is the post-fee value
+    
     const initialCost = userHolding.amount * userHolding.avgBuyPrice;
     const pnl = currentValue - initialCost;
     const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
-    return { pnl, pnlPercent, currentValue };
+    return { pnl, pnlPercent, currentValue, reclaimableValue };
   }, [userHolding, ticker]);
 
   const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
@@ -183,10 +186,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             }
             
             const costBasisOfSoldTokens = tokenAmount * userHolding.avgBuyPrice;
-            const realizedPnl = ngnToGetBeforeFee - costBasisOfSoldTokens;
-
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
+            const realizedPnl = ngnToUser - costBasisOfSoldTokens;
+
             const pricePerToken = ngnToGetBeforeFee / tokenAmount;
 
             const newSupply = currentTickerData.supply + tokenAmount;
@@ -458,10 +461,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                       className="h-auto px-1 py-0 text-xs text-primary"
                       onClick={() => {
                         // Round down to avoid precision errors that might cause the transaction to fail
-                        const maxSellValue = Math.floor(positionPnl.currentValue);
+                        const maxSellValue = Math.floor(positionPnl.reclaimableValue);
                         sellForm.setValue('ngnAmount', maxSellValue, { shouldValidate: true });
                       }}
-                      disabled={!hasPosition || positionPnl.currentValue <= 0}
+                      disabled={!hasPosition || positionPnl.reclaimableValue <= 0}
                     >
                       Max
                     </Button>
@@ -541,4 +544,3 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
-    

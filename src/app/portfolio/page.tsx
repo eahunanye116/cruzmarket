@@ -30,6 +30,8 @@ function isValidUrl(url: string | undefined | null): url is string {
     }
 }
 
+const TRANSACTION_FEE_PERCENTAGE = 0.002;
+
 export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
@@ -47,7 +49,10 @@ export default function PortfolioPage() {
       const ticker = tickers.find(t => t.id === holding.tickerId);
       if (!ticker) return null;
 
-      const currentValue = calculateReclaimableValue(holding.amount, ticker);
+      const reclaimableValue = calculateReclaimableValue(holding.amount, ticker);
+      const fee = reclaimableValue * TRANSACTION_FEE_PERCENTAGE;
+      const currentValue = reclaimableValue - fee;
+      
       const initialCost = holding.amount * holding.avgBuyPrice;
       const profitOrLoss = currentValue - initialCost;
       const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;

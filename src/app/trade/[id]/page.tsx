@@ -1,3 +1,4 @@
+
 'use client';
 import { useDoc, useFirestore, useUser } from '@/firebase';
 import { Activity, Ticker } from '@/lib/types';
@@ -22,6 +23,8 @@ function isValidUrl(url: string | undefined | null): url is string {
         return false;
     }
 }
+
+const TRANSACTION_FEE_PERCENTAGE = 0.002;
 
 export default function TradeDetailsPage({ params }: { params: { id: string } }) {
   const resolvedParams = use(params);
@@ -65,7 +68,11 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
     }
     
     const initialCost = activity.value; 
-    const currentValue = calculateReclaimableValue(activity.tokenAmount, ticker);
+
+    const reclaimableValue = calculateReclaimableValue(activity.tokenAmount, ticker);
+    const fee = reclaimableValue * TRANSACTION_FEE_PERCENTAGE;
+    const currentValue = reclaimableValue - fee;
+    
     const profitOrLoss = currentValue - initialCost;
     const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
     
