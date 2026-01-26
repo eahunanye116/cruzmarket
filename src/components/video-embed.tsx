@@ -63,7 +63,7 @@ export function VideoEmbed({ url }: { url: string }) {
     const tikTokId = getTikTokVideoId(url);
     if (tikTokId) {
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 max-w-sm mx-auto">
                  <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={handleReplay}>
                         <RefreshCw />
@@ -87,14 +87,14 @@ export function VideoEmbed({ url }: { url: string }) {
     const instagramShortcode = getInstagramShortcode(url);
     if (instagramShortcode) {
         return (
-             <div className="space-y-4">
+             <div className="space-y-4 max-w-sm mx-auto">
                 <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={handleReplay}>
                         <RefreshCw />
                         Replay
                     </Button>
                 </div>
-                <div key={replayKey} className="aspect-square w-full sm:max-w-sm sm:mx-auto">
+                <div key={replayKey} className="aspect-square w-full">
                     <iframe
                         className="w-full h-full sm:rounded-lg sm:border-2 border-y-2"
                         src={`https://www.instagram.com/p/${instagramShortcode}/embed`}
