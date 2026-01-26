@@ -187,7 +187,7 @@ export function CreateTickerForm() {
             tickerId: newTickerRef.id,
             tickerName: values.name,
             tickerIcon: values.icon,
-            value: initialBuyValue,
+            value: ngnForCurve,
             tokenAmount: tokensOut,
             pricePerToken: avgBuyPrice,
             userId: user.uid,
@@ -370,5 +370,7 @@ export function CreateTickerForm() {
     </Form>
   );
 }
+
+    
 
     
