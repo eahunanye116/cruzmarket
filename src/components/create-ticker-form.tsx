@@ -22,7 +22,7 @@ import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import type { UserProfile, Ticker } from "@/lib/types";
+import type { UserProfile, Ticker, PlatformStats } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 
@@ -113,6 +113,7 @@ export function CreateTickerForm() {
     const userProfileRef = doc(firestore, "users", user.uid);
     const tickersCollectionRef = collection(firestore, 'tickers');
     const activitiesCollection = collection(firestore, 'activities');
+    const statsRef = doc(firestore, 'stats', 'platform');
 
     try {
       const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
@@ -126,6 +127,15 @@ export function CreateTickerForm() {
         if (userProfile.balance < totalCost) {
           throw new Error(`Insufficient balance. You need at least ₦${totalCost.toLocaleString()} for this transaction.`);
         }
+        
+        const statsDoc = await transaction.get(statsRef);
+        const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
+        
+        const creationFee = marketCapOptions[selectedMarketCap]?.fee || 0;
+        const initialBuyFee = values.initialBuyNgn * 0.002;
+        const totalFeeForTx = creationFee + initialBuyFee;
+
+        transaction.set(statsRef, { totalFeesGenerated: currentFees + totalFeeForTx }, { merge: true });
 
         const newBalance = userProfile.balance - totalCost;
         transaction.update(userProfileRef, { balance: newBalance });

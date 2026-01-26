@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch, onSnapshot } from 'firebase/firestore';
-import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
+import type { Ticker, PortfolioHolding, UserProfile, PlatformStats } from '@/lib/types';
 import { Loader2, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -172,6 +172,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             const currentTickerData = tickerDoc.data();
+            
+            const statsRef = doc(firestore, 'stats', 'platform');
+            const statsDoc = await transaction.get(statsRef);
+            const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
+            const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+            transaction.set(statsRef, { totalFeesGenerated: currentFees + fee }, { merge: true });
 
             // Calculate tokens required based on desired NGN amount
             const k = currentTickerData.marketCap * currentTickerData.supply;
@@ -186,7 +192,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             }
             
             const costBasisOfSoldTokens = tokenAmount * userHolding.avgBuyPrice;
-            const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
             const realizedPnl = ngnToUser - costBasisOfSoldTokens;
 
@@ -273,6 +278,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
                 throw new Error('Insufficient balance.');
             }
+            
+            const statsRef = doc(firestore, 'stats', 'platform');
+            const statsDoc = await transaction.get(statsRef);
+            const currentFees = statsDoc.data()?.totalFeesGenerated || 0;
+            transaction.set(statsRef, { totalFeesGenerated: currentFees + fee }, { merge: true });
 
             const tickerRef = doc(firestore, 'tickers', ticker.id);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);

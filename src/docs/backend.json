@@ -31,7 +31,8 @@
         "creatorId": { "type": "string" },
         "trendingScore": { "type": "number" },
         "volume24h": { "type": "number" },
-        "priceChange24h": { "type": "number" }
+        "priceChange24h": { "type": "number" },
+        "isVerified": { "type": "boolean", "description": "Indicates if the ticker is a verified token of a meme legend." }
       },
       "required": ["name", "slug", "tickerAddress", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
     },
@@ -40,7 +41,7 @@
       "description": "Represents a single trading or creation event in the activity feed.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL"] },
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
@@ -51,7 +52,7 @@
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["type", "tickerId", "tickerName", "tickerIcon", "value", "createdAt", "userId"]
+      "required": ["type", "value", "createdAt", "userId"]
     },
     "userProfile": {
       "title": "User Profile",
@@ -72,9 +73,10 @@
       "properties": {
         "tickerId": { "type": "string" },
         "amount": { "type": "number" },
-        "avgBuyPrice": { "type": "number" }
+        "avgBuyPrice": { "type": "number" },
+        "userId": { "type": "string" }
       },
-      "required": ["tickerId", "amount", "avgBuyPrice"]
+      "required": ["tickerId", "amount", "avgBuyPrice", "userId"]
     },
     "platformSettings": {
       "title": "Platform Settings",
@@ -87,6 +89,18 @@
         }
       },
       "required": ["signupEnabled"]
+    },
+    "platformStats": {
+      "title": "Platform Stats",
+      "description": "Stores global statistics for the platform, such as total fees generated.",
+      "type": "object",
+      "properties": {
+        "totalFeesGenerated": {
+          "type": "number",
+          "description": "The cumulative total of all fees (creation, buy, sell) collected in NGN."
+        }
+      },
+      "required": ["totalFeesGenerated"]
     },
     "savedTone": {
       "title": "Saved Tone",
@@ -114,6 +128,45 @@
         "isTrending": { "type": "boolean", "description": "Whether this post is featured in the 'Top Stories' section." }
       },
       "required": ["title", "slug", "content", "excerpt", "coverImage", "authorId", "createdAt", "updatedAt"]
+    },
+    "aiToneTrainingData": {
+      "title": "AI Tone Training Data",
+      "description": "A piece of text content used to train the AI's tone.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "A name for this training data set." },
+        "content": { "type": "string", "description": "The text content for training." },
+        "userId": { "type": "string", "description": "The user who added this data." }
+      },
+      "required": ["name", "content", "userId"]
+    },
+    "deposit": {
+      "title": "Deposit",
+      "description": "Represents a successful Paystack deposit transaction to prevent duplicates.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "processedAt"]
+    },
+    "withdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Represents a user's request to withdraw funds from their wallet.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["userId", "amount", "status", "bankName", "accountNumber", "accountName", "createdAt"]
     }
   },
   "auth": {
@@ -144,9 +197,25 @@
       "schema": { "$ref": "#/entities/platformSettings" },
       "description": "Stores privacy and registration settings for the platform."
     },
+    "/stats/platform": {
+      "schema": { "$ref": "#/entities/platformStats" },
+      "description": "A singleton document to store global platform statistics."
+    },
     "/blogPosts/{postId}": {
       "schema": { "$ref": "#/entities/blogPost" },
       "description": "Collection of all blog posts."
+    },
+    "/aiToneTrainingData/{dataId}": {
+      "schema": { "$ref": "#/entities/aiToneTrainingData" },
+      "description": "Collection of text samples to train the AI's tone."
+    },
+    "/deposits/{transactionReference}": {
+      "schema": { "$ref": "#/entities/deposit" },
+      "description": "Collection to track processed Paystack deposits by their reference ID to prevent double-crediting."
+    },
+    "/withdrawalRequests/{requestId}": {
+        "schema": { "$ref": "#/entities/withdrawalRequest" },
+        "description": "Collection of all user withdrawal requests."
     }
   }
 }

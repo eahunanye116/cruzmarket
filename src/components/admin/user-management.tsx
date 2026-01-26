@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, PlatformStats } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -40,7 +40,11 @@ import { EditUserDialog } from './edit-user-dialog';
 export function UserManagement() {
   const firestore = useFirestore();
   const usersQuery = firestore ? collection(firestore, 'users') : null;
-  const { data: users, loading, error } = useCollection<UserProfile>(usersQuery);
+  const { data: users, loading: usersLoading, error } = useCollection<UserProfile>(usersQuery);
+  
+  const statsRef = firestore ? doc(firestore, 'stats', 'platform') : null;
+  const { data: platformStats, loading: statsLoading } = useDoc<PlatformStats>(statsRef);
+
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,6 +53,9 @@ export function UserManagement() {
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   
   const totalBalance = users?.reduce((acc, user) => acc + user.balance, 0) ?? 0;
+  const totalFees = platformStats?.totalFeesGenerated ?? 0;
+  
+  const loading = usersLoading || statsLoading;
 
   const handleEdit = (user: UserProfile) => {
     setSelectedUser(user);
@@ -78,10 +85,12 @@ export function UserManagement() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Users</CardTitle>
+        <CardTitle>Users & Platform Stats</CardTitle>
         <CardDescription>
-          View and manage all registered users. Found {users?.length ?? 0} users. 
-          Total platform balance: ₦{totalBalance.toLocaleString()}
+          View and manage all registered users. Found {users?.length ?? 0} users.
+          <br/>
+          Total platform balance: ₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+          Total fees generated: ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
         </CardDescription>
       </CardHeader>
       <CardContent>

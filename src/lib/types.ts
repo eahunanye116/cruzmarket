@@ -1,4 +1,3 @@
-
 import { Timestamp } from "firebase/firestore";
 
 export type Ticker = {
@@ -107,4 +106,9 @@ export type WithdrawalRequest = {
   processedAt?: Timestamp;
   rejectionReason?: string;
   user?: UserProfile; // Only used for client-side enrichment
+};
+
+export type PlatformStats = {
+  id?: string;
+  totalFeesGenerated: number;
 };
