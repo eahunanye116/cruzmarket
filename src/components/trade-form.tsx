@@ -341,15 +341,16 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
             const portfolioSnapshot = await getDocs(q);
             
-            const effectivePricePerToken = ngnForCurve / tokensOut;
+            const effectivePricePerToken = ngnAmount / tokensOut;
 
             if (!portfolioSnapshot.empty) {
                 const holdingDoc = portfolioSnapshot.docs[0];
                 const holdingRef = holdingDoc.ref;
-                const currentHolding = holdingDoc.data();
+                const currentHolding = holdingDoc.data() as PortfolioHolding;
                 
                 const newAmount = currentHolding.amount + tokensOut;
-                const newAvgBuyPrice = ((currentHolding.avgBuyPrice * currentHolding.amount) + (ngnForCurve)) / newAmount;
+                const newTotalCost = (currentHolding.avgBuyPrice * currentHolding.amount) + ngnAmount;
+                const newAvgBuyPrice = newTotalCost / newAmount;
                 
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
@@ -392,7 +393,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 tickerId: ticker.id,
                 tickerName: ticker.name,
                 tickerIcon: ticker.icon,
-                value: ngnForCurve,
+                value: ngnAmount,
                 tokenAmount: tokensOut,
                 pricePerToken: effectivePricePerToken,
                 userId: user.uid,

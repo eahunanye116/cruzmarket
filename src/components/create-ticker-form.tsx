@@ -159,7 +159,7 @@ export function CreateTickerForm() {
         transaction.update(userProfileRef, { balance: newBalance });
 
         const tickerData = { ...newTickerBaseData };
-        const ngnForCurve = initialBuyValue - (initialBuyValue * 0.002);
+        const ngnForCurve = initialBuyValue - initialBuyFee;
         
         const finalMarketCap = tickerData.marketCap + ngnForCurve;
         if (finalMarketCap <= 0) throw new Error("Market cap cannot be zero or negative.");
@@ -167,7 +167,7 @@ export function CreateTickerForm() {
         const finalSupply = k / finalMarketCap;
         const tokensOut = tickerData.supply - finalSupply;
         const finalPrice = finalMarketCap / finalSupply;
-        const avgBuyPrice = ngnForCurve / tokensOut;
+        const avgBuyPrice = initialBuyValue / tokensOut;
         
         const initialPrice = tickerData.marketCap / tickerData.supply;
 
@@ -215,7 +215,7 @@ export function CreateTickerForm() {
             tickerId: newTickerRef.id,
             tickerName: values.name,
             tickerIcon: values.icon,
-            value: ngnForCurve,
+            value: initialBuyValue,
             tokenAmount: tokensOut,
             pricePerToken: avgBuyPrice,
             userId: user.uid,
