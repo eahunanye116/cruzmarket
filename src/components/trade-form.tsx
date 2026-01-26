@@ -286,83 +286,87 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     try {
         const { tokensOut } = await runTransaction(firestore, async (transaction) => {
             const ngnAmount = values.ngnAmount;
-            const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
-            const ngnForCurve = ngnAmount - fee;
-
+            
+            // --- 1. All READS must happen first ---
             const userRef = doc(firestore, 'users', user.uid);
+            const tickerRef = doc(firestore, 'tickers', ticker.id);
+            const statsRef = doc(firestore, 'stats', 'platform');
+            
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
+            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
+            const statsDoc = await transaction.get(statsRef);
+            
+            let holdingRef: DocumentReference | null = null;
+            let currentHolding: PortfolioHolding | null = null;
+            if (userHolding) {
+                holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
+                const holdingDoc = await transaction.get(holdingRef);
+                if (holdingDoc.exists()) {
+                    currentHolding = holdingDoc.data() as PortfolioHolding;
+                }
+            }
 
+            // --- 2. Perform validation checks on read data ---
             if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
                 throw new Error('Insufficient balance.');
             }
+            if (!tickerDoc.exists()) {
+                throw new Error('Ticker not found.');
+            }
+            const currentTickerData = tickerDoc.data();
+            if (currentTickerData.marketCap <= 0) {
+                throw new Error("Market is not active.");
+            }
+
+            // --- 3. Calculations ---
+            const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
+            const ngnForCurve = ngnAmount - fee;
             
-            const statsRef = doc(firestore, 'stats', 'platform');
-            const statsDoc = await transaction.get(statsRef);
+            const k = currentTickerData.marketCap * currentTickerData.supply;
+            const newMarketCap = currentTickerData.marketCap + ngnForCurve;
+            const newSupply = k / newMarketCap;
+            const tokensOut = currentTickerData.supply - newSupply;
+            const finalPrice = newMarketCap / newSupply;
+            const avgBuyPrice = ngnAmount / tokensOut;
+
+            if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
+            if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
+
+            // --- 4. All WRITES must happen after reads ---
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
             const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
-
             let newUserFees = currentUserFees;
             let newAdminFees = currentAdminFees;
-
             if (user.uid === ADMIN_UID) {
                 newAdminFees += fee;
             } else {
                 newUserFees += fee;
             }
-            
             transaction.set(statsRef, { 
                 totalFeesGenerated: currentTotalFees + fee,
                 totalUserFees: newUserFees,
                 totalAdminFees: newAdminFees,
             }, { merge: true });
 
-
-            const tickerRef = doc(firestore, 'tickers', ticker.id);
-            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
-            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
-            const currentTickerData = tickerDoc.data();
-
-            if (currentTickerData.marketCap <= 0) throw new Error("Market is not active.");
-            
-            const k = currentTickerData.marketCap * currentTickerData.supply;
-            const newMarketCap = currentTickerData.marketCap + ngnForCurve;
-            const newSupply = k / newMarketCap;
-            const tokensOut = currentTickerData.supply - newSupply;
-            const finalPrice = newMarketCap / newSupply; 
-
-            if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
-            if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
-            
             const newBalance = userDoc.data().balance - ngnAmount;
             transaction.update(userRef, { balance: newBalance });
 
-            const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
-            const q = query(portfolioColRef, where('tickerId', '==', ticker.id));
-            const portfolioSnapshot = await getDocs(q);
-            
-            const effectivePricePerToken = ngnAmount / tokensOut;
-
-            if (!portfolioSnapshot.empty) {
-                const holdingDoc = portfolioSnapshot.docs[0];
-                const holdingRef = holdingDoc.ref;
-                const currentHolding = holdingDoc.data() as PortfolioHolding;
-                
+            if (currentHolding && holdingRef) {
                 const newAmount = currentHolding.amount + tokensOut;
                 const newTotalCost = (currentHolding.avgBuyPrice * currentHolding.amount) + ngnAmount;
                 const newAvgBuyPrice = newTotalCost / newAmount;
-                
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
-                const holdingRef = doc(portfolioColRef);
-                transaction.set(holdingRef, {
+                const newHoldingRef = doc(collection(firestore, `users/${user.uid}/portfolio`));
+                transaction.set(newHoldingRef, {
                     tickerId: ticker.id,
                     amount: tokensOut,
-                    avgBuyPrice: effectivePricePerToken,
+                    avgBuyPrice: avgBuyPrice,
                     userId: user.uid
                 });
             }
-            
+
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
@@ -371,7 +375,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const volume24h = (currentTickerData.volume24h || 0) + ngnForCurve;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
-             transaction.update(tickerRef, { 
+            transaction.update(tickerRef, { 
                 price: finalPrice,
                 marketCap: newMarketCap,
                 supply: newSupply,
@@ -384,9 +388,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     volume: ngnForCurve,
                     marketCap: newMarketCap,
                 })
-             });
+            });
 
-            // Add activity atomically
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
                 type: 'BUY',
@@ -395,12 +398,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 tickerIcon: ticker.icon,
                 value: ngnAmount,
                 tokenAmount: tokensOut,
-                pricePerToken: effectivePricePerToken,
+                pricePerToken: avgBuyPrice,
                 userId: user.uid,
                 createdAt: serverTimestamp(),
             });
 
-             return { tokensOut };
+            return { tokensOut };
         });
 
         toast({ title: "Purchase Successful!", description: `You bought ${tokensOut.toLocaleString()} ${ticker.name.split(' ')[0]}`});
@@ -589,3 +592,5 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     </Tabs>
   );
 }
+
+    
