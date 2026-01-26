@@ -256,8 +256,8 @@ export default function WalletPage() {
             <p className="mt-2 text-lg text-muted-foreground">View your balance, deposit funds, and see your transaction history.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-             <Card className="lg:col-span-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+             <Card>
                 <CardHeader>
                     <CardTitle>Your Balance</CardTitle>
                     <CardDescription>Your available NGN balance.</CardDescription>
@@ -272,10 +272,8 @@ export default function WalletPage() {
                     )}
                 </CardContent>
             </Card>
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-               {user && <DepositForm user={user} />}
-               {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
-            </div>
+            {user && <DepositForm user={user} />}
+            {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
         </div>
       
         <Card className="overflow-hidden mb-8">
