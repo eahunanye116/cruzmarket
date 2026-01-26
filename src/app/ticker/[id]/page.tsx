@@ -64,20 +64,14 @@ export default function TickerPage({ params }: { params: { id: string } }) {
   if (loading) {
     return (
        <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Skeleton className="h-16 w-16 rounded-none border-2" />
-          <div>
-            <Skeleton className="h-10 w-48 mb-2" />
-            <Skeleton className="h-8 w-32" />
-          </div>
-        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          <div className="lg:col-span-2 space-y-6">
-             <Skeleton className="h-48 w-full" />
-             <Skeleton className="h-32 w-full mt-8" />
-          </div>
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
+            <Skeleton className="h-[320px] w-full" />
+            <Skeleton className="h-96 w-full" />
             <Skeleton className="h-64 w-full" />
+          </div>
+          <div className="lg:col-span-1">
+            <Skeleton className="h-96 w-full" />
           </div>
         </div>
        </div>
@@ -101,9 +95,10 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-8">
-        <div className="lg:col-span-2">
-           <Card className="overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2 space-y-8">
+          {/* Ticker Header */}
+          <Card className="overflow-hidden">
             <div className="relative h-48 w-full">
                  {hasValidCover ? (
                     <Image
@@ -173,19 +168,8 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                 </div>
             </CardHeader>
           </Card>
-        </div>
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader><CardTitle>Trade ${ticker.name}</CardTitle></CardHeader>
-            <CardContent>
-              <TradeForm ticker={ticker} />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-8">
+          
+          {/* Price History */}
           <Card>
             <CardHeader>
               <CardTitle>Price History & Stats</CardTitle>
@@ -205,13 +189,15 @@ export default function TickerPage({ params }: { params: { id: string } }) {
             </CardContent>
           </Card>
           
-           <Card>
+          {/* About Card */}
+          <Card>
             <CardHeader><CardTitle>About ${ticker.name}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{ticker.description}</p>
             </CardContent>
           </Card>
 
+          {/* Trades & Analysis */}
           <Card>
              <Tabs defaultValue="trades">
                 <CardHeader>
@@ -246,8 +232,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
           </Card>
         </div>
 
+        {/* Right Column (Trade Form) */}
         <div className="lg:col-span-1">
-          {/* This column can be used for other content in the future */}
+          <div className="lg:sticky lg:top-20 space-y-8">
+            <Card>
+              <CardHeader><CardTitle>Trade ${ticker.name}</CardTitle></CardHeader>
+              <CardContent>
+                <TradeForm ticker={ticker} />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
