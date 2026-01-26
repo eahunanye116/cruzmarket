@@ -1,5 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
 function getYouTubeId(url: string): string | null {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
@@ -22,6 +26,12 @@ function getInstagramShortcode(url: string): string | null {
 
 
 export function VideoEmbed({ url }: { url: string }) {
+    const [replayKey, setReplayKey] = useState(0);
+
+    const handleReplay = () => {
+        setReplayKey(prevKey => prevKey + 1);
+    };
+
     if (!url) {
         return null;
     }
@@ -29,15 +39,23 @@ export function VideoEmbed({ url }: { url: string }) {
     const youtubeId = getYouTubeId(url);
     if (youtubeId) {
         return (
-            <div className="aspect-video w-full">
-                <iframe
-                    className="w-full h-full rounded-lg border"
-                    src={`https://www.youtube.com/embed/${youtubeId}`}
-                    title="YouTube video player"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                ></iframe>
+            <div className="space-y-4">
+                <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleReplay}>
+                        <RefreshCw />
+                        Replay
+                    </Button>
+                </div>
+                <div key={replayKey} className="aspect-video w-full">
+                    <iframe
+                        className="w-full h-full rounded-lg border"
+                        src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
+                        title="YouTube video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
             </div>
         );
     }
@@ -45,15 +63,23 @@ export function VideoEmbed({ url }: { url: string }) {
     const tikTokId = getTikTokVideoId(url);
     if (tikTokId) {
         return (
-            <div className="aspect-[9/16] w-full max-w-sm mx-auto">
-                <iframe
-                    className="w-full h-full rounded-lg border"
-                    src={`https://www.tiktok.com/embed/v2/${tikTokId}`}
-                    title="TikTok video player"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                ></iframe>
+            <div className="space-y-4">
+                 <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleReplay}>
+                        <RefreshCw />
+                        Replay
+                    </Button>
+                </div>
+                <div key={replayKey} className="aspect-[9/16] w-full max-w-sm mx-auto">
+                    <iframe
+                        className="w-full h-full rounded-lg border"
+                        src={`https://www.tiktok.com/embed/v2/${tikTokId}`}
+                        title="TikTok video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
             </div>
         )
     }
@@ -61,15 +87,23 @@ export function VideoEmbed({ url }: { url: string }) {
     const instagramShortcode = getInstagramShortcode(url);
     if (instagramShortcode) {
         return (
-            <div className="aspect-square w-full max-w-sm mx-auto">
-                <iframe
-                    className="w-full h-full rounded-lg border"
-                    src={`https://www.instagram.com/p/${instagramShortcode}/embed`}
-                    title="Instagram post embed"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                ></iframe>
+             <div className="space-y-4">
+                <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleReplay}>
+                        <RefreshCw />
+                        Replay
+                    </Button>
+                </div>
+                <div key={replayKey} className="aspect-square w-full max-w-sm mx-auto">
+                    <iframe
+                        className="w-full h-full rounded-lg border"
+                        src={`https://www.instagram.com/p/${instagramShortcode}/embed`}
+                        title="Instagram post embed"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
             </div>
         )
     }
