@@ -29,8 +29,10 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
   const filteredAndSortedTickers = useMemo(() => {
     let filtered = tickers;
     if (searchTerm) {
+      const lowercasedSearchTerm = searchTerm.toLowerCase();
       filtered = tickers.filter(ticker =>
-        ticker.name.toLowerCase().includes(searchTerm.toLowerCase())
+        ticker.name.toLowerCase().includes(lowercasedSearchTerm) ||
+        ticker.tickerAddress.toLowerCase().includes(lowercasedSearchTerm)
       );
     }
 
@@ -60,7 +62,7 @@ export function TickerList({ tickers }: { tickers: Ticker[] }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search tickers..."
+            placeholder="Search by name or CA..."
             value={searchTerm}
             onChange={handleSearchChange}
             className="pl-10 w-full"
