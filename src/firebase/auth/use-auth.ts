@@ -34,7 +34,7 @@ export function useAuth() {
         email: user.email,
         displayName: displayName,
         photoURL: user.photoURL,
-        balance: 1000000,
+        balance: 0,
       };
 
       // We are not handling permission errors here anymore,

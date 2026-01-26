@@ -55,7 +55,7 @@ export default function Home() {
         title: 'Join the Fray',
         description: (
         <p>
-            Ready to trade? <strong>Sign up</strong> to get <strong>₦1,000,000</strong> in virtual funds to start trading, or launch your own legendary meme coin.
+            Ready to trade? <strong>Sign up</strong> to deposit funds, start trading, or launch your own legendary meme coin.
         </p>
         ),
     },
@@ -66,7 +66,7 @@ export default function Home() {
         title: `Welcome, ${user?.displayName || 'Trader'}!`,
         description: (
         <p>
-            We've credited your account with <strong>₦1,000,000</strong> to start your trading journey. Spend it wisely... or don't. We're not your dad.
+            You're all set to start your trading journey. Deposit funds to your wallet to get started.
         </p>
         ),
     },
