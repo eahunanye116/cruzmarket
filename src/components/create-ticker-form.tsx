@@ -41,6 +41,7 @@ const formSchema = z.object({
   }),
   icon: z.string().url({ message: "Please enter a valid icon image URL." }),
   coverImage: z.string().url({ message: "Please enter a valid cover image URL." }),
+  videoUrl: z.string().url({ message: "Must be a valid URL." }).optional().or(z.literal('')),
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
   }).max(200, {
@@ -70,6 +71,7 @@ export function CreateTickerForm() {
       name: "",
       icon: "",
       coverImage: "",
+      videoUrl: "",
       description: "",
       supply: 1000000000,
       initialMarketCap: '100000',
@@ -98,8 +100,6 @@ export function CreateTickerForm() {
     const slug = values.name.toLowerCase().replace(/\s+/g, '-');
     const initialMarketCapNum = Number(values.initialMarketCap);
     
-    const k = initialMarketCapNum * values.supply;
-    
     const newTickerBaseData: Omit<Ticker, 'id' | 'createdAt' | 'tickerAddress' | 'trendingScore' | 'volume24h' | 'priceChange24h' | 'chartData' > = {
       name: values.name,
       slug,
@@ -110,6 +110,7 @@ export function CreateTickerForm() {
       icon: values.icon,
       coverImage: values.coverImage,
       creatorId: user.uid,
+      videoUrl: values.videoUrl || undefined,
     };
 
     const userProfileRef = doc(firestore, "users", user.uid);
@@ -164,10 +165,11 @@ export function CreateTickerForm() {
         const finalMarketCap = tickerData.marketCap + ngnForCurve;
         if (finalMarketCap <= 0) throw new Error("Market cap cannot be zero or negative.");
         
+        const k = (tickerData.marketCap * tickerData.supply);
         const finalSupply = k / finalMarketCap;
         const tokensOut = tickerData.supply - finalSupply;
         const finalPrice = finalMarketCap / finalSupply;
-        const avgBuyPrice = initialBuyValue / tokensOut;
+        const avgBuyPrice = values.initialBuyNgn / tokensOut;
         
         const initialPrice = tickerData.marketCap / tickerData.supply;
 
@@ -198,6 +200,7 @@ export function CreateTickerForm() {
             trendingScore: 0,
             priceChange24h: 0,
             volume24h: ngnForCurve,
+            isVerified: false,
         });
 
         // Add activities atomically within the transaction
@@ -215,7 +218,7 @@ export function CreateTickerForm() {
             tickerId: newTickerRef.id,
             tickerName: values.name,
             tickerIcon: values.icon,
-            value: initialBuyValue,
+            value: ngnForCurve,
             tokenAmount: tokensOut,
             pricePerToken: avgBuyPrice,
             userId: user.uid,
@@ -296,6 +299,22 @@ export function CreateTickerForm() {
               </FormControl>
               <FormDescription>
                 Public URL for the widescreen cover/banner image.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="videoUrl"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Video URL (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="https://youtube.com/watch?v=..." {...field} />
+              </FormControl>
+              <FormDescription>
+                Embed a video from YouTube by pasting its URL here.
               </FormDescription>
               <FormMessage />
             </FormItem>

@@ -19,6 +19,7 @@ const formSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters."),
   icon: z.string().url("Must be a valid URL."),
   coverImage: z.string().url("Must be a valid URL."),
+  videoUrl: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
   price: z.coerce.number().positive(),
   marketCap: z.coerce.number().positive(),
   supply: z.coerce.number().positive(),
@@ -42,6 +43,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
       description: '',
       icon: '',
       coverImage: '',
+      videoUrl: '',
       price: 0,
       marketCap: 0,
       supply: 0
@@ -53,7 +55,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
       form.reset(ticker);
     } else {
       form.reset({
-        name: '', description: '', icon: '', coverImage: '',
+        name: '', description: '', icon: '', coverImage: '', videoUrl: '',
         price: 1, marketCap: 100000, supply: 1000000000
       });
     }
@@ -135,6 +137,13 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
               <FormItem>
                 <FormLabel>Cover Image URL</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="videoUrl" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Video URL (Optional)</FormLabel>
+                <FormControl><Input placeholder="https://youtube.com/watch?v=..." {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

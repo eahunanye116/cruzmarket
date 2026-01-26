@@ -17,6 +17,7 @@ import { TokenAnalysis } from '@/components/token-analysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { PriceChart } from '@/components/price-chart';
+import { VideoEmbed } from '@/components/video-embed';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -206,6 +207,15 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               <p className="text-muted-foreground">{ticker.description}</p>
             </CardContent>
           </Card>
+
+          {ticker.videoUrl && (
+            <Card>
+              <CardHeader><CardTitle>Video</CardTitle></CardHeader>
+              <CardContent>
+                <VideoEmbed url={ticker.videoUrl} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Trades & Analysis */}
           <Card>

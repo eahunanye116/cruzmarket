@@ -8,6 +8,7 @@ export type Ticker = {
   description: string;
   icon: string;
   coverImage: string;
+  videoUrl?: string;
   price: number;
   supply: number;
   marketCap: number; 

@@ -12,6 +12,7 @@
         "description": { "type": "string" },
         "icon": { "type": "string" },
         "coverImage": { "type": "string" },
+        "videoUrl": { "type": "string", "format": "uri", "description": "Optional URL for an embeddable video from a social media platform." },
         "price": { "type": "number" },
         "supply": { "type": "number" },
         "marketCap": { "type": "number" },
