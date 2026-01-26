@@ -314,7 +314,7 @@ export function CreateTickerForm() {
                 <Input placeholder="https://youtube.com/watch?v=..." {...field} />
               </FormControl>
               <FormDescription>
-                Embed a video from YouTube by pasting its URL here.
+                Embed a video from YouTube, TikTok, or Instagram by pasting its URL here.
               </FormDescription>
               <FormMessage />
             </FormItem>

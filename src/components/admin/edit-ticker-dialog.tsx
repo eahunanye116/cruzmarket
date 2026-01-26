@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -144,6 +144,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
               <FormItem>
                 <FormLabel>Video URL (Optional)</FormLabel>
                 <FormControl><Input placeholder="https://youtube.com/watch?v=..." {...field} /></FormControl>
+                <FormDescription>Supports YouTube, TikTok, and Instagram URLs.</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />

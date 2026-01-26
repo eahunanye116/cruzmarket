@@ -6,32 +6,78 @@ function getYouTubeId(url: string): string | null {
 
     if (match && match[2].length === 11) {
         return match[2];
-    } else {
-        return null;
     }
+    return null;
 }
 
-export function VideoEmbed({ url }: { url: string }) {
-    const videoId = getYouTubeId(url);
+function getTikTokVideoId(url: string): string | null {
+    const match = url.match(/tiktok\.com\/.*\/video\/(\d+)/);
+    return match ? match[1] : null;
+}
 
-    if (!videoId) {
+function getInstagramShortcode(url: string): string | null {
+    const match = url.match(/instagram\.com\/(p|reel)\/([a-zA-Z0-9_-]+)/);
+    return match ? match[2] : null;
+}
+
+
+export function VideoEmbed({ url }: { url: string }) {
+    if (!url) {
+        return null;
+    }
+    
+    const youtubeId = getYouTubeId(url);
+    if (youtubeId) {
         return (
-            <div className="text-center text-muted-foreground p-4 border rounded-lg">
-                <p>Could not embed video. Invalid or unsupported URL.</p>
+            <div className="aspect-video w-full">
+                <iframe
+                    className="w-full h-full rounded-lg border"
+                    src={`https://www.youtube.com/embed/${youtubeId}`}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                ></iframe>
             </div>
         );
     }
 
+    const tikTokId = getTikTokVideoId(url);
+    if (tikTokId) {
+        return (
+            <div className="aspect-[9/16] w-full max-w-sm mx-auto">
+                <iframe
+                    className="w-full h-full rounded-lg border"
+                    src={`https://www.tiktok.com/embed/v2/${tikTokId}`}
+                    title="TikTok video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                ></iframe>
+            </div>
+        )
+    }
+    
+    const instagramShortcode = getInstagramShortcode(url);
+    if (instagramShortcode) {
+        return (
+            <div className="aspect-square w-full max-w-sm mx-auto">
+                <iframe
+                    className="w-full h-full rounded-lg border"
+                    src={`https://www.instagram.com/p/${instagramShortcode}/embed`}
+                    title="Instagram post embed"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                ></iframe>
+            </div>
+        )
+    }
+
     return (
-        <div className="aspect-video w-full">
-            <iframe
-                className="w-full h-full rounded-lg border"
-                src={`https://www.youtube.com/embed/${videoId}`}
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-            ></iframe>
+        <div className="text-center text-muted-foreground p-4 border rounded-lg">
+            <p>Could not embed video. Invalid or unsupported URL.</p>
+            <p className="text-xs mt-1">Supports YouTube, TikTok, and Instagram.</p>
         </div>
     );
 }
