@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,13 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Info } from "lucide-react";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp, doc, runTransaction, DocumentReference, writeBatch, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker, PlatformStats } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 
 const marketCapOptions = {
@@ -261,13 +261,20 @@ export function CreateTickerForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Ticker Name</FormLabel>
+              <div className="flex items-center gap-1.5">
+                  <FormLabel>Ticker Name</FormLabel>
+                  <Popover>
+                      <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent side="right" className="max-w-xs text-sm">
+                          <p>The official name of your meme ticker. This will be displayed prominently across the platform (e.g., 'DogeCoin'). Keep it short and memorable.</p>
+                      </PopoverContent>
+                  </Popover>
+              </div>
               <FormControl>
                 <Input placeholder="e.g., DogeCoin" {...field} />
               </FormControl>
-              <FormDescription>
-                The unique name of your meme ticker.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -277,13 +284,20 @@ export function CreateTickerForm() {
           name="icon"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Icon URL (Square)</FormLabel>
+              <div className="flex items-center gap-1.5">
+                  <FormLabel>Icon URL (Square)</FormLabel>
+                   <Popover>
+                      <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent side="right" className="max-w-xs text-sm">
+                          <p>Provide a direct public URL to a square image for your token's icon. This will be used in lists, feeds, and wallets. For best results, use a 1:1 aspect ratio image (e.g., 200x200 pixels).</p>
+                      </PopoverContent>
+                  </Popover>
+              </div>
               <FormControl>
                 <Input placeholder="https://example.com/icon.png" {...field} />
               </FormControl>
-              <FormDescription>
-                Public URL for the small, square token icon.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -293,13 +307,20 @@ export function CreateTickerForm() {
           name="coverImage"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Cover Image URL (16:9)</FormLabel>
+                <div className="flex items-center gap-1.5">
+                    <FormLabel>Cover Image URL (16:9)</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                            <p>Provide a direct public URL to a widescreen image for your token's banner. This will appear at the top of your token's page. For best results, use a 16:9 aspect ratio image (e.g., 1200x675 pixels).</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <FormControl>
                 <Input placeholder="https://example.com/cover.png" {...field} />
               </FormControl>
-              <FormDescription>
-                Public URL for the widescreen cover/banner image.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -309,13 +330,20 @@ export function CreateTickerForm() {
           name="videoUrl"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Video URL (Optional)</FormLabel>
+               <div className="flex items-center gap-1.5">
+                    <FormLabel>Video URL (Optional)</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                            <p>Optionally embed a video from YouTube, TikTok, or Instagram. Paste the full URL of the video here to have it featured on your token's page.</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <FormControl>
                 <Input placeholder="https://youtube.com/watch?v=..." {...field} />
               </FormControl>
-              <FormDescription>
-                Embed a video from YouTube, TikTok, or Instagram by pasting its URL here.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -325,7 +353,17 @@ export function CreateTickerForm() {
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+               <div className="flex items-center gap-1.5">
+                    <FormLabel>Description</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                            <p>A short, catchy description of your meme ticker. Explain what makes it unique, what the meme is about, or link to viral posts that give it context.</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <FormControl>
                 <Textarea
                   placeholder="Tell us about your meme ticker..."
@@ -333,9 +371,6 @@ export function CreateTickerForm() {
                   {...field}
                 />
               </FormControl>
-              <FormDescription>
-                A short and catchy description.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -345,7 +380,17 @@ export function CreateTickerForm() {
           name="initialMarketCap"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Starting Market Cap</FormLabel>
+                <div className="flex items-center gap-1.5">
+                    <FormLabel>Starting Market Cap</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                            <p>This is the initial valuation of your token. A higher market cap requires a higher creation fee but makes the price less volatile. A lower market cap is cheaper to launch but means the price will move more dramatically with early buys.</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -373,13 +418,20 @@ export function CreateTickerForm() {
           name="supply"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Total Supply</FormLabel>
+                <div className="flex items-center gap-1.5">
+                    <FormLabel>Total Supply</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                           <p>The total number of tokens that will ever be created. This, combined with the market cap, sets the initial price per token. A larger supply means a lower starting price.</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <FormControl>
                 <Input type="number" placeholder="1000000000" {...field} />
               </FormControl>
-              <FormDescription>
-                The total number of tokens that will ever exist. (Min: 1M, Max: 1T).
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -389,13 +441,20 @@ export function CreateTickerForm() {
           name="initialBuyNgn"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Initial Buy</FormLabel>
+               <div className="flex items-center gap-1.5">
+                    <FormLabel>Initial Buy</FormLabel>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs text-sm">
+                           <p>The amount in NGN you want to automatically buy when the token is created. This makes you the very first investor and helps establish an initial price history. A minimum of ₦1,000 is required, and a 0.2% fee applies.</p>
+                        </PopoverContent>
+                    </Popover>
+                </div>
               <FormControl>
                 <Input type="number" placeholder="1000" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
               </FormControl>
-              <FormDescription>
-                Amount in NGN to automatically buy upon creation, making you the first buyer. Min ₦1,000.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
