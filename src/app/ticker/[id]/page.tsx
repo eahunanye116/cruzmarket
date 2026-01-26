@@ -2,7 +2,7 @@
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Copy, Check, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Copy, Check, ArrowDownRight, ArrowUpRight, CheckCircle } from 'lucide-react';
 import { useDoc, useCollection, useFirestore } from '@/firebase';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
@@ -133,6 +133,12 @@ export default function TickerPage({ params }: { params: { id: string } }) {
                     <div className="flex-1 mt-4 sm:mt-0">
                         <div className="flex items-center gap-3">
                           <CardTitle className="font-headline text-4xl">${ticker.name}</CardTitle>
+                          {ticker.isVerified && (
+                              <div className="flex items-center gap-1 text-primary bg-primary/10 px-2 py-1 rounded-md border-2 border-primary/50">
+                                  <CheckCircle className="h-4 w-4" />
+                                  <span className="text-sm font-semibold">Verified</span>
+                              </div>
+                          )}
                            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 border-2 rounded-md">
                                 🌱 {tokenAge}
                            </div>

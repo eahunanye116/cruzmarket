@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, deleteDoc, doc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { Ticker } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import Image from 'next/image';
 import { EditTickerDialog } from './edit-ticker-dialog';
+import { Switch } from '../ui/switch';
+import { cn } from '@/lib/utils';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -43,6 +45,7 @@ export function TickerManagement() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState<Ticker | null>(null);
+  const [updatingVerified, setUpdatingVerified] = useState<string | null>(null);
 
   const handleEdit = (ticker: Ticker) => {
     setSelectedTicker(ticker);
@@ -68,6 +71,28 @@ export function TickerManagement() {
     }
   };
 
+  const handleVerifiedToggle = async (tickerId: string, newStatus: boolean) => {
+    if (!firestore) return;
+    setUpdatingVerified(tickerId);
+    try {
+        const tickerRef = doc(firestore, 'tickers', tickerId);
+        await updateDoc(tickerRef, { isVerified: newStatus });
+        toast({
+            title: 'Ticker Updated',
+            description: `Ticker is now ${newStatus ? 'verified' : 'unverified'}.`
+        });
+    } catch (e: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Update failed',
+            description: e.message
+        });
+    } finally {
+        setUpdatingVerified(null);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader>
@@ -89,6 +114,7 @@ export function TickerManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Ticker</TableHead>
+                  <TableHead>Verified</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Market Cap</TableHead>
                   <TableHead>Creator ID</TableHead>
@@ -97,7 +123,7 @@ export function TickerManagement() {
               </TableHeader>
               <TableBody>
                 {tickers?.map((ticker) => (
-                  <TableRow key={ticker.id}>
+                  <TableRow key={ticker.id} className={cn(ticker.isVerified && "bg-primary/5")}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                          {isValidUrl(ticker.icon) ? (
@@ -107,6 +133,16 @@ export function TickerManagement() {
                         )}
                         <span className="font-medium">{ticker.name}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {updatingVerified === ticker.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Switch
+                            checked={!!ticker.isVerified}
+                            onCheckedChange={(checked) => handleVerifiedToggle(ticker.id, checked)}
+                        />
+                      )}
                     </TableCell>
                     <TableCell>₦{(ticker.price || 0).toLocaleString('en-US', { maximumFractionDigits: 8 })}</TableCell>
                     <TableCell>₦{(ticker.marketCap || 0).toLocaleString()}</TableCell>

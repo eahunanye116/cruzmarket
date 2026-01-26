@@ -19,6 +19,7 @@ export type Ticker = {
   trendingScore?: number;
   volume24h?: number;
   priceChange24h?: number;
+  isVerified?: boolean;
 };
 
 export type PortfolioHolding = {

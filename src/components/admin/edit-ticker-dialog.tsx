@@ -87,6 +87,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
           trendingScore: 0,
           volume24h: 0,
           priceChange24h: 0,
+          isVerified: false,
         });
         toast({ title: 'Ticker Created', description: `"${values.name}" is now live.` });
       }

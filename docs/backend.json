@@ -31,7 +31,8 @@
         "creatorId": { "type": "string" },
         "trendingScore": { "type": "number" },
         "volume24h": { "type": "number" },
-        "priceChange24h": { "type": "number" }
+        "priceChange24h": { "type": "number" },
+        "isVerified": { "type": "boolean", "description": "Indicates if the ticker is a verified token of a meme legend." }
       },
       "required": ["name", "slug", "tickerAddress", "description", "supply", "price", "createdAt", "marketCap", "creatorId", "icon", "coverImage"]
     },

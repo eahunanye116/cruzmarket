@@ -2,7 +2,7 @@
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from './ui/button';
-import { ArrowDownRight, ArrowUpRight, Zap } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Zap, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { TickerSparkline } from './ticker-sparkline';
 import { calculateMarketCapChange, cn } from '@/lib/utils';
@@ -42,7 +42,10 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
                 <div className="h-[100px] w-[100px] rounded-none border-4 border-background bg-muted"></div>
             )}
             <div className="text-left">
-                <h3 className="font-headline text-4xl font-bold">${ticker.name}</h3>
+                 <div className="flex items-center gap-2">
+                    <h3 className="font-headline text-4xl font-bold">${ticker.name}</h3>
+                    {ticker.isVerified && <CheckCircle className="h-6 w-6 text-primary" />}
+                </div>
                 <div className="flex items-end gap-3 mt-1">
                     <p className="text-primary text-2xl font-semibold leading-none">
                         ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
