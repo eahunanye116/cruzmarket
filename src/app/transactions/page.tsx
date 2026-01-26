@@ -1,5 +1,3 @@
-
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -11,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile } from '@/lib/types';
@@ -29,8 +27,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WithdrawalForm } from '@/components/withdrawal-form';
+import { cn } from '@/lib/utils';
 
 
 // Helper function to check for valid URLs
@@ -136,15 +134,16 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
     )
 }
 
-// Transaction list activity icon
-function ActivityIcon({ type }: { type: Activity['type'] }) {
-  switch (type) {
-    case 'BUY': return <Plus className="h-4 w-4 text-accent-foreground" />;
-    case 'SELL': return <Minus className="h-4 w-4 text-destructive-foreground" />;
-    case 'DEPOSIT': return <Landmark className="h-4 w-4" />;
-    case 'WITHDRAWAL': return <ArrowDown className="h-4 w-4" />;
-    default: return null;
-  }
+// New type for grouped data
+type GroupedTransaction = {
+    tickerId: string;
+    tickerName: string;
+    tickerIcon: string | undefined;
+    tradeCount: number;
+    totalVolume: number;
+    realizedPnl: number;
+    lastActivity: Date;
+    ticker: Ticker | undefined;
 }
 
 const ITEMS_PER_PAGE = 7;
@@ -152,17 +151,14 @@ const ITEMS_PER_PAGE = 7;
 export default function WalletPage() {
   const user = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
-  // --- Filter and Pagination State ---
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [visibleAssets, setVisibleAssets] = useState(ITEMS_PER_PAGE);
 
-  // Fetch user profile for balance
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // --- Data for the transaction list ---
   const activitiesQuery = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
@@ -174,49 +170,66 @@ export default function WalletPage() {
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
 
   const enrichedActivities = useMemo(() => {
-    if (!activities) return [];
-    
-    const getTickerName = (activity: Activity) => {
-        if (activity.type === 'DEPOSIT') return 'Wallet Deposit';
-        if (activity.type === 'WITHDRAWAL') return 'Wallet Withdrawal';
-        return activity.tickerName || 'Unknown';
-    }
-
-    if (!tickers) { // If tickers haven't loaded, still show deposits/withdrawals
-        return activities
-            .filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL')
-            .map(activity => ({
-                ...activity,
-                tickerName: getTickerName(activity),
-            }));
-    }
-
-    return activities.map(activity => {
-      const ticker = tickers.find(t => t.id === activity.tickerId);
-      return {
-        ...activity,
-        ticker,
-        tickerIcon: ticker?.icon || '',
-        tickerName: getTickerName(activity),
-      };
-    });
+    if (!activities || !tickers) return [];
+    return activities.map(activity => ({
+      ...activity,
+      ticker: tickers.find(t => t.id === activity.tickerId),
+    }));
   }, [activities, tickers]);
   
+  const { groupedTransactions, walletActivities } = useMemo(() => {
+    if (!enrichedActivities) return { groupedTransactions: [], walletActivities: [] };
+    
+    const walletActs = enrichedActivities.filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL');
+    const trades = enrichedActivities.filter(act => act.type === 'BUY' || act.type === 'SELL');
+
+    const groups: { [key: string]: GroupedTransaction } = {};
+
+    for (const trade of trades) {
+        if (!trade.tickerId || !trade.ticker) continue;
+
+        if (!groups[trade.tickerId]) {
+            groups[trade.tickerId] = {
+                tickerId: trade.tickerId,
+                tickerName: trade.ticker.name,
+                tickerIcon: trade.ticker.icon,
+                tradeCount: 0,
+                totalVolume: 0,
+                realizedPnl: 0,
+                lastActivity: trade.createdAt.toDate(),
+                ticker: trade.ticker,
+            };
+        }
+
+        const group = groups[trade.tickerId];
+        group.tradeCount++;
+        group.totalVolume += trade.value;
+        if (trade.type === 'SELL' && typeof trade.realizedPnl === 'number') {
+            group.realizedPnl += trade.realizedPnl;
+        }
+        if (trade.createdAt.toDate() > group.lastActivity) {
+            group.lastActivity = trade.createdAt.toDate();
+        }
+    }
+    
+    const sortedGroupedTransactions = Object.values(groups).sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+    return { groupedTransactions: sortedGroupedTransactions, walletActivities: walletActs };
+
+  }, [enrichedActivities]);
+
+
   const isLoading = profileLoading || activitiesLoading || tickersLoading;
 
-  // --- Filtering and Pagination Logic ---
-  const filteredActivities = useMemo(() => {
-    if (!enrichedActivities) return [];
-    return enrichedActivities.filter(activity => {
-        const typeMatch = filterType === 'all' || activity.type.toLowerCase() === filterType;
-        const searchMatch = !searchTerm || activity.tickerName?.toLowerCase().includes(searchTerm.toLowerCase());
-        return typeMatch && searchMatch;
+  const filteredAssets = useMemo(() => {
+    if (!groupedTransactions) return [];
+    return groupedTransactions.filter(asset => {
+        return !searchTerm || asset.tickerName?.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [enrichedActivities, filterType, searchTerm]);
+  }, [groupedTransactions, searchTerm]);
 
-  const visibleActivities = useMemo(() => {
-    return filteredActivities.slice(0, visibleCount);
-  }, [filteredActivities, visibleCount]);
+  const visibleGroupedAssets = useMemo(() => {
+    return filteredAssets.slice(0, visibleAssets);
+  }, [filteredAssets, visibleAssets]);
 
 
   if (!user && !profileLoading) {
@@ -259,154 +272,135 @@ export default function WalletPage() {
                     )}
                 </CardContent>
             </Card>
-
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                {user && <DepositForm user={user} />}
                {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
             </div>
         </div>
       
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden mb-8">
             <CardHeader>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>A record of all your trading and wallet activities.</CardDescription>
+                <CardTitle>Trade History</CardTitle>
+                <CardDescription>A summary of your trading activity, grouped by token.</CardDescription>
             </CardHeader>
              <div className="p-4 border-y">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                            type="search"
-                            placeholder="Search by asset name..."
-                            value={searchTerm}
-                            onChange={(e) => {
-                                setSearchTerm(e.target.value);
-                                setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on search
-                            }}
-                            className="pl-10 w-full"
-                        />
-                    </div>
-                    <Select onValueChange={(value) => {
-                        setFilterType(value);
-                        setVisibleCount(ITEMS_PER_PAGE); // Reset pagination on filter
-                    }} defaultValue={filterType}>
-                        <SelectTrigger className="w-full md:w-[200px]">
-                            <SelectValue placeholder="Filter by type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="buy">Buys</SelectItem>
-                            <SelectItem value="sell">Sells</SelectItem>
-                            <SelectItem value="deposit">Deposits</SelectItem>
-                            <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search by asset name..."
+                        value={searchTerm}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setVisibleAssets(ITEMS_PER_PAGE);
+                        }}
+                        className="pl-10 w-full"
+                    />
                 </div>
             </div>
             <CardContent className="p-0">
             {isLoading ? (
-                <div className="p-4">
-                    <Skeleton className="h-40 w-full" />
-                </div>
-            ) : visibleActivities && visibleActivities.length > 0 ? (
+                <div className="p-4"><Skeleton className="h-40 w-full" /></div>
+            ) : visibleGroupedAssets.length > 0 ? (
                 <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead>Asset</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Value (NGN)</TableHead>
-                    <TableHead className="text-right">Date</TableHead>
+                    <TableHead>Trades</TableHead>
+                    <TableHead>Realized P/L</TableHead>
+                    <TableHead>Last Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {visibleActivities.map((activity) => {
-                    const hasValidIcon = isValidUrl(activity.tickerIcon);
-                    const isTrade = activity.type === 'BUY' || activity.type === 'SELL';
-                    const isWalletActivity = activity.type === 'DEPOSIT' || activity.type === 'WITHDRAWAL';
-                    
-                    const getBadgeVariant = () => {
-                        switch(activity.type) {
-                            case 'BUY': return 'default';
-                            case 'SELL': return 'destructive';
-                            case 'DEPOSIT': return 'secondary';
-                            case 'WITHDRAWAL': return 'outline';
-                            default: return 'secondary';
-                        }
-                    }
-
-                    return (
-                        <TableRow key={activity.id}>
+                    {visibleGroupedAssets.map((asset) => (
+                        <TableRow key={asset.tickerId}>
                             <TableCell>
                                 <div className="flex items-center gap-4">
-                                {isWalletActivity ? (
-                                    <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted flex items-center justify-center">
-                                        <ActivityIcon type={activity.type}/>
-                                    </div>
-                                ) : hasValidIcon ? (
+                                {isValidUrl(asset.tickerIcon) ? (
                                     <Image
-                                    src={activity.tickerIcon!}
-                                    alt={activity.tickerName!}
-                                    width={32}
-                                    height={32}
-                                    className="rounded-none border-2 aspect-square object-cover"
+                                        src={asset.tickerIcon}
+                                        alt={asset.tickerName}
+                                        width={32}
+                                        height={32}
+                                        className="rounded-none border-2 aspect-square object-cover"
                                     />
                                 ) : (
                                     <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted" />
                                 )}
-                                <div>
-                                    <p className="font-medium">{activity.tickerName}</p>
-                                </div>
+                                <div><p className="font-medium">{asset.tickerName}</p></div>
                                 </div>
                             </TableCell>
-                            <TableCell>
-                                <Badge variant={getBadgeVariant()} className="text-xs">
-                                    <ActivityIcon type={activity.type}/>
-                                    <span className="ml-1">{activity.type}</span>
-                                </Badge>
+                            <TableCell>{asset.tradeCount}</TableCell>
+                            <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>
+                                {asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto' })}
                             </TableCell>
-                            <TableCell className="text-right font-medium">
-                                ₦{activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="text-right text-muted-foreground">
-                                {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
+                            <TableCell className="text-muted-foreground">
+                                {formatDistanceToNow(asset.lastActivity, { addSuffix: true })}
                             </TableCell>
                             <TableCell className="text-right">
-                            {isTrade && (
                                 <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-                                    <Link href={`/trade/${activity.id}`}>
-                                    <ArrowRight className="h-4 w-4" />
+                                    <Link href={`/transactions/token/${asset.tickerId}`}>
+                                        <ArrowRight className="h-4 w-4" />
                                     </Link>
                                 </Button>
-                            )}
                             </TableCell>
                         </TableRow>
-                    );
-                    })}
+                    ))}
                 </TableBody>
                 </Table>
             ) : (
                 <div className="text-center py-12">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2 mx-auto">
-                    <History className="h-8 w-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-bold font-headline">No Transactions Found</h2>
-                <p className="mt-2 text-muted-foreground">
-                    Your transaction history is empty, or no items match your current filters.
-                </p>
+                    <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-medium">No Trade History</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">You haven't traded any tokens yet, or no assets match your search.</p>
                 </div>
             )}
             </CardContent>
-             {visibleCount < filteredActivities.length && (
+             {visibleAssets < filteredAssets.length && (
                 <CardFooter className="justify-center border-t pt-6">
-                    <Button 
-                        onClick={() => setVisibleCount(prev => prev + ITEMS_PER_PAGE)}
-                        variant="outline"
-                    >
-                        Load More
+                    <Button onClick={() => setVisibleAssets(prev => prev + ITEMS_PER_PAGE)} variant="outline">
+                        Load More Assets
                     </Button>
                 </CardFooter>
             )}
+        </Card>
+
+         <Card className="overflow-hidden">
+            <CardHeader>
+                <CardTitle>Wallet History</CardTitle>
+                <CardDescription>A record of your deposits and withdrawals.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+             {isLoading ? (
+                <div className="p-4"><Skeleton className="h-24 w-full" /></div>
+            ) : walletActivities.length > 0 ? (
+                 <Table>
+                    <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        {walletActivities.map(activity => (
+                            <TableRow key={activity.id}>
+                                <TableCell>
+                                     <Badge variant={activity.type === 'DEPOSIT' ? 'secondary' : 'outline'}>{activity.type}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {activity.value.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}
+                                </TableCell>
+                                <TableCell>
+                                    {formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                 </Table>
+             ) : (
+                 <div className="text-center py-12">
+                    <History className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-medium">No Wallet History</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">You haven't made any deposits or withdrawals yet.</p>
+                </div>
+             )}
+            </CardContent>
         </Card>
     </div>
   );
