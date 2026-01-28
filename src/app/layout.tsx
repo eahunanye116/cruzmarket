@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Comic_Neue } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BottomNav } from '@/components/layout/bottom-nav';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   // Add a metadataBase for absolute URLs in sitemaps and social sharing.
@@ -66,6 +67,7 @@ export default function RootLayout({
           <BottomNav />
           <Toaster />
         </FirebaseClientProvider>
+        <Analytics />
       </body>
     </html>
   );
