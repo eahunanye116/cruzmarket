@@ -57,8 +57,6 @@ export function Header() {
     { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
   ];
   
-  const adminNavItem = { href: '/admin', label: 'Admin', icon: <ShieldCheck className="h-5 w-5" /> };
-  
   const isAdmin = user?.uid === ADMIN_UID;
 
   return (
@@ -85,18 +83,6 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
-             {isAdmin && (
-               <Link
-                href={adminNavItem.href}
-                className={cn(
-                  "transition-colors hover:text-foreground/80 flex items-center gap-2",
-                  pathname === adminNavItem.href ? "text-foreground font-bold" : "text-foreground/60"
-                )}
-              >
-                {adminNavItem.icon}
-                {adminNavItem.label}
-              </Link>
-             )}
           </nav>
         </div>
         
@@ -124,6 +110,11 @@ export function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">Admin Panel</Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link href="/support">Support Chat</Link>
                 </DropdownMenuItem>
