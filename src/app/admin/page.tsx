@@ -1,7 +1,6 @@
-
 'use client';
 import { useUser } from '@/firebase';
-import { Ban, ShieldCheck, Twitter, HandCoins, Bell, MessageSquare } from 'lucide-react';
+import { Ban, ShieldCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
@@ -12,6 +11,14 @@ import { BlogManagement } from '@/components/admin/blog-management';
 import { WithdrawalManagement } from '@/components/admin/withdrawal-management';
 import { NotificationManagement } from '@/components/admin/notification-management';
 import { SupportManagement } from '@/components/admin/support-management';
+import { useState } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -20,6 +27,7 @@ const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 export default function AdminPage() {
   const user = useUser();
+  const [activeTab, setActiveTab] = useState('tickers');
 
   if (!user) {
     return (
@@ -64,17 +72,40 @@ export default function AdminPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
-          <TabsTrigger value="tickers">Tickers</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="blog">Blog</TabsTrigger>
-          <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="x">X</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Desktop Tabs */}
+        <div className="hidden sm:block">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+            <TabsTrigger value="tickers">Tickers</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="support">Support</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="blog">Blog</TabsTrigger>
+            <TabsTrigger value="privacy">Privacy</TabsTrigger>
+            <TabsTrigger value="x">X</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Mobile Select Dropdown */}
+        <div className="sm:hidden">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a section..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tickers">Tickers</SelectItem>
+              <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="withdrawals">Withdrawals</SelectItem>
+              <SelectItem value="support">Support</SelectItem>
+              <SelectItem value="notifications">Notifications</SelectItem>
+              <SelectItem value="blog">Blog</SelectItem>
+              <SelectItem value="privacy">Privacy</SelectItem>
+              <SelectItem value="x">X</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <TabsContent value="tickers" className="mt-6">
           <TickerManagement />
         </TabsContent>
