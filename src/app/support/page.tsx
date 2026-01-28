@@ -102,7 +102,7 @@ const startConvoSchema = z.object({
   initialMessage: z.string().min(10, "Message must be at least 10 characters.").max(1000),
 });
 
-function StartConversationForm({ user, onConversationStarted, onBack }: { user: NonNullable<ReturnType<typeof useUser>>; onConversationStarted: (id: string) => void; onBack: () => void; }) {
+function StartConversationForm({ user, onConversationStarted, onBack, showBackButton }: { user: NonNullable<ReturnType<typeof useUser>>; onConversationStarted: (id: string) => void; onBack: () => void; showBackButton: boolean; }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const form = useForm<z.infer<typeof startConvoSchema>>({
@@ -131,7 +131,7 @@ function StartConversationForm({ user, onConversationStarted, onBack }: { user: 
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
         <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft/></Button>
+            {showBackButton && <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft/></Button>}
             <div>
                 <CardTitle>Start a New Support Chat</CardTitle>
                 <CardDescription>Describe your issue, and an admin will get back to you shortly.</CardDescription>
@@ -275,7 +275,7 @@ export default function SupportPage() {
   const user = useUser();
   const firestore = useFirestore();
 
-  const [view, setView] = useState<'list' | 'form' | 'chat'>('list');
+  const [view, setView] = useState<'loading' | 'list' | 'form' | 'chat'>('loading');
   const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
 
   const allUserConvosQuery = useMemo(() => {
@@ -293,10 +293,13 @@ export default function SupportPage() {
   }, [allConversations, selectedConvoId]);
 
   useEffect(() => {
-    if (!loading && (!allConversations || allConversations.length === 0)) {
-        setView('form');
-    } else if (!loading && view !== 'chat') {
+    // This effect sets the initial view state once data is loaded, then stops interfering.
+    if (view === 'loading' && !loading) {
+      if (allConversations && allConversations.length > 0) {
         setView('list');
+      } else {
+        setView('form');
+      }
     }
   }, [loading, allConversations, view]);
   
@@ -312,7 +315,7 @@ export default function SupportPage() {
 
   const handleBackToList = () => {
     setSelectedConvoId(null);
-    setView('list');
+    setView('list'); // Always go back to the list view
   };
 
   const handleStartNew = () => {
@@ -320,7 +323,7 @@ export default function SupportPage() {
   };
   
   const renderContent = () => {
-      if (loading) {
+      if (view === 'loading') {
           return (
             <div className="flex justify-center p-12">
                 <Loader2 className="h-10 w-10 animate-spin text-primary"/>
@@ -333,7 +336,8 @@ export default function SupportPage() {
       }
       
       if (view === 'form') {
-          return <StartConversationForm user={user!} onConversationStarted={handleConversationStarted} onBack={handleBackToList} />
+          const canGoBack = !!(allConversations && allConversations.length > 0);
+          return <StartConversationForm user={user!} onConversationStarted={handleConversationStarted} onBack={handleBackToList} showBackButton={canGoBack} />
       }
 
       return <ConversationList conversations={allConversations || []} onSelect={handleSelectConversation} onNewClick={handleStartNew} loading={loading} />
