@@ -1,4 +1,4 @@
-# CruzMarket
+git add .# CruzMarket
 
 **Welcome to CruzMarket: The Premier Battleground for Meme Tickers.**
 
