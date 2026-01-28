@@ -65,7 +65,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
           <TabsTrigger value="tickers">Tickers</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
