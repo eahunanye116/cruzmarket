@@ -1,7 +1,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, query, getDocs, where, writeBatch, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, getDocs, where, writeBatch, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 // Action to create a notification (Admin)
@@ -80,5 +80,25 @@ export async function dismissHighPriorityNotificationAction(userId: string, noti
         return { success: true, message: "Popup dismissed." };
     } catch(error: any) {
         return { success: false, error: error.message };
+    }
+}
+
+
+export async function deleteNotificationAction(notificationId: string) {
+    if (!notificationId) {
+        return { success: false, error: 'Notification ID is required.' };
+    }
+    const firestore = getFirestoreInstance();
+    try {
+        // Just delete the main notification. The frontend is resilient enough to handle
+        // orphaned userNotification documents. A cleanup job could be run periodically
+        // in a real production environment.
+        await deleteDoc(doc(firestore, 'notifications', notificationId));
+
+        revalidatePath('/admin');
+        return { success: true, message: 'Notification deleted successfully.' };
+    } catch (error: any) {
+        console.error('Error deleting notification:', error);
+        return { success: false, error: error.message || 'Failed to delete notification.' };
     }
 }

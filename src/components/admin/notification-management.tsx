@@ -6,7 +6,7 @@ import { Notification } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, MoreHorizontal, Send, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { format } from 'date-fns';
@@ -14,8 +14,10 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
-import { createNotificationAction } from '@/app/actions/notification-actions';
+import { createNotificationAction, deleteNotificationAction } from '@/app/actions/notification-actions';
 import { Badge } from '../ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 export function NotificationManagement() {
     const firestore = useFirestore();
@@ -27,6 +29,10 @@ export function NotificationManagement() {
     const [message, setMessage] = useState('');
     const [isHighPriority, setIsHighPriority] = useState(false);
     const [isSending, setIsSending] = useState(false);
+
+    // Delete State
+    const [notificationToDelete, setNotificationToDelete] = useState<Notification | null>(null);
+    const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
 
     // Data Fetching
     const notificationsQuery = firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null;
@@ -56,6 +62,21 @@ export function NotificationManagement() {
         } else {
             toast({ variant: 'destructive', title: 'Send Failed', description: result.error });
         }
+    };
+    
+    const handleDelete = async () => {
+        if (!notificationToDelete) return;
+        
+        const result = await deleteNotificationAction(notificationToDelete.id);
+        
+        if (result.success) {
+            toast({ title: 'Notification Deleted' });
+        } else {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+        }
+        
+        setDeleteAlertOpen(false);
+        setNotificationToDelete(null);
     };
 
     return (
@@ -101,6 +122,7 @@ export function NotificationManagement() {
                                         <TableHead>Title</TableHead>
                                         <TableHead>Priority</TableHead>
                                         <TableHead>Date Sent</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -111,6 +133,26 @@ export function NotificationManagement() {
                                                 {notif.isHighPriority ? <Badge variant="destructive">High</Badge> : <Badge variant="secondary">Normal</Badge>}
                                             </TableCell>
                                             <TableCell>{notif.createdAt ? format(notif.createdAt.toDate(), 'PPP p') : 'N/A'}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                            className="text-destructive"
+                                                            onClick={() => {
+                                                                setNotificationToDelete(notif);
+                                                                setDeleteAlertOpen(true);
+                                                            }}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -119,6 +161,23 @@ export function NotificationManagement() {
                     )}
                 </CardContent>
             </Card>
+            
+            <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the notification "{notificationToDelete?.title}". This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
