@@ -282,26 +282,30 @@ export default function SupportPage() {
     if (!user || !firestore) return null;
     return query(
       collection(firestore, 'chatConversations'),
-      where('userId', '==', user.uid),
-      orderBy('lastMessageAt', 'desc')
+      where('userId', '==', user.uid)
     );
   }, [user, firestore]);
   const { data: allConversations, loading } = useCollection<ChatConversation>(allUserConvosQuery);
 
+  const sortedConversations = useMemo(() => {
+      if (!allConversations) return null;
+      return [...allConversations].sort((a,b) => b.lastMessageAt.toMillis() - a.lastMessageAt.toMillis());
+  }, [allConversations]);
+
   const selectedConversation = useMemo(() => {
-    return allConversations?.find(c => c.id === selectedConvoId) || null;
-  }, [allConversations, selectedConvoId]);
+    return sortedConversations?.find(c => c.id === selectedConvoId) || null;
+  }, [sortedConversations, selectedConvoId]);
 
   useEffect(() => {
     // This effect sets the initial view state once data is loaded, then stops interfering.
     if (view === 'loading' && !loading) {
-      if (allConversations && allConversations.length > 0) {
+      if (sortedConversations && sortedConversations.length > 0) {
         setView('list');
       } else {
         setView('form');
       }
     }
-  }, [loading, allConversations, view]);
+  }, [loading, sortedConversations, view]);
   
   const handleConversationStarted = (conversationId: string) => {
     setSelectedConvoId(conversationId);
@@ -336,11 +340,11 @@ export default function SupportPage() {
       }
       
       if (view === 'form') {
-          const canGoBack = !!(allConversations && allConversations.length > 0);
+          const canGoBack = !!(sortedConversations && sortedConversations.length > 0);
           return <StartConversationForm user={user!} onConversationStarted={handleConversationStarted} onBack={handleBackToList} showBackButton={canGoBack} />
       }
 
-      return <ConversationList conversations={allConversations || []} onSelect={handleSelectConversation} onNewClick={handleStartNew} loading={loading} />
+      return <ConversationList conversations={sortedConversations || []} onSelect={handleSelectConversation} onNewClick={handleStartNew} loading={loading} />
   }
 
   if (!user && !loading) {

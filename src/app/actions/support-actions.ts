@@ -18,10 +18,12 @@ export async function startConversationAction(payload: StartConversationPayload)
     
     // Check if user already has an open conversation
     const conversationsRef = collection(firestore, 'chatConversations');
-    const q = query(conversationsRef, where('userId', '==', userId), where('status', '==', 'open'));
-    const existingConvos = await getDocs(q);
+    const userConvosQuery = query(conversationsRef, where('userId', '==', userId));
+    const userConvosSnapshot = await getDocs(userConvosQuery);
 
-    if (!existingConvos.empty) {
+    const hasOpenConvo = userConvosSnapshot.docs.some(doc => doc.data().status === 'open');
+
+    if (hasOpenConvo) {
         return { success: false, error: 'You already have an open support chat.' };
     }
 
