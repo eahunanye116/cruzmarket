@@ -1,7 +1,7 @@
 
 'use client';
 import { useUser } from '@/firebase';
-import { Ban, ShieldCheck, Twitter, HandCoins } from 'lucide-react';
+import { Ban, ShieldCheck, Twitter, HandCoins, Bell } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
@@ -10,6 +10,7 @@ import { PrivacyManagement } from '@/components/admin/privacy-management';
 import { XManagement } from '@/components/admin/x-management';
 import { BlogManagement } from '@/components/admin/blog-management';
 import { WithdrawalManagement } from '@/components/admin/withdrawal-management';
+import { NotificationManagement } from '@/components/admin/notification-management';
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -63,10 +64,11 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
           <TabsTrigger value="tickers">Tickers</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="blog">Blog</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="x">X</TabsTrigger>
@@ -79,6 +81,9 @@ export default function AdminPage() {
         </TabsContent>
          <TabsContent value="withdrawals" className="mt-6">
           <WithdrawalManagement />
+        </TabsContent>
+         <TabsContent value="notifications" className="mt-6">
+          <NotificationManagement />
         </TabsContent>
         <TabsContent value="blog" className="mt-6">
           <BlogManagement />

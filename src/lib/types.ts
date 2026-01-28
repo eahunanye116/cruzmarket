@@ -115,3 +115,20 @@ export type PlatformStats = {
   totalUserFees: number;
   totalAdminFees: number;
 };
+
+export type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  isHighPriority: boolean;
+  createdAt: Timestamp;
+  authorId: string;
+};
+
+export type UserNotification = {
+  id: string;
+  notificationId: string;
+  userId: string;
+  isRead: boolean;
+  isPopupDismissed: boolean;
+};

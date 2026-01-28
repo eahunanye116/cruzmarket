@@ -7,6 +7,7 @@ import { Comic_Neue } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Analytics } from '@vercel/analytics/react';
+import { HighPriorityNotificationPopup } from '@/components/high-priority-notification-popup';
 
 export const metadata: Metadata = {
   // Add a metadataBase for absolute URLs in sitemaps and social sharing.
@@ -56,6 +57,7 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased', comicNeue.variable)}>
         <FirebaseClientProvider>
+          <HighPriorityNotificationPopup />
           <div className="relative flex min-h-dvh flex-col">
             <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full animated-gradient"></div>

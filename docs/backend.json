@@ -176,6 +176,31 @@
         "rejectionReason": { "type": "string" }
       },
       "required": ["userId", "amount", "status", "bankName", "accountNumber", "accountName", "createdAt"]
+    },
+    "notification": {
+      "title": "Notification",
+      "description": "Represents a platform-wide notification sent by an admin.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "isHighPriority": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["title", "message", "isHighPriority", "createdAt", "authorId"]
+    },
+    "userNotification": {
+      "title": "User Notification",
+      "description": "Tracks the status of a notification for a specific user.",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "isPopupDismissed": { "type": "boolean" }
+      },
+      "required": ["notificationId", "userId", "isRead", "isPopupDismissed"]
     }
   },
   "auth": {
@@ -202,6 +227,10 @@
       "schema": { "$ref": "#/entities/savedTone" },
       "description": "Sub-collection for a user's saved AI tones."
     },
+    "/users/{userId}/userNotifications/{userNotificationId}": {
+      "schema": { "$ref": "#/entities/userNotification" },
+      "description": "Sub-collection tracking notification read status for each user."
+    },
     "/settings/privacy": {
       "schema": { "$ref": "#/entities/platformSettings" },
       "description": "Stores privacy and registration settings for the platform."
@@ -225,6 +254,10 @@
     "/withdrawalRequests/{requestId}": {
         "schema": { "$ref": "#/entities/withdrawalRequest" },
         "description": "Collection of all user withdrawal requests."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/notification" },
+      "description": "Collection of all platform notifications."
     }
   }
 }

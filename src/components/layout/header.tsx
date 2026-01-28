@@ -12,6 +12,7 @@ import { ReactNode } from 'react';
 import { doc } from 'firebase/firestore';
 import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+import { NotificationBell } from './notification-bell';
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
 const ADMIN_UID = 'YOUR_ADMIN_UID_HERE'; 
@@ -103,6 +104,7 @@ export function Header() {
           {user ? (
             <>
             <UserBalance />
+            <NotificationBell user={user} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
