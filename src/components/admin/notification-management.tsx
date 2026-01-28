@@ -17,7 +17,6 @@ import { Switch } from '../ui/switch';
 import { createNotificationAction, deleteNotificationAction } from '@/app/actions/notification-actions';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 export function NotificationManagement() {
     const firestore = useFirestore();
@@ -29,10 +28,6 @@ export function NotificationManagement() {
     const [message, setMessage] = useState('');
     const [isHighPriority, setIsHighPriority] = useState(false);
     const [isSending, setIsSending] = useState(false);
-
-    // Delete State
-    const [notificationToDelete, setNotificationToDelete] = useState<Notification | null>(null);
-    const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
 
     // Data Fetching
     const notificationsQuery = firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null;
@@ -64,7 +59,7 @@ export function NotificationManagement() {
         }
     };
     
-    const handleDelete = async () => {
+    const handleDelete = async (notificationToDelete: Notification) => {
         if (!notificationToDelete) return;
         
         const result = await deleteNotificationAction(notificationToDelete.id);
@@ -74,9 +69,6 @@ export function NotificationManagement() {
         } else {
             toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
         }
-        
-        setDeleteAlertOpen(false);
-        setNotificationToDelete(null);
     };
 
     return (
@@ -143,10 +135,7 @@ export function NotificationManagement() {
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem
                                                             className="text-destructive"
-                                                            onClick={() => {
-                                                                setNotificationToDelete(notif);
-                                                                setDeleteAlertOpen(true);
-                                                            }}
+                                                            onClick={() => handleDelete(notif)}
                                                         >
                                                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                                                         </DropdownMenuItem>
@@ -161,23 +150,6 @@ export function NotificationManagement() {
                     )}
                 </CardContent>
             </Card>
-            
-            <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the notification "{notificationToDelete?.title}". This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     )
 }
