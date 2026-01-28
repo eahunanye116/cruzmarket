@@ -186,18 +186,22 @@ export default function SupportPage() {
   const user = useUser();
   const firestore = useFirestore();
 
-  const openConvoQuery = useMemo(() => {
+  // Query for all of the user's conversations, sorted by creation date
+  const allUserConvosQuery = useMemo(() => {
     if (!user || !firestore) return null;
     return query(
-      collection(firestore, 'chatConversations'), 
+      collection(firestore, 'chatConversations'),
       where('userId', '==', user.uid),
-      where('status', '==', 'open'),
       orderBy('createdAt', 'desc')
     );
   }, [user, firestore]);
-  
-  const { data: openConversations, loading: loadingOpen } = useCollection<ChatConversation>(openConvoQuery);
-  const openConversation = openConversations?.[0];
+  const { data: allConversations, loading: loadingOpen } = useCollection<ChatConversation>(allUserConvosQuery);
+
+  // Find the open conversation on the client side to avoid complex Firestore indexes
+  const openConversation = useMemo(() => {
+    return allConversations?.find(c => c.status === 'open');
+  }, [allConversations]);
+
 
   if (!user && !loadingOpen) {
     return (

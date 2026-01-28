@@ -179,15 +179,23 @@ export function SupportManagement() {
     const [statusFilter, setStatusFilter] = useState<'open' | 'closed'>('open');
     const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
 
-    const conversationsQuery = useMemo(() => {
-        return query(collection(firestore, 'chatConversations'), where('status', '==', statusFilter), orderBy('lastMessageAt', 'desc'));
-    }, [firestore, statusFilter]);
+    // Query all conversations, sorted by most recent message
+    const allConversationsQuery = useMemo(() => {
+        return query(collection(firestore, 'chatConversations'), orderBy('lastMessageAt', 'desc'));
+    }, [firestore]);
 
-    const { data: conversations, loading } = useCollection<ChatConversation>(conversationsQuery);
+    const { data: allConversations, loading } = useCollection<ChatConversation>(allConversationsQuery);
+    
+    // Filter and sort conversations on the client
+    const conversations = useMemo(() => {
+        if (!allConversations) return [];
+        return allConversations.filter(convo => convo.status === statusFilter);
+    }, [allConversations, statusFilter]);
     
     const selectedConversation = useMemo(() => {
-        return conversations?.find(c => c.id === selectedConvoId) || null;
-    }, [conversations, selectedConvoId]);
+        return allConversations?.find(c => c.id === selectedConvoId) || null;
+    }, [allConversations, selectedConvoId]);
+
 
     const handleSelectConversation = (id: string) => {
         setSelectedConvoId(id);
