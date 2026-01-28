@@ -201,6 +201,35 @@
         "isPopupDismissed": { "type": "boolean" }
       },
       "required": ["notificationId", "userId", "isRead", "isPopupDismissed"]
+    },
+    "chatConversation": {
+      "title": "Chat Conversation",
+      "description": "A support chat conversation between a user and admins.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhotoURL": { "type": "string", "format": "uri" },
+        "subject": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "lastMessageSnippet": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "isReadByAdmin": { "type": "boolean" },
+        "isReadByUser": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "userPhotoURL", "subject", "status", "lastMessageSnippet", "lastMessageAt", "isReadByAdmin", "isReadByUser", "createdAt"]
+    },
+    "chatMessage": {
+      "title": "Chat Message",
+      "description": "A single message within a support chat conversation.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "content", "createdAt"]
     }
   },
   "auth": {
@@ -258,6 +287,14 @@
     "/notifications/{notificationId}": {
       "schema": { "$ref": "#/entities/notification" },
       "description": "Collection of all platform notifications."
+    },
+    "/chatConversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/chatConversation" },
+      "description": "Collection of all support chat conversations."
+    },
+    "/chatConversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/chatMessage" },
+      "description": "Sub-collection for messages within a conversation."
     }
   }
 }

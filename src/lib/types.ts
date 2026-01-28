@@ -132,3 +132,24 @@ export type UserNotification = {
   isRead: boolean;
   isPopupDismissed: boolean;
 };
+
+export type ChatConversation = {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhotoURL?: string;
+  subject: string;
+  status: 'open' | 'closed';
+  lastMessageSnippet: string;
+  lastMessageAt: Timestamp;
+  isReadByAdmin: boolean;
+  isReadByUser: boolean;
+  createdAt: Timestamp;
+};
+
+export type ChatMessage = {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: Timestamp;
+};

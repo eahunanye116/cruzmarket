@@ -15,7 +15,7 @@ import { Skeleton } from '../ui/skeleton';
 import { NotificationBell } from './notification-bell';
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
-const ADMIN_UID = 'YOUR_ADMIN_UID_HERE'; 
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1'; 
 
 function UserBalance() {
   const user = useUser();
@@ -124,6 +124,9 @@ export function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/support">Support Chat</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut}>
                   Log out
                 </DropdownMenuItem>

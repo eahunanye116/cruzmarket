@@ -1,7 +1,7 @@
 
 'use client';
 import { useUser } from '@/firebase';
-import { Ban, ShieldCheck, Twitter, HandCoins, Bell } from 'lucide-react';
+import { Ban, ShieldCheck, Twitter, HandCoins, Bell, MessageSquare } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
@@ -11,6 +11,7 @@ import { XManagement } from '@/components/admin/x-management';
 import { BlogManagement } from '@/components/admin/blog-management';
 import { WithdrawalManagement } from '@/components/admin/withdrawal-management';
 import { NotificationManagement } from '@/components/admin/notification-management';
+import { SupportManagement } from '@/components/admin/support-management';
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
@@ -64,10 +65,11 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="tickers" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
           <TabsTrigger value="tickers">Tickers</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="blog">Blog</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
@@ -81,6 +83,9 @@ export default function AdminPage() {
         </TabsContent>
          <TabsContent value="withdrawals" className="mt-6">
           <WithdrawalManagement />
+        </TabsContent>
+         <TabsContent value="support" className="mt-6">
+          <SupportManagement />
         </TabsContent>
          <TabsContent value="notifications" className="mt-6">
           <NotificationManagement />
