@@ -17,6 +17,16 @@ import { Switch } from '../ui/switch';
 import { createNotificationAction, deleteNotificationAction } from '@/app/actions/notification-actions';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+
 
 export function NotificationManagement() {
     const firestore = useFirestore();
@@ -28,6 +38,10 @@ export function NotificationManagement() {
     const [message, setMessage] = useState('');
     const [isHighPriority, setIsHighPriority] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    
+    // View Message Dialog State
+    const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+    const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
 
     // Data Fetching
     const notificationsQuery = firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null;
@@ -71,6 +85,11 @@ export function NotificationManagement() {
         }
     };
 
+    const handleViewMessage = (notification: Notification) => {
+        setSelectedNotification(notification);
+        setIsMessageDialogOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             <Card>
@@ -112,6 +131,7 @@ export function NotificationManagement() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Title</TableHead>
+                                        <TableHead>Message</TableHead>
                                         <TableHead>Priority</TableHead>
                                         <TableHead>Date Sent</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
@@ -121,6 +141,11 @@ export function NotificationManagement() {
                                     {notifications?.map(notif => (
                                         <TableRow key={notif.id}>
                                             <TableCell className="font-medium">{notif.title}</TableCell>
+                                            <TableCell>
+                                                <button onClick={() => handleViewMessage(notif)} className="text-left hover:underline focus:outline-none w-full">
+                                                    <p className="truncate max-w-[200px]">{notif.message}</p>
+                                                </button>
+                                            </TableCell>
                                             <TableCell>
                                                 {notif.isHighPriority ? <Badge variant="destructive">High</Badge> : <Badge variant="secondary">Normal</Badge>}
                                             </TableCell>
@@ -150,6 +175,21 @@ export function NotificationManagement() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* View Message Dialog */}
+            <AlertDialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{selectedNotification?.title}</AlertDialogTitle>
+                        <AlertDialogDescription className="pt-2 max-h-[60vh] overflow-y-auto pr-4 text-foreground">
+                            {selectedNotification?.message}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Close</AlertDialogCancel>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
-    )
+    );
 }
