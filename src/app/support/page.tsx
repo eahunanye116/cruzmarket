@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, MessageSquare, Ban } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { startConversationAction, sendMessageAction, markAsReadByUserAction } from '@/app/actions/support-actions';
+import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
