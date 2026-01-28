@@ -1,5 +1,5 @@
 'use client';
-import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
+import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { ChatConversation, ChatMessage } from '@/lib/types';
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Send, MessageSquare, Ban } from 'lucide-react';
+import { Loader2, Send, MessageSquare, Ban, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { startConversationAction, sendMessageAction, markAsReadByUserAction } from '@/app/actions/support-actions';
 import { useForm } from 'react-hook-form';
@@ -16,9 +16,85 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// --- Conversation List View ---
+function ConversationList({ conversations, onSelect, onNewClick, loading }: { conversations: ChatConversation[], onSelect: (id: string) => void, onNewClick: () => void, loading: boolean }) {
+    if (loading) {
+        return (
+            <Card className="max-w-3xl mx-auto">
+                <CardHeader className="flex-row items-center justify-between">
+                    <div>
+                        <Skeleton className="h-8 w-48 mb-2" />
+                        <Skeleton className="h-5 w-64" />
+                    </div>
+                    <Skeleton className="h-10 w-32" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-16 w-full mt-2" />
+                    <Skeleton className="h-16 w-full mt-4" />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="max-w-3xl mx-auto">
+            <CardHeader className="flex-row items-center justify-between">
+                <div>
+                    <CardTitle>My Support Chats</CardTitle>
+                    <CardDescription>View your past and active conversations.</CardDescription>
+                </div>
+                <Button onClick={onNewClick}>Start New Chat</Button>
+            </CardHeader>
+            <CardContent>
+                {conversations.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">
+                        <MessageSquare className="mx-auto h-12 w-12" />
+                        <h3 className="mt-4 text-lg font-medium">No conversations yet</h3>
+                        <p className="mt-1 text-sm">Click "Start New Chat" to get help.</p>
+                    </div>
+                ) : (
+                    <div className="border rounded-lg">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Subject</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Last Update</TableHead>
+                                    <TableHead></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {conversations.map(convo => (
+                                    <TableRow key={convo.id} className="cursor-pointer" onClick={() => onSelect(convo.id)}>
+                                        <TableCell>
+                                            <p className="font-medium">{convo.subject}</p>
+                                            <p className="text-sm text-muted-foreground truncate max-w-[200px] sm:max-w-xs">{convo.lastMessageSnippet}</p>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={convo.status === 'open' ? 'default' : 'outline'}>{convo.status}</Badge>
+                                        </TableCell>
+                                        <TableCell className="hidden sm:table-cell">{formatDistanceToNow(convo.lastMessageAt.toDate(), { addSuffix: true })}</TableCell>
+                                        <TableCell className="text-right">
+                                            {!convo.isReadByUser && <div className="h-2.5 w-2.5 rounded-full bg-primary inline-block" />}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
+
 
 // --- Start Conversation Form ---
 const startConvoSchema = z.object({
@@ -26,7 +102,7 @@ const startConvoSchema = z.object({
   initialMessage: z.string().min(10, "Message must be at least 10 characters.").max(1000),
 });
 
-function StartConversationForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
+function StartConversationForm({ user, onConversationStarted, onBack }: { user: NonNullable<ReturnType<typeof useUser>>; onConversationStarted: (id: string) => void; onBack: () => void; }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const form = useForm<z.infer<typeof startConvoSchema>>({
@@ -42,7 +118,10 @@ function StartConversationForm({ user }: { user: NonNullable<ReturnType<typeof u
       userName: user.displayName || user.email!,
       userPhotoURL: user.photoURL || '',
     });
-    if (!result.success) {
+    if (result.success && result.conversationId) {
+        toast({ title: 'Success', description: 'Support chat started.' });
+        onConversationStarted(result.conversationId);
+    } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
     setIsSubmitting(false);
@@ -51,8 +130,13 @@ function StartConversationForm({ user }: { user: NonNullable<ReturnType<typeof u
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Start a New Support Chat</CardTitle>
-        <CardDescription>Describe your issue, and an admin will get back to you shortly.</CardDescription>
+        <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft/></Button>
+            <div>
+                <CardTitle>Start a New Support Chat</CardTitle>
+                <CardDescription>Describe your issue, and an admin will get back to you shortly.</CardDescription>
+            </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -75,7 +159,7 @@ function StartConversationForm({ user }: { user: NonNullable<ReturnType<typeof u
 }
 
 // --- Chat View ---
-function ChatView({ conversation }: { conversation: ChatConversation }) {
+function ChatView({ conversation, onBack }: { conversation: ChatConversation; onBack: () => void; }) {
   const user = useUser()!;
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -125,10 +209,15 @@ function ChatView({ conversation }: { conversation: ChatConversation }) {
   return (
     <Card className="max-w-2xl mx-auto h-[75vh] flex flex-col">
       <CardHeader className="border-b">
-        <CardTitle>{conversation.subject}</CardTitle>
-        <CardDescription>
-          Status: <span className={cn('font-semibold', conversation.status === 'open' ? 'text-accent' : 'text-destructive')}>{conversation.status}</span>
-        </CardDescription>
+         <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft/></Button>
+            <div>
+                <CardTitle>{conversation.subject}</CardTitle>
+                <CardDescription>
+                Status: <span className={cn('font-semibold', conversation.status === 'open' ? 'text-accent' : 'text-destructive')}>{conversation.status}</span>
+                </CardDescription>
+            </div>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 p-0">
         <ScrollArea className="h-full p-6" ref={scrollAreaRef}>
@@ -186,24 +275,71 @@ export default function SupportPage() {
   const user = useUser();
   const firestore = useFirestore();
 
-  // Query for all of the user's conversations, sorted by creation date
+  const [view, setView] = useState<'list' | 'form' | 'chat'>('list');
+  const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
+
   const allUserConvosQuery = useMemo(() => {
     if (!user || !firestore) return null;
     return query(
       collection(firestore, 'chatConversations'),
       where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      orderBy('lastMessageAt', 'desc')
     );
   }, [user, firestore]);
-  const { data: allConversations, loading: loadingOpen } = useCollection<ChatConversation>(allUserConvosQuery);
+  const { data: allConversations, loading } = useCollection<ChatConversation>(allUserConvosQuery);
 
-  // Find the open conversation on the client side to avoid complex Firestore indexes
-  const openConversation = useMemo(() => {
-    return allConversations?.find(c => c.status === 'open');
-  }, [allConversations]);
+  const selectedConversation = useMemo(() => {
+    return allConversations?.find(c => c.id === selectedConvoId) || null;
+  }, [allConversations, selectedConvoId]);
 
+  useEffect(() => {
+    if (!loading && (!allConversations || allConversations.length === 0)) {
+        setView('form');
+    } else if (!loading && view !== 'chat') {
+        setView('list');
+    }
+  }, [loading, allConversations, view]);
+  
+  const handleConversationStarted = (conversationId: string) => {
+    setSelectedConvoId(conversationId);
+    setView('chat');
+  };
 
-  if (!user && !loadingOpen) {
+  const handleSelectConversation = (id: string) => {
+    setSelectedConvoId(id);
+    setView('chat');
+  };
+
+  const handleBackToList = () => {
+    setSelectedConvoId(null);
+    setView('list');
+  };
+
+  const handleStartNew = () => {
+    setView('form');
+  };
+  
+  const renderContent = () => {
+      if (loading) {
+          return (
+            <div className="flex justify-center p-12">
+                <Loader2 className="h-10 w-10 animate-spin text-primary"/>
+            </div>
+          );
+      }
+      
+      if (view === 'chat' && selectedConversation) {
+          return <ChatView conversation={selectedConversation} onBack={handleBackToList} />
+      }
+      
+      if (view === 'form') {
+          return <StartConversationForm user={user!} onConversationStarted={handleConversationStarted} onBack={handleBackToList} />
+      }
+
+      return <ConversationList conversations={allConversations || []} onSelect={handleSelectConversation} onNewClick={handleStartNew} loading={loading} />
+  }
+
+  if (!user && !loading) {
     return (
       <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-destructive/10 border-2 mx-auto">
@@ -219,15 +355,7 @@ export default function SupportPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      {loadingOpen ? (
-        <div className="flex justify-center p-12">
-            <Loader2 className="h-10 w-10 animate-spin text-primary"/>
-        </div>
-      ) : openConversation ? (
-        <ChatView conversation={openConversation} />
-      ) : (
-        <StartConversationForm user={user!} />
-      )}
+      {renderContent()}
     </div>
   )
 }
