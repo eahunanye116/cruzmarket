@@ -3,9 +3,9 @@
 
 import { processDeposit } from '@/lib/wallet';
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile, WithdrawalRequest } from '@/lib/types';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -94,8 +94,28 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
             throw new Error('Insufficient balance.');
         }
 
-        const withdrawalRequestsRef = collection(firestore, 'withdrawalRequests');
-        await addDoc(withdrawalRequestsRef, {
+        // --- NEW: Check for existing PENDING requests ---
+        const requestsRef = collection(firestore, 'withdrawalRequests');
+        const pendingQuery = query(
+            requestsRef, 
+            where('userId', '==', payload.userId), 
+            where('status', '==', 'pending')
+        );
+        const pendingSnapshot = await getDocs(pendingQuery);
+        
+        let totalPending = 0;
+        pendingSnapshot.forEach(doc => {
+            const data = doc.data() as WithdrawalRequest;
+            totalPending += data.amount;
+        });
+
+        // Ensure total pending + new request doesn't exceed balance
+        if (totalPending + payload.amount > userProfile.balance) {
+            const availableAfterPending = userProfile.balance - totalPending;
+            throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
+        }
+
+        await addDoc(requestsRef, {
             ...payload,
             status: 'pending',
             createdAt: serverTimestamp(),
