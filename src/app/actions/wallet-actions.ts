@@ -3,7 +3,7 @@
 
 import { processDeposit } from '@/lib/wallet';
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
 
@@ -90,11 +90,12 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         }
         const userProfile = userDoc.data() as UserProfile;
 
+        // Basic check for current request
         if (userProfile.balance < payload.amount) {
             throw new Error('Insufficient balance.');
         }
 
-        // --- NEW: Check for existing PENDING requests ---
+        // Check for existing PENDING requests to prevent "double-requesting" balance
         const requestsRef = collection(firestore, 'withdrawalRequests');
         const pendingQuery = query(
             requestsRef, 
@@ -109,7 +110,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
             totalPending += data.amount;
         });
 
-        // Ensure total pending + new request doesn't exceed balance
+        // Ensure total pending + new request doesn't exceed current balance
         if (totalPending + payload.amount > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
             throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
@@ -149,14 +150,17 @@ export async function approveWithdrawalAction(requestId: string) {
 
             const userBalance = userDoc.data().balance;
             if (userBalance < requestData.amount) {
-                throw new Error('User has insufficient balance for this withdrawal.');
+                throw new Error('User has insufficient balance for this withdrawal. They may have spent funds after requesting.');
             }
 
             // Debit user balance
             transaction.update(userRef, { balance: userBalance - requestData.amount });
 
             // Update request status
-            transaction.update(requestRef, { status: 'completed', processedAt: serverTimestamp() });
+            transaction.update(requestRef, { 
+                status: 'completed', 
+                processedAt: serverTimestamp() 
+            });
 
             // Create activity log
             const activityRef = doc(collection(firestore, 'activities'));
@@ -170,7 +174,7 @@ export async function approveWithdrawalAction(requestId: string) {
 
         revalidatePath('/admin');
         revalidatePath('/transactions');
-        return { success: true, message: 'Withdrawal approved and processed.' };
+        return { success: true, message: 'Withdrawal approved and funds deducted from user wallet.' };
     } catch (error: any) {
         console.error('Error approving withdrawal:', error);
         return { success: false, error: error.message };
