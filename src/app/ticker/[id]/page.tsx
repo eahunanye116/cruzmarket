@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -39,14 +40,19 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const activitiesQuery = useMemo(() => {
     if (!firestore || !resolvedParams.id) return null;
+    // Simplified query to avoid composite index requirement
     return query(
       collection(firestore, 'activities'), 
-      where('tickerId', '==', resolvedParams.id), 
-      orderBy('createdAt', 'desc')
+      where('tickerId', '==', resolvedParams.id)
     );
   }, [firestore, resolvedParams.id]);
 
-  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+  const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+
+  const activities = useMemo(() => {
+    if (!unsortedActivities) return [];
+    return [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [unsortedActivities]);
 
   const handleCopy = () => {
     if (ticker?.tickerAddress) {
@@ -262,7 +268,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               <CardContent>
                 <TradeForm ticker={ticker} />
               </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
       </div>

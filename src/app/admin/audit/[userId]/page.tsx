@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
@@ -38,7 +39,7 @@ export default function UserAuditPage() {
     );
   }
 
-  // 2. Data Fetching
+  // 2. Data Fetching - Simplified to avoid composite index requirements
   const userRef = firestore ? doc(firestore, 'users', userId) : null;
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(userRef);
 
@@ -46,34 +47,43 @@ export default function UserAuditPage() {
     if (!firestore || !userId) return null;
     return query(
       collection(firestore, 'activities'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', userId)
     );
   }, [firestore, userId]);
-  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+  const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
   const withdrawalsQuery = useMemo(() => {
     if (!firestore || !userId) return null;
     return query(
       collection(firestore, 'withdrawalRequests'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', userId)
     );
   }, [firestore, userId]);
-  const { data: withdrawals, loading: withdrawalsLoading } = useCollection<WithdrawalRequest>(withdrawalsQuery);
+  const { data: unsortedWithdrawals, loading: withdrawalsLoading } = useCollection<WithdrawalRequest>(withdrawalsQuery);
 
-  // 3. Data Processing
-  const { deposits, pastWithdrawals, totalDeposited, totalWithdrawn } = useMemo(() => {
-    if (!activities) return { deposits: [], pastWithdrawals: [], totalDeposited: 0, totalWithdrawn: 0 };
+  // 3. Data Processing & Sorting
+  const { activities, withdrawals, deposits, pastWithdrawals, totalDeposited, totalWithdrawn } = useMemo(() => {
+    if (!unsortedActivities) return { activities: [], withdrawals: [], deposits: [], pastWithdrawals: [], totalDeposited: 0, totalWithdrawn: 0 };
     
-    const deps = activities.filter(a => a.type === 'DEPOSIT');
-    const withs = activities.filter(a => a.type === 'WITHDRAWAL');
+    // Sort locally to bypass index need
+    const sortedActs = [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    const sortedWithdrawals = unsortedWithdrawals ? [...unsortedWithdrawals].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()) : [];
+
+    const deps = sortedActs.filter(a => a.type === 'DEPOSIT');
+    const withs = sortedActs.filter(a => a.type === 'WITHDRAWAL');
     
     const totalD = deps.reduce((acc, a) => acc + a.value, 0);
     const totalW = withs.reduce((acc, a) => acc + a.value, 0);
 
-    return { deposits: deps, pastWithdrawals: withs, totalDeposited: totalD, totalWithdrawn: totalW };
-  }, [activities]);
+    return { 
+        activities: sortedActs, 
+        withdrawals: sortedWithdrawals,
+        deposits: deps, 
+        pastWithdrawals: withs, 
+        totalDeposited: totalD, 
+        totalWithdrawn: totalW 
+    };
+  }, [unsortedActivities, unsortedWithdrawals]);
 
   const isLoading = profileLoading || activitiesLoading || withdrawalsLoading;
 
@@ -139,7 +149,7 @@ export default function UserAuditPage() {
             </CardDescription>
             <CardTitle className="text-2xl text-destructive">₦{totalWithdrawn.toLocaleString()}</CardTitle>
           </CardHeader>
-        </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="deposits" className="w-full">

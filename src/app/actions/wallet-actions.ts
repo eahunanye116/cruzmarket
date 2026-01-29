@@ -95,19 +95,20 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
             throw new Error('Insufficient balance.');
         }
 
-        // Check for existing PENDING requests to prevent "double-requesting" balance
+        // Fetch all user requests and filter locally to avoid index requirements
         const requestsRef = collection(firestore, 'withdrawalRequests');
-        const pendingQuery = query(
+        const userRequestsQuery = query(
             requestsRef, 
-            where('userId', '==', payload.userId), 
-            where('status', '==', 'pending')
+            where('userId', '==', payload.userId)
         );
-        const pendingSnapshot = await getDocs(pendingQuery);
+        const requestsSnapshot = await getDocs(userRequestsQuery);
         
         let totalPending = 0;
-        pendingSnapshot.forEach(doc => {
+        requestsSnapshot.forEach(doc => {
             const data = doc.data() as WithdrawalRequest;
-            totalPending += data.amount;
+            if (data.status === 'pending') {
+                totalPending += data.amount;
+            }
         });
 
         // Ensure total pending + new request doesn't exceed current balance

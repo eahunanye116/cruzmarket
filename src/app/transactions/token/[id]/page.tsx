@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import { notFound, useParams } from 'next/navigation';
@@ -46,14 +47,19 @@ export default function TokenTransactionHistoryPage() {
 
     const activitiesQuery = useMemo(() => {
         if (!user || !firestore || !tickerId) return null;
+        // Simplified query to avoid composite index requirement
         return query(
             collection(firestore, 'activities'),
             where('userId', '==', user.uid),
-            where('tickerId', '==', tickerId),
-            orderBy('createdAt', 'desc')
+            where('tickerId', '==', tickerId)
         );
     }, [user, firestore, tickerId]);
-    const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+    const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+
+    const activities = useMemo(() => {
+        if (!unsortedActivities) return [];
+        return [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    }, [unsortedActivities]);
 
     const summary = useMemo(() => {
         if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, tradeCount: 0 };
@@ -141,7 +147,7 @@ export default function TokenTransactionHistoryPage() {
                     <CardContent>
                         <p className="text-2xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
-                </Card>
+                </div>
             </div>
             
             <Card>

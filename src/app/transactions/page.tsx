@@ -160,21 +160,33 @@ export default function WalletPage() {
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
+  // Queries simplified to avoid manual index requirements. Sorting is handled in useMemo.
   const activitiesQuery = useMemo(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'activities'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    return query(collection(firestore, 'activities'), where('userId', '==', user.uid));
   }, [user, firestore]);
   
-  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+  const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
   const requestsQuery = useMemo(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'withdrawalRequests'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    return query(collection(firestore, 'withdrawalRequests'), where('userId', '==', user.uid));
   }, [user, firestore]);
-  const { data: withdrawalRequests, loading: requestsLoading } = useCollection<WithdrawalRequest>(requestsQuery);
+  const { data: unsortedWithdrawalRequests, loading: requestsLoading } = useCollection<WithdrawalRequest>(requestsQuery);
   
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
+
+  // Local sorting for withdrawals
+  const withdrawalRequests = useMemo(() => {
+    if (!unsortedWithdrawalRequests) return [];
+    return [...unsortedWithdrawalRequests].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [unsortedWithdrawalRequests]);
+
+  const activities = useMemo(() => {
+    if (!unsortedActivities) return [];
+    return [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [unsortedActivities]);
 
   const enrichedActivities = useMemo(() => {
     if (!activities || !tickers) return [];
