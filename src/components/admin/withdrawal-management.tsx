@@ -6,7 +6,7 @@ import { WithdrawalRequest, UserProfile, Ticker, PortfolioHolding } from '@/lib/
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, Briefcase } from 'lucide-react';
+import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, Briefcase, History } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -18,6 +18,7 @@ import { Textarea } from '../ui/textarea';
 import { approveWithdrawalAction, rejectWithdrawalAction } from '@/app/actions/wallet-actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { calculateReclaimableValue } from '@/lib/utils';
+import Link from 'next/link';
 
 export function WithdrawalManagement() {
     const firestore = useFirestore();
@@ -180,6 +181,11 @@ export function WithdrawalManagement() {
                                                             <DropdownMenuItem onClick={() => handleViewDetails(req)}>
                                                                 <Eye className="mr-2 h-4 w-4" /> View Info
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/admin/audit/${req.userId}`}>
+                                                                    <History className="mr-2 h-4 w-4" /> User Audit
+                                                                </Link>
+                                                            </DropdownMenuItem>
                                                             
                                                             {req.status === 'pending' && (
                                                                 <>
@@ -260,9 +266,14 @@ export function WithdrawalManagement() {
 
                             {/* Financial Profile Section */}
                             <div className="space-y-3 border rounded-lg p-4">
-                                <h4 className="text-sm font-bold flex items-center gap-2">
-                                    <Wallet className="h-4 w-4" /> Financial Profile
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-bold flex items-center gap-2">
+                                        <Wallet className="h-4 w-4" /> Financial Profile
+                                    </h4>
+                                    <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs">
+                                        <Link href={`/admin/audit/${selectedRequest.userId}`}>View Full Audit <History className="ml-1 h-3 w-3" /></Link>
+                                    </Button>
+                                </div>
                                 <div className="grid grid-cols-2 gap-y-2 text-sm">
                                     <span className="text-muted-foreground">Current Balance</span>
                                     <span className="text-right font-semibold">₦{selectedRequest.user?.balance.toLocaleString() || '0'}</span>

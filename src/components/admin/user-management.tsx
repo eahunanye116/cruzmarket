@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { EditUserDialog } from './edit-user-dialog';
+import Link from 'next/link';
 
 
 export function UserManagement() {
@@ -141,6 +142,11 @@ export function UserManagement() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                                <Link href={`/admin/audit/${user.id}`}>
+                                    <History className="mr-2 h-4 w-4" /> Audit History
+                                </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEdit(user)}>
                               <Pencil className="mr-2" /> Edit Balance
                             </DropdownMenuItem>
