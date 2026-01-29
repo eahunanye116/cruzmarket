@@ -147,7 +147,7 @@ export default function TokenTransactionHistoryPage() {
                     <CardContent>
                         <p className="text-2xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
-                </div>
+                </Card>
             </div>
             
             <Card>
