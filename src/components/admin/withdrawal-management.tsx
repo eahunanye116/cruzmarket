@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
@@ -7,7 +6,7 @@ import { WithdrawalRequest, UserProfile } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Check, MoreHorizontal, X, Loader2, HandCoins } from 'lucide-react';
+import { Check, MoreHorizontal, X, Loader2, Eye, Copy } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -17,6 +16,7 @@ import { Badge } from '../ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Textarea } from '../ui/textarea';
 import { approveWithdrawalAction, rejectWithdrawalAction } from '@/app/actions/wallet-actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 export function WithdrawalManagement() {
     const firestore = useFirestore();
@@ -26,6 +26,10 @@ export function WithdrawalManagement() {
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('pending');
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
+    
+    // Details Dialog State
+    const [selectedRequest, setSelectedRequest] = useState<WithdrawalRequest | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     // Data Fetching
     const requestsQuery = firestore ? query(collection(firestore, 'withdrawalRequests'), orderBy('createdAt', 'desc')) : null;
@@ -69,6 +73,16 @@ export function WithdrawalManagement() {
         setProcessingId(null);
     };
     
+    const handleViewDetails = (req: WithdrawalRequest) => {
+        setSelectedRequest(req);
+        setIsDetailsOpen(true);
+    };
+
+    const handleCopyAccountNumber = (num: string) => {
+        navigator.clipboard.writeText(num);
+        toast({ title: 'Copied!', description: 'Account number copied to clipboard.' });
+    };
+    
     const getStatusBadge = (status: WithdrawalRequest['status']) => {
         switch(status) {
             case 'pending': return <Badge variant="secondary">Pending</Badge>;
@@ -80,15 +94,15 @@ export function WithdrawalManagement() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     <div>
                         <CardTitle>Withdrawal Requests</CardTitle>
                         <CardDescription>
-                            Review and process user withdrawal requests.
+                            Review and process user withdrawal requests. Click "View Info" to see full bank details.
                         </CardDescription>
                     </div>
                     <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
-                        <SelectTrigger className="w-[180px]">
+                        <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Filter by status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -106,14 +120,14 @@ export function WithdrawalManagement() {
                         {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                     </div>
                 ) : (
-                    <div className="border rounded-lg">
+                    <div className="border rounded-lg overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>User</TableHead>
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Bank Details</TableHead>
-                                    <TableHead>Date</TableHead>
+                                    <TableHead className="hidden md:table-cell">Date</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -125,58 +139,65 @@ export function WithdrawalManagement() {
                                         <TableCell>₦{req.amount.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <div className="text-sm">
-                                                <p className="font-semibold">{req.accountName}</p>
-                                                <p className="text-muted-foreground">{req.bankName} - {req.accountNumber}</p>
+                                                <p className="font-semibold line-clamp-1">{req.accountName}</p>
+                                                <p className="text-muted-foreground text-xs">{req.bankName} - {req.accountNumber}</p>
                                             </div>
                                         </TableCell>
-                                        <TableCell>{format(req.createdAt.toDate(), 'PPP')}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{format(req.createdAt.toDate(), 'PPP')}</TableCell>
                                         <TableCell>{getStatusBadge(req.status)}</TableCell>
                                         <TableCell className="text-right">
-                                            {processingId === req.id ? <Loader2 className="animate-spin" /> : (
-                                                req.status === 'pending' && (
-                                                    <AlertDialog>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                    <MoreHorizontal className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onClick={() => handleApprove(req.id)}>
-                                                                    <Check className="mr-2" /> Approve
-                                                                </DropdownMenuItem>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem className="text-destructive">
-                                                                        <X className="mr-2" /> Reject
+                                            {processingId === req.id ? <Loader2 className="animate-spin ml-auto" /> : (
+                                                <AlertDialog>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => handleViewDetails(req)}>
+                                                                <Eye className="mr-2 h-4 w-4" /> View Info
+                                                            </DropdownMenuItem>
+                                                            
+                                                            {req.status === 'pending' && (
+                                                                <>
+                                                                    <DropdownMenuItem onClick={() => handleApprove(req.id)}>
+                                                                        <Check className="mr-2 h-4 w-4 text-accent" /> Approve
                                                                     </DropdownMenuItem>
-                                                                </AlertDialogTrigger>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Reject Withdrawal Request?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Please provide a reason for rejecting this request of ₦{req.amount.toLocaleString()} for {req.user?.email}. This cannot be undone.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                              <Textarea
-                                                                placeholder="Reason for rejection..."
-                                                                value={rejectionReason}
-                                                                onChange={(e) => setRejectionReason(e.target.value)}
-                                                              />
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel onClick={() => setRejectionReason('')}>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction
-                                                                    onClick={() => handleReject(req.id)}
-                                                                    disabled={!rejectionReason}
-                                                                    className="bg-destructive hover:bg-destructive/90"
-                                                                >
-                                                                    Confirm Rejection
-                                                                </AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                )
+                                                                    <AlertDialogTrigger asChild>
+                                                                        <DropdownMenuItem className="text-destructive">
+                                                                            <X className="mr-2 h-4 w-4" /> Reject
+                                                                        </DropdownMenuItem>
+                                                                    </AlertDialogTrigger>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                    
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Reject Withdrawal Request?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Please provide a reason for rejecting this request of ₦{req.amount.toLocaleString()} for {req.user?.email}. This action cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                          <Textarea
+                                                            placeholder="Reason for rejection..."
+                                                            value={rejectionReason}
+                                                            onChange={(e) => setRejectionReason(e.target.value)}
+                                                          />
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel onClick={() => setRejectionReason('')}>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction
+                                                                onClick={() => handleReject(req.id)}
+                                                                disabled={!rejectionReason}
+                                                                className="bg-destructive hover:bg-destructive/90"
+                                                            >
+                                                                Confirm Rejection
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
                                             )}
                                         </TableCell>
                                     </TableRow>
@@ -192,7 +213,69 @@ export function WithdrawalManagement() {
                     </div>
                 )}
             </CardContent>
+
+            {/* View Details Dialog */}
+            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Withdrawal Details</DialogTitle>
+                        <DialogDescription>
+                            Full bank information for processing the request.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedRequest && (
+                        <div className="space-y-6 py-4">
+                            <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-muted/30">
+                                <div className="space-y-1">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Amount</p>
+                                    <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1 text-right">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Status</p>
+                                    <div>{getStatusBadge(selectedRequest.status)}</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1 border-b pb-2">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Account Name</p>
+                                    <p className="font-semibold text-lg">{selectedRequest.accountName}</p>
+                                </div>
+                                <div className="space-y-1 border-b pb-2">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Bank Name</p>
+                                    <p className="font-semibold">{selectedRequest.bankName}</p>
+                                </div>
+                                <div className="space-y-1 border-b pb-2 flex justify-between items-end">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground uppercase font-bold">Account Number</p>
+                                        <p className="font-mono text-xl tracking-wider">{selectedRequest.accountNumber}</p>
+                                    </div>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => handleCopyAccountNumber(selectedRequest.accountNumber)}
+                                    >
+                                        <Copy className="h-4 w-4 mr-2" /> Copy
+                                    </Button>
+                                </div>
+                                <div className="space-y-1 pt-2">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Requested On</p>
+                                    <p className="text-sm">{format(selectedRequest.createdAt.toDate(), 'PPPP p')}</p>
+                                </div>
+                                {selectedRequest.status === 'rejected' && selectedRequest.rejectionReason && (
+                                    <div className="space-y-1 pt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                                        <p className="text-xs text-destructive uppercase font-bold">Rejection Reason</p>
+                                        <p className="text-sm italic">"{selectedRequest.rejectionReason}"</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button type="button" onClick={() => setIsDetailsOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
-
