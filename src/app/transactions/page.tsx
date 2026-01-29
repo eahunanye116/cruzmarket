@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -9,13 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
-import { Activity, Ticker, UserProfile } from '@/lib/types';
+import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
@@ -165,6 +166,12 @@ export default function WalletPage() {
   }, [user, firestore]);
   
   const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
+
+  const requestsQuery = useMemo(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'withdrawalRequests'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+  }, [user, firestore]);
+  const { data: withdrawalRequests, loading: requestsLoading } = useCollection<WithdrawalRequest>(requestsQuery);
   
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
@@ -218,7 +225,7 @@ export default function WalletPage() {
   }, [enrichedActivities]);
 
 
-  const isLoading = profileLoading || activitiesLoading || tickersLoading;
+  const isLoading = profileLoading || activitiesLoading || tickersLoading || requestsLoading;
 
   const filteredAssets = useMemo(() => {
     if (!groupedTransactions) return [];
@@ -275,6 +282,68 @@ export default function WalletPage() {
             {user && <DepositForm user={user} />}
             {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
         </div>
+
+        <Card className="overflow-hidden mb-8">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    Withdrawal Status &amp; History
+                </CardTitle>
+                <CardDescription>Monitor the status of your current and past withdrawal requests.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                {requestsLoading ? (
+                    <div className="p-4"><Skeleton className="h-32 w-full" /></div>
+                ) : withdrawalRequests && withdrawalRequests.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>Bank Info</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {withdrawalRequests.map(req => (
+                                <TableRow key={req.id}>
+                                    <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <div className="text-xs">
+                                            <p className="font-semibold">{req.bankName}</p>
+                                            <p className="text-muted-foreground">{req.accountNumber}</p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                        {format(req.createdAt.toDate(), 'PP')}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant={
+                                                req.status === 'completed' ? 'default' : 
+                                                req.status === 'pending' ? 'secondary' : 
+                                                'destructive'
+                                            }>
+                                                {req.status.toUpperCase()}
+                                            </Badge>
+                                            {req.status === 'rejected' && req.rejectionReason && (
+                                                <span className="text-[10px] text-destructive italic max-w-[120px] truncate" title={req.rejectionReason}>
+                                                    Reason: {req.rejectionReason}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                        <p className="text-sm">No withdrawal requests found.</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       
         <Card className="overflow-hidden mb-8">
             <CardHeader>
