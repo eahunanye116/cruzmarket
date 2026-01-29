@@ -2,11 +2,11 @@
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { WithdrawalRequest, UserProfile } from '@/lib/types';
+import { WithdrawalRequest, UserProfile, Ticker, PortfolioHolding } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Check, MoreHorizontal, X, Loader2, Eye, Copy } from 'lucide-react';
+import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, Briefcase } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '../ui/textarea';
 import { approveWithdrawalAction, rejectWithdrawalAction } from '@/app/actions/wallet-actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { calculateReclaimableValue } from '@/lib/utils';
 
 export function WithdrawalManagement() {
     const firestore = useFirestore();
@@ -38,7 +39,16 @@ export function WithdrawalManagement() {
     const usersQuery = firestore ? collection(firestore, 'users') : null;
     const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
 
-    const loading = requestsLoading || usersLoading;
+    const tickersQuery = firestore ? collection(firestore, 'tickers') : null;
+    const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
+
+    // Portfolio fetching for the selected user
+    const portfolioQuery = (selectedRequest && firestore) 
+        ? query(collection(firestore, `users/${selectedRequest.userId}/portfolio`))
+        : null;
+    const { data: selectedUserPortfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
+
+    const loading = requestsLoading || usersLoading || tickersLoading;
 
     const enrichedRequests = useMemo(() => {
         if (!requests || !users) return [];
@@ -49,6 +59,16 @@ export function WithdrawalManagement() {
             }))
             .filter(req => filterStatus === 'all' || req.status === filterStatus);
     }, [requests, users, filterStatus]);
+
+    const portfolioValue = useMemo(() => {
+        if (!selectedUserPortfolio || !tickers) return 0;
+        return selectedUserPortfolio.reduce((acc, holding) => {
+            const ticker = tickers.find(t => t.id === holding.tickerId);
+            if (!ticker) return acc;
+            const reclaimable = calculateReclaimableValue(holding.amount, ticker);
+            return acc + (reclaimable * 0.998); // Estimating post-fee value
+        }, 0);
+    }, [selectedUserPortfolio, tickers]);
 
     const handleApprove = async (requestId: string) => {
         setProcessingId(requestId);
@@ -98,7 +118,7 @@ export function WithdrawalManagement() {
                     <div>
                         <CardTitle>Withdrawal Requests</CardTitle>
                         <CardDescription>
-                            Review and process user withdrawal requests. Click "View Info" to see full bank details.
+                            Review and process user withdrawal requests. Click "View Info" to see full bank details and portfolio valuation.
                         </CardDescription>
                     </div>
                     <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
@@ -125,7 +145,8 @@ export function WithdrawalManagement() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>User</TableHead>
-                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Balance</TableHead>
+                                    <TableHead>Request Amount</TableHead>
                                     <TableHead>Bank Details</TableHead>
                                     <TableHead className="hidden md:table-cell">Date</TableHead>
                                     <TableHead>Status</TableHead>
@@ -136,6 +157,7 @@ export function WithdrawalManagement() {
                                 {enrichedRequests.length > 0 ? enrichedRequests.map((req) => (
                                     <TableRow key={req.id}>
                                         <TableCell className="font-medium">{req.user?.displayName || req.user?.email || 'Unknown'}</TableCell>
+                                        <TableCell className="text-primary font-semibold">₦{req.user?.balance.toLocaleString() || '0'}</TableCell>
                                         <TableCell>₦{req.amount.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <div className="text-sm">
@@ -203,7 +225,7 @@ export function WithdrawalManagement() {
                                     </TableRow>
                                 )) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
+                                        <TableCell colSpan={7} className="h-24 text-center">
                                             No requests found with status "{filterStatus}".
                                         </TableCell>
                                     </TableRow>
@@ -216,24 +238,64 @@ export function WithdrawalManagement() {
 
             {/* View Details Dialog */}
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Withdrawal Details</DialogTitle>
                         <DialogDescription>
-                            Full bank information for processing the request.
+                            Review user financial standing and bank information.
                         </DialogDescription>
                     </DialogHeader>
                     {selectedRequest && (
                         <div className="space-y-6 py-4">
                             <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-muted/30">
                                 <div className="space-y-1">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Amount</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-bold">Request Amount</p>
                                     <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
                                 </div>
                                 <div className="space-y-1 text-right">
                                     <p className="text-xs text-muted-foreground uppercase font-bold">Status</p>
                                     <div>{getStatusBadge(selectedRequest.status)}</div>
                                 </div>
+                            </div>
+
+                            {/* Financial Profile Section */}
+                            <div className="space-y-3 border rounded-lg p-4">
+                                <h4 className="text-sm font-bold flex items-center gap-2">
+                                    <Wallet className="h-4 w-4" /> Financial Profile
+                                </h4>
+                                <div className="grid grid-cols-2 gap-y-2 text-sm">
+                                    <span className="text-muted-foreground">Current Balance</span>
+                                    <span className="text-right font-semibold">₦{selectedRequest.user?.balance.toLocaleString() || '0'}</span>
+                                    
+                                    <span className="text-muted-foreground">Position Value</span>
+                                    <span className="text-right font-semibold">
+                                        {portfolioLoading ? <Loader2 className="h-3 w-3 animate-spin inline ml-auto" /> : `₦${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                    </span>
+                                    
+                                    <div className="col-span-2 border-t pt-2 mt-1 flex justify-between font-bold text-base">
+                                        <span>Total Platform Equity</span>
+                                        <span className="text-accent">₦{((selectedRequest.user?.balance || 0) + portfolioValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+
+                                {/* Mini Portfolio List */}
+                                {!portfolioLoading && selectedUserPortfolio && selectedUserPortfolio.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t space-y-2">
+                                        <p className="text-xs font-bold text-muted-foreground uppercase">Active Holdings</p>
+                                        <ul className="space-y-1 max-h-32 overflow-y-auto pr-2">
+                                            {selectedUserPortfolio.map(holding => {
+                                                const ticker = tickers?.find(t => t.id === holding.tickerId);
+                                                const value = ticker ? calculateReclaimableValue(holding.amount, ticker) * 0.998 : 0;
+                                                return (
+                                                    <li key={holding.tickerId} className="flex justify-between items-center text-xs">
+                                                        <span className="font-medium">{ticker?.name || 'Unknown'}</span>
+                                                        <span className="text-muted-foreground">₦{value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-4">
@@ -258,9 +320,8 @@ export function WithdrawalManagement() {
                                         <Copy className="h-4 w-4 mr-2" /> Copy
                                     </Button>
                                 </div>
-                                <div className="space-y-1 pt-2">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Requested On</p>
-                                    <p className="text-sm">{format(selectedRequest.createdAt.toDate(), 'PPPP p')}</p>
+                                <div className="space-y-1 pt-2 text-xs text-muted-foreground">
+                                    <p>Requested On: {format(selectedRequest.createdAt.toDate(), 'PPPP p')}</p>
                                 </div>
                                 {selectedRequest.status === 'rejected' && selectedRequest.rejectionReason && (
                                     <div className="space-y-1 pt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
