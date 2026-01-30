@@ -96,7 +96,7 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
         return;
     }
     try {
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -107,6 +107,11 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
                 reply_markup: replyMarkup 
             }),
         });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("TELEGRAM_API_ERROR:", errorData);
+        }
     } catch (error) {
         console.error("TELEGRAM_SEND_ERROR:", error);
     }
@@ -116,7 +121,7 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
  * Broadcasts a notification about a new ticker to the dedicated Telegram channel.
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
-    // Prioritize username provided by user, then .env, then hard fallback
+    // Public channel username
     const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot';
