@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -125,6 +126,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
                 value: ngnAmount,
+                fee: fee, // Store the fee collected
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,
                 userId: userId,
@@ -239,6 +241,7 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
                 value: ngnToGetBeforeFee,
+                fee: fee, // Store the fee collected
                 tokenAmount: tokensSold,
                 pricePerToken: pricePerToken,
                 realizedPnl: realizedPnl,
@@ -370,6 +373,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerName: input.name,
                 tickerIcon: input.icon,
                 value: creationFee,
+                fee: creationFee, // The entire creation fee is a platform fee
                 userId: userId,
                 createdAt: serverTimestamp(),
             });
@@ -380,6 +384,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerName: input.name,
                 tickerIcon: input.icon,
                 value: initialBuyNgn,
+                fee: initialBuyFee, // The transaction fee part of the initial buy
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,
                 userId: userId,

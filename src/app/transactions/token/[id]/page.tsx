@@ -62,10 +62,11 @@ export default function TokenTransactionHistoryPage() {
     }, [unsortedActivities]);
 
     const summary = useMemo(() => {
-        if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, tradeCount: 0 };
+        if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, totalFees: 0, tradeCount: 0 };
         return activities.reduce((acc, act) => {
             if (act.type === 'BUY' || act.type === 'SELL') {
                 acc.tradeCount++;
+                acc.totalFees += act.fee || (act.value * 0.002);
             }
             if (act.type === 'BUY') {
                 acc.totalBuy += act.value;
@@ -76,7 +77,7 @@ export default function TokenTransactionHistoryPage() {
                 }
             }
             return acc;
-        }, { totalBuy: 0, totalSell: 0, realizedPnl: 0, tradeCount: 0 });
+        }, { totalBuy: 0, totalSell: 0, realizedPnl: 0, totalFees: 0, tradeCount: 0 });
     }, [activities]);
 
     const isLoading = tickerLoading || activitiesLoading;
@@ -127,25 +128,31 @@ export default function TokenTransactionHistoryPage() {
                 </div>
             </CardHeader>
             
-            <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <div className="grid md:grid-cols-4 gap-4 mb-8">
                 <Card>
-                    <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Realized P/L</CardTitle></CardHeader>
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Realized P/L</CardTitle></CardHeader>
                     <CardContent>
-                        <p className={cn("text-2xl font-bold", summary.realizedPnl > 0 ? "text-accent" : summary.realizedPnl < 0 ? "text-destructive" : "text-foreground")}>
+                        <p className={cn("text-xl font-bold", summary.realizedPnl > 0 ? "text-accent" : summary.realizedPnl < 0 ? "text-destructive" : "text-foreground")}>
                            {summary.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto', notation: 'compact' })}
                         </p>
                     </CardContent>
                 </Card>
                  <Card>
-                    <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Total Buy Volume</CardTitle></CardHeader>
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Fees Paid</CardTitle></CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
+                        <p className="text-xl font-bold text-destructive/80">₦{summary.totalFees.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Buy Volume</CardTitle></CardHeader>
+                    <CardContent>
+                        <p className="text-xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><CardTitle className="text-sm font-normal text-muted-foreground">Total Sell Volume</CardTitle></CardHeader>
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Sell Volume</CardTitle></CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
+                        <p className="text-xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
             </div>
@@ -155,43 +162,43 @@ export default function TokenTransactionHistoryPage() {
                     <CardTitle>All Transactions</CardTitle>
                     <CardDescription>All buy and sell activity for this token.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Type</TableHead>
+                                <TableHead className="pl-6">Type</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead>NGN Value</TableHead>
+                                <TableHead>Value</TableHead>
+                                <TableHead>Fee</TableHead>
                                 <TableHead>Tokens</TableHead>
-                                <TableHead>Price / Token</TableHead>
-                                <TableHead className="text-right">Details</TableHead>
+                                <TableHead className="text-right pr-6">Details</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {activities?.map(act => (
                                 <TableRow key={act.id}>
-                                    <TableCell>
-                                        <Badge variant={act.type === 'BUY' ? 'default' : 'destructive'} className="text-xs">
+                                    <TableCell className="pl-6">
+                                        <Badge variant={act.type === 'BUY' ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0">
                                             <ActivityIcon type={act.type} />
                                             <span className="ml-1">{act.type}</span>
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col text-xs">
                                             <span>{format(act.createdAt.toDate(), 'PP')}</span>
-                                            <span className="text-xs text-muted-foreground">{formatDistanceToNow(act.createdAt.toDate(), { addSuffix: true })}</span>
+                                            <span className="text-muted-foreground">{format(act.createdAt.toDate(), 'p')}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        {act.value.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}
+                                    <TableCell className="text-xs font-medium">
+                                        ₦{act.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                                     </TableCell>
-                                    <TableCell>
-                                        {act.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                                    <TableCell className="text-xs text-destructive/70">
+                                        ₦{(act.fee ?? (act.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                     </TableCell>
-                                     <TableCell>
-                                        {act.pricePerToken?.toLocaleString('en-US', { style: 'currency', currency: 'NGN', maximumFractionDigits: 8 })}
+                                    <TableCell className="text-xs">
+                                        {act.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' })}
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right pr-6">
                                         <Button asChild variant="ghost" size="icon" className="h-8 w-8">
                                             <Link href={`/trade/${act.id}`}>
                                                 <ArrowRight className="h-4 w-4" />

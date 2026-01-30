@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { ArrowDown, ArrowUp, Calendar, Hash, CircleDollarSign, Banknote, Briefcase, Wallet } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, Hash, CircleDollarSign, Banknote, Briefcase, Wallet, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -88,7 +88,7 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
     if (!activity || activity.type !== 'SELL' || activity.realizedPnl == null || activity.value == null) {
         return null;
     }
-    const costBasis = activity.value - activity.realizedPnl;
+    const costBasis = activity.value - activity.realizedPnl - (activity.fee || 0);
     const pnlPercent = costBasis > 0 ? (activity.realizedPnl / costBasis) * 100 : 0;
 
     return {
@@ -168,7 +168,8 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   if (activity.type === 'BUY') {
     const buyTradeStats = [
         { icon: Calendar, label: 'Trade Date', value: activity.createdAt ? format(activity.createdAt.toDate(), 'PPP p') : 'N/A' },
-        { icon: Banknote, label: 'NGN In', value: `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        { icon: Banknote, label: 'Total Spent', value: `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        { icon: ShieldAlert, label: 'Platform Fee', value: `₦${(activity.fee ?? (activity.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
         { icon: Hash, label: 'Tokens Bought', value: `${activity.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${ticker.name.split(' ')[0]}` },
         { icon: CircleDollarSign, label: 'Avg. Price / Token', value: `₦${activity.pricePerToken?.toLocaleString('en-US', { maximumFractionDigits: 8 })}` },
     ];
@@ -184,7 +185,7 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
                       {buyTradeStats.map(stat => (
                           <li key={stat.label} className="flex items-center justify-between p-3 text-sm">
                               <div className="flex items-center text-muted-foreground">
-                                  <stat.icon className="h-4 w-4 mr-3" />
+                                  <stat.icon className="h-4 w-4 mr-3 text-primary/70" />
                                   <span>{stat.label}</span>
                               </div>
                               <span className="font-semibold text-right">{stat.value}</span>
@@ -223,7 +224,8 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
       { icon: Calendar, label: 'Trade Date', value: activity.createdAt ? format(activity.createdAt.toDate(), 'PPP p') : 'N/A' },
       { icon: Hash, label: 'Tokens Sold', value: `${activity.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${ticker.name.split(' ')[0]}` },
       { icon: CircleDollarSign, label: 'Avg. Price / Token', value: `₦${activity.pricePerToken?.toLocaleString('en-US', { maximumFractionDigits: 8 })}` },
-      { icon: Wallet, label: 'NGN Received', value: `₦${activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+      { icon: Wallet, label: 'Net Received', value: `₦${(activity.value - (activity.fee || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+      { icon: ShieldAlert, label: 'Platform Fee', value: `₦${(activity.fee ?? (activity.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
     ];
     return (
        <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 max-w-2xl">
@@ -237,7 +239,7 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
                       {sellTradeStats.map(stat => (
                           <li key={stat.label} className="flex items-center justify-between p-3 text-sm">
                               <div className="flex items-center text-muted-foreground">
-                                  <stat.icon className="h-4 w-4 mr-3" />
+                                  <stat.icon className="h-4 w-4 mr-3 text-primary/70" />
                                   <span>{stat.label}</span>
                               </div>
                               <span className="font-semibold text-right">{stat.value}</span>
@@ -251,7 +253,7 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Realized Profit / Loss</h3>
                     <div className="border rounded-lg p-4 space-y-3">
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">NGN Received (before fee)</span>
+                            <span className="text-muted-foreground">Gross Extraction</span>
                             <span className="font-semibold">₦{activity.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">

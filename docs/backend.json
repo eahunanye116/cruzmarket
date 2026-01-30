@@ -46,7 +46,8 @@
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
-        "value": { "type": "number" },
+        "value": { "type": "number", "description": "The gross value of the transaction." },
+        "fee": { "type": "number", "description": "The platform fee collected from this transaction." },
         "tokenAmount": { "type": "number" },
         "pricePerToken": { "type": "number" },
         "realizedPnl": { "type": "number" },
@@ -298,4 +299,3 @@
     }
   }
 }
-    

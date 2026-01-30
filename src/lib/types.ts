@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type Ticker = {
@@ -42,7 +43,8 @@ export type Activity = {
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
-  value: number; // NGN value
+  value: number; // Gross NGN value
+  fee?: number; // Platform fee collected
   tokenAmount?: number;
   pricePerToken?: number;
   realizedPnl?: number;
