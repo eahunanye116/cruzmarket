@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, updateDoc, doc } from 'firebase/firestore';
 import { UserProfile, Ticker, PortfolioHolding } from '@/lib/types';
-import { executeBuyAction, executeSellAction, executeCreateTickerAction } from '@/app/actions/trade-actions';
+import { executeBuyAction, executeSellAction, executeCreateTickerAction, executeBurnHoldingsAction } from '@/app/actions/trade-actions';
 import { calculateReclaimableValue } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -143,6 +143,17 @@ export async function POST(req: NextRequest) {
                 } else {
                     await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
                 }
+            }
+        } else if (data.startsWith('confirm_burn_')) {
+            const tickerId = data.replace('confirm_burn_', '');
+            await editTelegramMessage(chatId, messageId, "⏳ <b>Processing Burn...</b>");
+            
+            const result = await executeBurnHoldingsAction(userId, [tickerId]);
+            
+            if (result.success) {
+                await editTelegramMessage(chatId, messageId, `🔥 <b>Burn Successful!</b>\n\nThe asset has been permanently removed from your portfolio.\n\n<i>Platform stats updated.</i>`);
+            } else {
+                await editTelegramMessage(chatId, messageId, `❌ <b>Burn Failed:</b> ${result.error}`);
             }
         } else if (data.startsWith('page_')) {
             const [, type, offsetStr] = data.split('_');
@@ -386,6 +397,20 @@ export async function POST(req: NextRequest) {
             if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>$${result.tickerName}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
             else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
 
+        } else if (command.toLowerCase() === '/burn') {
+            if (args.length < 1) {
+                await sendTelegramMessage(chatId, "Usage: <code>/burn &lt;address&gt;</code>\n\n<i>This permanently removes the holding from your portfolio.</i>");
+                return NextResponse.json({ ok: true });
+            }
+            let resolvedId = args[0].trim();
+            if (resolvedId.toLowerCase().endsWith('cruz') && resolvedId.length > 5) {
+                resolvedId = resolvedId.slice(0, -4);
+            }
+            
+            await sendTelegramMessage(chatId, `⚠️ <b>Permanent Burn Warning</b>\n\nYou are about to burn your holdings for <code>${args[0]}</code>.\n\n<b>This action is irreversible.</b> You will receive ₦0.00 in return.\n\nDo you want to proceed?`, {
+                inline_keyboard: [[{ text: "🔥 Confirm Permanent Burn", callback_data: `confirm_burn_${resolvedId}` }]]
+            });
+
         } else if (command.toLowerCase() === '/create') {
             await updateDoc(userDoc.ref, {
                 botSession: {
@@ -435,12 +460,13 @@ export async function POST(req: NextRequest) {
                 }
             });
             msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
+            msg += `\n\n<i>Tip: Use <code>/burn &lt;address&gt;</code> to clear dust.</i>`;
             await sendTelegramMessage(chatId, msg);
 
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/create - Launch token step-by-step\n/top - Trending by volume\n/latest - Newest launches\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/top - Trending by volume\n/latest - Newest launches\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);
