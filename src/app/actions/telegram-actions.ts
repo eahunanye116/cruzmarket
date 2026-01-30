@@ -44,6 +44,7 @@ export async function unlinkTelegramAction(userId: string) {
 }
 
 export async function getTelegramBotUsername() {
+    // Explicitly fallback to the user's specific bot name
     return process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
 }
 
@@ -56,7 +57,7 @@ export async function setTelegramWebhookAction(baseUrl: string) {
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
     
     try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
+        const res = await fetch(`https://api.paystack.co/bot${token}/setWebhook?url=${webhookUrl}`);
         const result = await res.json();
         
         if (result.ok) {
@@ -125,6 +126,8 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
     const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
+
+    console.log(`Broadcasting new ticker to ${channelId} using bot: @${botUsername}`);
 
     const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
