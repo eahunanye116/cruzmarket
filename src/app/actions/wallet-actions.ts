@@ -5,8 +5,6 @@ import { getFirestoreInstance } from '@/firebase/server';
 import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
-import { sendTelegramMessage } from './telegram-actions';
-import { escapeHtmlForTelegram } from '@/lib/utils';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -132,7 +130,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
 export async function approveWithdrawalAction(requestId: string) {
     const firestore = getFirestoreInstance();
     try {
-        const result = await runTransaction(firestore, async (transaction) => {
+        await runTransaction(firestore, async (transaction) => {
             const requestRef = doc(firestore, 'withdrawalRequests', requestId);
             const requestDoc = await transaction.get(requestRef);
             if (!requestDoc.exists() || requestDoc.data().status !== 'pending') {
@@ -165,19 +163,7 @@ export async function approveWithdrawalAction(requestId: string) {
                 userId: requestData.userId,
                 createdAt: serverTimestamp(),
             });
-
-            return { 
-                telegramChatId: userData.telegramChatId || null, 
-                amount: requestData.amount,
-                userEmail: userData.email 
-            };
         });
-
-        if (result.telegramChatId) {
-            const amountFormatted = result.amount.toLocaleString();
-            const msg = `✅ <b>Withdrawal Approved!</b>\n\nYour request for <b>₦${amountFormatted}</b> has been processed and funds have been sent to your bank account.\n\n<i>Thank you for choosing CruzMarket!</i>`;
-            await sendTelegramMessage(result.telegramChatId, msg);
-        }
 
         revalidatePath('/admin');
         revalidatePath('/transactions');
@@ -199,7 +185,6 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
         const requestSnap = await getDoc(requestRef);
         
         if (!requestSnap.exists()) throw new Error("Request not found.");
-        const requestData = requestSnap.data();
 
         await updateDoc(requestRef, {
             status: 'rejected',
@@ -207,18 +192,6 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
             processedAt: serverTimestamp(),
         });
 
-        const userRef = doc(firestore, 'users', requestData.userId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-            const userData = userSnap.data() as UserProfile;
-            if (userData.telegramChatId) {
-                const amountFormatted = requestData.amount.toLocaleString();
-                const safeReason = escapeHtmlForTelegram(reason);
-                const msg = `❌ <b>Withdrawal Rejected</b>\n\nYour request for <b>₦${amountFormatted}</b> was rejected.\n\n<b>Reason:</b> ${safeReason}\n\n<i>Funds remain in your platform wallet.</i>`;
-                await sendTelegramMessage(userData.telegramChatId, msg);
-            }
-        }
-        
         revalidatePath('/admin');
         revalidatePath('/transactions');
         return { success: true, message: 'Withdrawal request has been rejected.' };
