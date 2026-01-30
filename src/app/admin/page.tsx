@@ -11,6 +11,7 @@ import { BlogManagement } from '@/components/admin/blog-management';
 import { WithdrawalManagement } from '@/components/admin/withdrawal-management';
 import { NotificationManagement } from '@/components/admin/notification-management';
 import { SupportManagement } from '@/components/admin/support-management';
+import { TelegramManagement } from '@/components/admin/telegram-management';
 import { useState } from 'react';
 import {
   Select,
@@ -75,13 +76,14 @@ export default function AdminPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
         <div className="hidden sm:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-9">
             <TabsTrigger value="tickers">Tickers</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="blog">Blog</TabsTrigger>
+            <TabsTrigger value="telegram">Telegram</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
             <TabsTrigger value="x">X</TabsTrigger>
           </TabsList>
@@ -100,6 +102,7 @@ export default function AdminPage() {
               <SelectItem value="support">Support</SelectItem>
               <SelectItem value="notifications">Notifications</SelectItem>
               <SelectItem value="blog">Blog</SelectItem>
+              <SelectItem value="telegram">Telegram</SelectItem>
               <SelectItem value="privacy">Privacy</SelectItem>
               <SelectItem value="x">X</SelectItem>
             </SelectContent>
@@ -123,6 +126,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="blog" className="mt-6">
           <BlogManagement />
+        </TabsContent>
+        <TabsContent value="telegram" className="mt-6">
+          <TelegramManagement />
         </TabsContent>
         <TabsContent value="privacy" className="mt-6">
           <PrivacyManagement />

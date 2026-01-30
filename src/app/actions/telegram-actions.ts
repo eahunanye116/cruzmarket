@@ -43,7 +43,44 @@ export async function unlinkTelegramAction(userId: string) {
 }
 
 export async function getTelegramBotUsername() {
-    // This assumes you set your bot's username in an env var.
-    // If not, replace with your actual bot username.
     return process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot';
+}
+
+export async function setTelegramWebhookAction(baseUrl: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+        return { success: false, error: "Bot token is not configured in .env" };
+    }
+
+    const webhookUrl = `${baseUrl}/api/telegram/webhook`;
+    
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
+        const result = await response.json();
+        
+        if (result.ok) {
+            return { success: true, message: `Webhook set to ${webhookUrl}` };
+        } else {
+            return { success: false, error: result.description || 'Failed to set webhook.' };
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteTelegramWebhookAction() {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return { success: false, error: "Bot token not configured." };
+
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`);
+        const result = await response.json();
+        if (result.ok) {
+            return { success: true, message: "Webhook removed." };
+        } else {
+            return { success: false, error: result.description };
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 }
