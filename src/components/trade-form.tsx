@@ -16,15 +16,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, query, where, runTransaction, DocumentReference, serverTimestamp, arrayUnion, onSnapshot } from 'firebase/firestore';
+import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
 import { Loader2, ArrowRight, ArrowDown, ArrowUp, Info, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { sub } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { executeBuyAction } from '@/app/actions/trade-actions';
+import { executeBuyAction, executeSellAction } from '@/app/actions/trade-actions';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -34,18 +33,7 @@ const sellSchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
-
 const TRANSACTION_FEE_PERCENTAGE = 0.002; // 0.2%
-const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
-
-// Helper function to calculate trending score
-const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
-    const volumeWeight = 0.7;
-    const priceChangeWeight = 0.3;
-    const volumeScore = Math.log1p(volume24h) * volumeWeight; 
-    const priceChangeScore = (priceChange24h > 0 ? priceChange24h : priceChange24h / 2) * priceChangeWeight;
-    return volumeScore + priceChangeScore;
-};
 
 export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
@@ -147,102 +135,24 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   }, [userHolding, ticker]);
 
   const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
-    if (!firestore || !user || !userHolding) return;
+    if (!user) return;
     setIsSubmitting(true);
-    const ngnToGetBeforeFee = values.ngnAmount;
-
-    try {
-        const { ngnToUser, realizedPnl } = await runTransaction(firestore, async (transaction) => {
-            const userRef = doc(firestore, 'users', user.uid);
-            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
-            if (!userDoc.exists()) throw new Error('User not found.');
-
-            const tickerRef = doc(firestore, 'tickers', ticker.id);
-            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
-            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
-            const currentTickerData = tickerDoc.data();
-            
-            const statsRef = doc(firestore, 'stats', 'platform');
-            const statsDoc = await transaction.get(statsRef);
-            const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
-            const currentUserFees = statsDoc.data()?.totalUserFees || 0;
-            const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
-            const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
-
-            let newUserFees = currentUserFees;
-            let newAdminFees = currentAdminFees;
-            if (user.uid === ADMIN_UID) { newAdminFees += fee; } else { newUserFees += fee; }
-            
-            transaction.set(statsRef, { 
-                totalFeesGenerated: currentTotalFees + fee,
-                totalUserFees: newUserFees,
-                totalAdminFees: newAdminFees
-            }, { merge: true });
-
-            const k = currentTickerData.marketCap * currentTickerData.supply;
-            if (ngnToGetBeforeFee >= currentTickerData.marketCap) throw new Error("Sell amount exceeds market cap.");
-            const tokenAmount = (k / (currentTickerData.marketCap - ngnToGetBeforeFee)) - currentTickerData.supply;
-            
-            if (tokenAmount <= 0) throw new Error("Invalid token amount.");
-            if (tokenAmount > userHolding.amount) throw new Error("Insufficient tokens.");
-            
-            const costBasisOfSoldTokens = tokenAmount * userHolding.avgBuyPrice;
-            const ngnToUser = ngnToGetBeforeFee - fee;
-            const realizedPnl = ngnToUser - costBasisOfSoldTokens;
-
-            const pricePerToken = ngnToGetBeforeFee / tokenAmount;
-            const newSupply = currentTickerData.supply + tokenAmount;
-            const newMarketCap = k / newSupply;
-            const newPrice = newMarketCap / newSupply;
-           
-            const newBalance = userDoc.data().balance + ngnToUser;
-            transaction.update(userRef, { balance: newBalance });
-
-            const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
-            const newAmount = userHolding.amount - tokenAmount;
-            if (newAmount > 0.000001) { transaction.update(holdingRef, { amount: newAmount }); } else { transaction.delete(holdingRef); }
-            
-            const now = new Date();
-            const twentyFourHoursAgo = sub(now, { hours: 24 });
-            const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
-            const price24hAgo = price24hAgoDataPoint?.price || currentTickerData.price;
-            const priceChange24h = price24hAgo > 0 ? ((newPrice - price24hAgo) / price24hAgo) * 100 : 0;
-            const volume24h = (currentTickerData.volume24h || 0) + ngnToGetBeforeFee;
-            const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
-
-            transaction.update(tickerRef, { 
-                price: newPrice, marketCap: newMarketCap, supply: newSupply,
-                volume24h, priceChange24h, trendingScore,
-                chartData: arrayUnion({
-                    time: now.toISOString(), price: newPrice, volume: ngnToGetBeforeFee, marketCap: newMarketCap,
-                })
-            });
-
-            const activityRef = doc(collection(firestore, 'activities'));
-            transaction.set(activityRef, {
-                type: 'SELL', tickerId: ticker.id, tickerName: ticker.name, tickerIcon: ticker.icon,
-                value: ngnToGetBeforeFee, tokenAmount: tokenAmount, pricePerToken: pricePerToken,
-                realizedPnl: realizedPnl, userId: user.uid, createdAt: serverTimestamp(),
-            });
-
-            return { ngnToUser, realizedPnl };
-        });
-
-        toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}.` });
+    const result = await executeSellAction(user.uid, ticker.id, values.ngnAmount);
+    if (result.success) {
+        toast({ title: "Sale Successful!", description: `You received approx. ₦${result.ngnToUser?.toLocaleString()}. (Fee: ₦${result.fee?.toLocaleString()})` });
         sellForm.reset();
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-        setIsSubmitting(false);
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-  }, [firestore, user, userHolding, ticker, toast, sellForm]);
+    setIsSubmitting(false);
+  }, [user, ticker.id, toast, sellForm]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!user) return;
     setIsSubmitting(true);
     const result = await executeBuyAction(user.uid, ticker.id, values.ngnAmount);
     if (result.success) {
-        toast({ title: "Purchase Successful!", description: `You bought ${result.tokensOut?.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+        toast({ title: "Purchase Successful!", description: `You bought ${result.tokensOut?.toLocaleString()} ${ticker.name.split(' ')[0]}. (Fee: ₦${result.fee?.toLocaleString()})`});
         buyForm.reset();
     } else {
         toast({ variant: 'destructive', title: 'Purchase Failed', description: result.error });

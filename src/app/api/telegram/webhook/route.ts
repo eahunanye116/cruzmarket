@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, updateDoc, doc } from 'firebase/firestore';
 import { UserProfile, Ticker, PortfolioHolding } from '@/lib/types';
-import { executeBuyAction, executeCreateTickerAction } from '@/app/actions/trade-actions';
+import { executeBuyAction, executeSellAction, executeCreateTickerAction } from '@/app/actions/trade-actions';
 import { calculateReclaimableValue } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -122,7 +122,6 @@ export async function POST(req: NextRequest) {
         }
 
         const userDoc = userSnapshot.docs[0];
-        const userData = userDoc.data() as UserProfile;
         const userId = userDoc.id;
 
         if (data.startsWith('buy_')) {
@@ -140,7 +139,7 @@ export async function POST(req: NextRequest) {
                 await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                 const result = await executeBuyAction(userId, tickerId, amount);
                 if (result.success) {
-                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${result.tickerName}</b>.`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${result.tickerName}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
                 } else {
                     await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
                 }
@@ -204,7 +203,6 @@ export async function POST(req: NextRequest) {
     const text = message.text.trim();
 
     try {
-        // --- 1. Account Linking (Commands with codes like /start <token>) ---
         const parts = text.split(' ');
         let potentialCode = '';
         if (text.startsWith('/start') && parts.length === 2) potentialCode = parts[1].trim();
@@ -226,18 +224,16 @@ export async function POST(req: NextRequest) {
                     await sendTelegramMessage(chatId, "❌ <b>Code expired.</b>");
                 } else {
                     await updateDoc(userDoc.ref, { telegramChatId: chatId, telegramLinkingCode: null });
-                    await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/create - Launch a token\n/portfolio - View holdings\n/help - All commands`);
+                    await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/help - All commands`);
                 }
             }
             return NextResponse.json({ ok: true });
         }
 
-        // --- Identify User by Chat ID ---
         const usersRef = collection(firestore, 'users');
         const userQuery = query(usersRef, where('telegramChatId', '==', chatId), limit(1));
         const userSnapshot = await getDocs(userQuery);
 
-        // Fallback for non-linked users sending plain commands
         if (userSnapshot.empty) {
             if (text === '/start') {
                 await sendTelegramMessage(chatId, "Welcome to <b>CruzMarket Bot</b>! 🚀\n\nTo trade, go to <b>Settings</b> in the web app, generate a code, and send it here.");
@@ -251,13 +247,11 @@ export async function POST(req: NextRequest) {
         const userId = userDoc.id;
         const userData = userDoc.data() as UserProfile;
 
-        // Personalized start for linked users
         if (text === '/start') {
-            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/create - Launch a token\n/portfolio - View holdings\n/top - Trending tickers\n/help - All commands`);
+            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/top - Trending tickers\n/help - All commands`);
             return NextResponse.json({ ok: true });
         }
 
-        // --- Handle Cancel (Handled globally for linked users) ---
         if (text.toLowerCase() === '/cancel') {
             const wasInSession = !!userData.botSession;
             await updateDoc(userDoc.ref, { botSession: null });
@@ -269,7 +263,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
         }
 
-        // --- Stateful Conversation Flow ---
         if (userData.botSession?.type === 'CREATE_TICKER') {
             const step = userData.botSession.step;
             const sessionData = userData.botSession.data;
@@ -345,7 +338,7 @@ export async function POST(req: NextRequest) {
 
                 if (result.success) {
                     await updateDoc(userDoc.ref, { botSession: null });
-                    await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${sessionData.name}</b> is now live.\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${sessionData.name}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
                 } else {
                     await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
                 }
@@ -353,7 +346,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
         }
 
-        // --- Custom Amount Reply Handling ---
         if (message.reply_to_message) {
             const promptText = message.reply_to_message.text;
             if (promptText && promptText.includes('Custom Buy')) {
@@ -367,14 +359,13 @@ export async function POST(req: NextRequest) {
                     }
                     await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                     const result = await executeBuyAction(userId, tickerId, amount);
-                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.`);
+                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.\nFee: ₦${result.fee?.toLocaleString()}`);
                     else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
                     return NextResponse.json({ ok: true });
                 }
             }
         }
 
-        // --- Standard Commands ---
         const [command, ...args] = text.split(' ');
 
         if (command.toLowerCase() === '/buy') {
@@ -383,7 +374,16 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ ok: true });
             }
             const result = await executeBuyAction(userId, args[0], parseFloat(args[1]));
-            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.`);
+            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.\nFee: ₦${result.fee?.toLocaleString()}`);
+            else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
+
+        } else if (command.toLowerCase() === '/sell') {
+            if (args.length < 2) {
+                await sendTelegramMessage(chatId, "Usage: <code>/sell &lt;address&gt; &lt;ngn_amount&gt;</code>\n\n<i>Note: Provide the amount of NGN you want to receive before fees.</i>");
+                return NextResponse.json({ ok: true });
+            }
+            const result = await executeSellAction(userId, args[0], parseFloat(args[1]));
+            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>$${result.tickerName}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
             else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
 
         } else if (command.toLowerCase() === '/create') {
@@ -416,25 +416,31 @@ export async function POST(req: NextRequest) {
             const tickersSnap = await getDocs(collection(firestore, 'tickers'));
             const tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
             
+            // Merge duplicate holdings in memory for accurate display
+            const merged: Record<string, number> = {};
+            holdingsSnap.forEach(hDoc => {
+                const h = hDoc.data() as PortfolioHolding;
+                merged[h.tickerId] = (merged[h.tickerId] || 0) + h.amount;
+            });
+
             let msg = "<b>📊 Portfolio</b>\n\n";
             let totalVal = 0;
             
-            holdingsSnap.forEach(hDoc => {
-                const h = hDoc.data() as PortfolioHolding;
-                const ticker = tickers.find(t => t.id === h.tickerId);
+            Object.entries(merged).forEach(([tId, amount]) => {
+                const ticker = tickers.find(t => t.id === tId);
                 if (ticker) {
-                    const val = calculateReclaimableValue(h.amount, ticker) * 0.998;
+                    const val = calculateReclaimableValue(amount, ticker) * 0.998;
                     totalVal += val;
                     msg += `<b>$${ticker.name}</b>: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
                 }
             });
-            msg += `\n<b>Total</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet</b>: ₦${userData.balance.toLocaleString()}`;
+            msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
             await sendTelegramMessage(chatId, msg);
 
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt;\n/create - Launch token\n/top - Trending\n/latest - Newest\n/portfolio - My holdings\n/balance - Wallet\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/create - Launch token step-by-step\n/top - Trending by volume\n/latest - Newest launches\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);

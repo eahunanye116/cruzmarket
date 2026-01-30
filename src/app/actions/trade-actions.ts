@@ -40,7 +40,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const holdingId = `holding_${resolvedId}`;
             const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             
-            // 1. EXECUTE ALL READS FIRST
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             const statsDoc = await transaction.get(statsRef);
@@ -63,7 +62,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
-            // 2. START WRITES
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
             const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
@@ -102,7 +100,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const price24hAgoDataPoint = tickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || tickerData.chartData?.[0];
             const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
             const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
-            const volume24h = (tickerData.volume24h || 0) + ngnForCurve;
+            const volume24h = (tickerData.volume24h || 0) + ngnAmount;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
             transaction.update(tickerRef, { 
@@ -115,7 +113,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 chartData: arrayUnion({
                     time: now.toISOString(),
                     price: finalPrice,
-                    volume: ngnForCurve,
+                    volume: ngnAmount,
                     marketCap: newMarketCap,
                 })
             });
@@ -133,12 +131,127 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 createdAt: serverTimestamp(),
             });
 
-            return { success: true, tokensOut, tickerName: tickerData.name };
+            return { success: true, tokensOut, tickerName: tickerData.name, fee };
         });
 
         return result;
     } catch (error: any) {
         console.error('Trade execution failed:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function executeSellAction(userId: string, tickerId: string, ngnToGetBeforeFee: number) {
+    const firestore = getFirestoreInstance();
+    
+    let resolvedId = tickerId.trim();
+    if (resolvedId.toLowerCase().endsWith('cruz') && resolvedId.length > 5) {
+        resolvedId = resolvedId.slice(0, -4);
+    }
+
+    try {
+        const result = await runTransaction(firestore, async (transaction) => {
+            const userRef = doc(firestore, 'users', userId);
+            const tickerRef = doc(firestore, 'tickers', resolvedId);
+            const statsRef = doc(firestore, 'stats', 'platform');
+            const holdingId = `holding_${resolvedId}`;
+            const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
+
+            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
+            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
+            const statsDoc = await transaction.get(statsRef);
+            const holdingDoc = await transaction.get(holdingRef);
+
+            if (!userDoc.exists()) throw new Error('User not found.');
+            if (!tickerDoc.exists()) throw new Error('Ticker not found.');
+            if (!holdingDoc.exists()) throw new Error('You do not own this ticker.');
+
+            const tickerData = tickerDoc.data();
+            const userHolding = holdingDoc.data() as PortfolioHolding;
+            const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+            const ngnToUser = ngnToGetBeforeFee - fee;
+
+            const k = tickerData.marketCap * tickerData.supply;
+            if (ngnToGetBeforeFee >= tickerData.marketCap) throw new Error("Sell amount exceeds liquidity.");
+            
+            const tokensSold = (k / (tickerData.marketCap - ngnToGetBeforeFee)) - tickerData.supply;
+            if (tokensSold <= 0) throw new Error("Invalid sell amount.");
+            if (tokensSold > userHolding.amount + 0.000001) throw new Error("Insufficient tokens in portfolio.");
+
+            const costBasis = tokensSold * userHolding.avgBuyPrice;
+            const realizedPnl = ngnToUser - costBasis;
+
+            const newSupply = tickerData.supply + tokensSold;
+            const newMarketCap = k / newSupply;
+            const finalPrice = newMarketCap / newSupply;
+            const pricePerToken = ngnToGetBeforeFee / tokensSold;
+
+            // Updates
+            const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
+            const currentUserFees = statsDoc.data()?.totalUserFees || 0;
+            const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
+            let newUserFees = currentUserFees;
+            let newAdminFees = currentAdminFees;
+            if (userId === ADMIN_UID) { newAdminFees += fee; } else { newUserFees += fee; }
+            
+            transaction.set(statsRef, { 
+                totalFeesGenerated: currentTotalFees + fee,
+                totalUserFees: newUserFees,
+                totalAdminFees: newAdminFees
+            }, { merge: true });
+
+            transaction.update(userRef, { balance: userDoc.data().balance + ngnToUser });
+
+            const newAmount = userHolding.amount - tokensSold;
+            if (newAmount > 0.000001) {
+                transaction.update(holdingRef, { amount: newAmount });
+            } else {
+                transaction.delete(holdingRef);
+            }
+
+            const now = new Date();
+            const twentyFourHoursAgo = sub(now, { hours: 24 });
+            const price24hAgoDataPoint = tickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || tickerData.chartData?.[0];
+            const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
+            const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
+            const volume24h = (tickerData.volume24h || 0) + ngnToGetBeforeFee;
+            const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
+
+            transaction.update(tickerRef, { 
+                price: finalPrice,
+                marketCap: newMarketCap,
+                supply: newSupply,
+                volume24h,
+                priceChange24h,
+                trendingScore,
+                chartData: arrayUnion({
+                    time: now.toISOString(),
+                    price: finalPrice,
+                    volume: ngnToGetBeforeFee,
+                    marketCap: newMarketCap,
+                })
+            });
+
+            const activityRef = doc(collection(firestore, 'activities'));
+            transaction.set(activityRef, {
+                type: 'SELL',
+                tickerId: resolvedId,
+                tickerName: tickerData.name,
+                tickerIcon: tickerData.icon,
+                value: ngnToGetBeforeFee,
+                tokenAmount: tokensSold,
+                pricePerToken: pricePerToken,
+                realizedPnl: realizedPnl,
+                userId: userId,
+                createdAt: serverTimestamp(),
+            });
+
+            return { success: true, tickerName: tickerData.name, ngnToUser, fee };
+        });
+
+        return result;
+    } catch (error: any) {
+        console.error('Sell execution failed:', error);
         return { success: false, error: error.message };
     }
 }
@@ -228,22 +341,20 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 createdAt: serverTimestamp(),
                 trendingScore: 0,
                 priceChange24h: 0,
-                volume24h: ngnForCurve,
+                volume24h: initialBuyNgn,
                 isVerified: false,
                 chartData: [
                     { time: now.toISOString(), price: initialPrice, volume: 0, marketCap: initialMarketCap },
-                    { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: ngnForCurve, marketCap: finalMarketCap }
+                    { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: initialBuyNgn, marketCap: finalMarketCap }
                 ]
             };
 
-            // Only add videoUrl if it's not empty
             if (input.videoUrl) {
                 tickerData.videoUrl = input.videoUrl;
             }
 
             transaction.set(newTickerRef, tickerData);
 
-            // Use deterministic holding ID to prevent duplicates
             const holdingId = `holding_${newTickerRef.id}`;
             const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             transaction.set(holdingRef, {
@@ -258,7 +369,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerId: newTickerRef.id,
                 tickerName: input.name,
                 tickerIcon: input.icon,
-                value: 0,
+                value: creationFee,
                 userId: userId,
                 createdAt: serverTimestamp(),
             });
@@ -275,11 +386,11 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 createdAt: serverTimestamp(),
             });
 
-            return { tickerId: newTickerRef.id, tickerName: input.name, tickerAddress };
+            return { tickerId: newTickerRef.id, tickerName: input.name, tickerAddress, fee: totalFeeForTx };
         });
 
         broadcastNewTickerNotification(result.tickerName, result.tickerAddress, result.tickerId);
-        return { success: true, tickerId: result.tickerId };
+        return { success: true, tickerId: result.tickerId, fee: result.fee };
     } catch (error: any) {
         console.error('Ticker creation failed:', error);
         return { success: false, error: error.message };
