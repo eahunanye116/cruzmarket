@@ -18,13 +18,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction, requestWithdrawalAction } from '@/app/actions/wallet-actions';
-import { generateTelegramLinkingCode, unlinkTelegramAction, getTelegramBotUsername } from '@/app/actions/telegram-actions';
+import { verifyPaystackDepositAction } from '@/app/actions/wallet-actions';
+import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -159,14 +159,12 @@ export default function WalletPage() {
   const [visibleAssets, setVisibleAssets] = useState(ITEMS_PER_PAGE);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
-  const [botUsername, setBotUsername] = useState('cruzmarketfunbot');
+  
+  // Hardcoded correct bot username
+  const botUsername = 'cruzmarketfunbot';
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
-
-  useEffect(() => {
-    getTelegramBotUsername().then(setBotUsername);
-  }, []);
 
   // Queries simplified to avoid manual index requirements. Sorting is handled in useMemo.
   const activitiesQuery = useMemo(() => {

@@ -7,6 +7,9 @@ import { revalidatePath } from 'next/cache';
 import { UserProfile } from '@/lib/types';
 import crypto from 'crypto';
 
+// Hardcoded to ensure accuracy as requested by the user
+const DEFAULT_BOT_USERNAME = 'cruzmarketfunbot';
+
 export async function generateTelegramLinkingCode(userId: string) {
     const firestore = getFirestoreInstance();
     // Generate a secure 16-character hex string (8 bytes)
@@ -22,6 +25,7 @@ export async function generateTelegramLinkingCode(userId: string) {
             }
         });
         revalidatePath('/settings');
+        revalidatePath('/transactions');
         return { success: true, code };
     } catch (error: any) {
         return { success: false, error: error.message };
@@ -37,6 +41,7 @@ export async function unlinkTelegramAction(userId: string) {
             telegramLinkingCode: null,
         });
         revalidatePath('/settings');
+        revalidatePath('/transactions');
         return { success: true };
     } catch (error: any) {
         return { success: false, error: error.message };
@@ -44,8 +49,7 @@ export async function unlinkTelegramAction(userId: string) {
 }
 
 export async function getTelegramBotUsername() {
-    // Explicitly fallback to the user's specific bot name
-    return process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
+    return process.env.TELEGRAM_BOT_USERNAME || DEFAULT_BOT_USERNAME;
 }
 
 export async function setTelegramWebhookAction(baseUrl: string) {
@@ -57,7 +61,8 @@ export async function setTelegramWebhookAction(baseUrl: string) {
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
     
     try {
-        const res = await fetch(`https://api.paystack.co/bot${token}/setWebhook?url=${webhookUrl}`);
+        // FIXED: Corrected the endpoint from api.paystack.co to api.telegram.org
+        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
         const result = await res.json();
         
         if (result.ok) {
@@ -125,7 +130,7 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
     // Public channel username
     const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
+    const botUsername = DEFAULT_BOT_USERNAME; // Strictly use the specific bot name
 
     console.log(`Broadcasting new ticker to ${channelId} using bot: @${botUsername}`);
 

@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Ban, Settings, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
-import { generateTelegramLinkingCode, unlinkTelegramAction, getTelegramBotUsername } from '@/app/actions/telegram-actions';
-import { useState, useEffect } from 'react';
+import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
+import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
@@ -22,11 +22,9 @@ export default function SettingsPage() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
-  const [botUsername, setBotUsername] = useState('cruzmarketfunbot');
-
-  useEffect(() => {
-    getTelegramBotUsername().then(setBotUsername);
-  }, []);
+  
+  // Explicitly use the correct bot username
+  const botUsername = 'cruzmarketfunbot';
 
   if (!user) {
     return (
