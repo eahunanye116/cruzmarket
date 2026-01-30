@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +23,7 @@ import { useRouter } from "next/navigation";
 import type { UserProfile, Ticker, PlatformStats } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { broadcastNewTickerNotification } from "@/app/actions/telegram-actions";
 
 
 const marketCapOptions = {
@@ -119,7 +119,7 @@ export function CreateTickerForm() {
     const statsRef = doc(firestore, 'stats', 'platform');
 
     try {
-      const newTickerDocRef = await runTransaction(firestore, async (transaction) => {
+      const { newTickerRef, tickerAddress } = await runTransaction(firestore, async (transaction) => {
         const userProfileDoc = await transaction.get(userProfileRef as DocumentReference<UserProfile>);
 
         if (!userProfileDoc.exists()) {
@@ -174,8 +174,8 @@ export function CreateTickerForm() {
         const initialPrice = tickerData.marketCap / tickerData.supply;
 
         const newTickerRef = doc(tickersCollectionRef);
+        const tickerAddress = `${newTickerRef.id}cruz`;
         
-        // --- FIX: Use deterministic ID for portfolio holding ---
         const holdingId = `holding_${newTickerRef.id}`;
         const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, holdingId);
         
@@ -198,7 +198,7 @@ export function CreateTickerForm() {
             marketCap: finalMarketCap,
             supply: finalSupply,
             chartData: chartData,
-            tickerAddress: `${newTickerRef.id}cruz`,
+            tickerAddress: tickerAddress,
             createdAt: serverTimestamp(),
             trendingScore: 0,
             priceChange24h: 0,
@@ -228,7 +228,7 @@ export function CreateTickerForm() {
             createdAt: serverTimestamp(),
         });
 
-        return newTickerRef;
+        return { newTickerRef, tickerAddress };
       });
       
       toast({
@@ -237,13 +237,13 @@ export function CreateTickerForm() {
         className: "bg-accent text-accent-foreground border-accent",
       });
 
-      toast({
-        title: "First Purchase Made!",
-        description: `You automatically purchased ₦${initialBuyValue.toLocaleString()} worth of ${values.name}.`,
-      });
+      // --- BROADCAST NOTIFICATION TO TELEGRAM ---
+      // We don't await this to avoid slowing down the redirect, 
+      // but it will fire off in the background.
+      broadcastNewTickerNotification(values.name, tickerAddress, newTickerRef.id);
 
       form.reset();
-      router.push(`/ticker/${newTickerDocRef.id}`);
+      router.push(`/ticker/${newTickerRef.id}`);
 
     } catch (e: any) {
       toast({

@@ -84,3 +84,64 @@ export async function deleteTelegramWebhookAction() {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Sends a message to a specific Telegram Chat ID
+ */
+async function sendTelegramMessage(chatId: string, text: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                chat_id: chatId, 
+                text, 
+                parse_mode: 'HTML',
+                disable_web_page_preview: false 
+            }),
+        });
+    } catch (error) {
+        console.error("TELEGRAM_SEND_ERROR:", error);
+    }
+}
+
+/**
+ * Broadcasts a notification about a new ticker to all users who have linked their Telegram.
+ */
+export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
+    const firestore = getFirestoreInstance();
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
+
+    if (!token) {
+        console.warn("Broadcast skipped: TELEGRAM_BOT_TOKEN not configured.");
+        return;
+    }
+
+    try {
+        // Query all users who have a linked Telegram account
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('telegramChatId', '!=', null));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return;
+
+        const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
+
+        // Send to all users. In a large app, you'd use a queue or batching, but for a prototype this works.
+        const promises = snapshot.docs.map(userDoc => {
+            const chatId = userDoc.data().telegramChatId;
+            if (chatId) {
+                return sendTelegramMessage(chatId, message);
+            }
+            return Promise.resolve();
+        });
+
+        await Promise.all(promises);
+        console.log(`Broadcasted new ticker ${tickerName} to ${snapshot.size} users.`);
+    } catch (error) {
+        console.error("BROADCAST_ERROR:", error);
+    }
+}
