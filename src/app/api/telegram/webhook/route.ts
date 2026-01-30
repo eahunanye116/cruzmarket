@@ -8,9 +8,12 @@ import { formatDistanceToNow } from 'date-fns';
 
 async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) return;
+    if (!token) {
+        console.error("TELEGRAM_BOT_TOKEN missing in environment");
+        return;
+    }
     try {
-        const response = await fetch(`https://api.paystack.co/https://api.telegram.org/bot${token}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
