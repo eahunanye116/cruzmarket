@@ -50,6 +50,12 @@ export type Activity = {
   createdAt: Timestamp;
 };
 
+export type BotSession = {
+  type: 'CREATE_TICKER';
+  step: string;
+  data: Record<string, any>;
+}
+
 export type UserProfile = {
   id?: string;
   email: string;
@@ -61,6 +67,7 @@ export type UserProfile = {
     code: string;
     expiresAt: Timestamp;
   };
+  botSession?: BotSession | null;
 };
 
 export type PlatformSettings = {
