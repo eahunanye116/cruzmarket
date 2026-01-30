@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -266,6 +265,8 @@ export async function executeBurnHoldingsAction(userId: string, tickerIds: strin
         await runTransaction(firestore, async (transaction) => {
             const statsRef = doc(firestore, 'stats', 'platform');
             
+            // READ PHASE: Collect all necessary data before performing any writes
+            const holdingsToBurn = [];
             for (const tickerId of tickerIds) {
                 const tickerRef = doc(firestore, 'tickers', tickerId);
                 const holdingId = `holding_${tickerId}`;
@@ -275,29 +276,40 @@ export async function executeBurnHoldingsAction(userId: string, tickerIds: strin
                 const holdingDoc = await transaction.get(holdingRef);
                 
                 if (holdingDoc.exists()) {
-                    const holdingData = holdingDoc.data() as PortfolioHolding;
-                    transaction.delete(holdingRef);
-                    
-                    const activityRef = doc(collection(firestore, 'activities'));
-                    transaction.set(activityRef, {
-                        type: 'BURN',
-                        tickerId: tickerId,
+                    holdingsToBurn.push({
+                        holdingRef,
+                        tickerId,
                         tickerName: tickerDoc.exists() ? tickerDoc.data().name : 'Unknown Token',
                         tickerIcon: tickerDoc.exists() ? tickerDoc.data().icon : '',
-                        tokenAmount: holdingData.amount,
-                        value: 0,
-                        userId: userId,
-                        createdAt: serverTimestamp(),
+                        amount: holdingDoc.data().amount
                     });
                 }
             }
+
+            // WRITE PHASE: Now that all reads are finished, we can perform all writes
+            for (const item of holdingsToBurn) {
+                transaction.delete(item.holdingRef);
+                
+                const activityRef = doc(collection(firestore, 'activities'));
+                transaction.set(activityRef, {
+                    type: 'BURN',
+                    tickerId: item.tickerId,
+                    tickerName: item.tickerName,
+                    tickerIcon: item.tickerIcon,
+                    tokenAmount: item.amount,
+                    value: 0,
+                    userId: userId,
+                    createdAt: serverTimestamp(),
+                });
+            }
             
-            transaction.update(statsRef, { totalTokensBurned: increment(tickerIds.length) });
+            transaction.update(statsRef, { totalTokensBurned: increment(holdingsToBurn.length) });
         });
         
         revalidatePath('/portfolio');
         return { success: true, message: `${tickerIds.length} tokens burned successfully.` };
     } catch (error: any) {
+        console.error('Burn failed:', error);
         return { success: false, error: error.message };
     }
 }
