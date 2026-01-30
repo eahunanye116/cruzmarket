@@ -98,7 +98,8 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
-            const price24hAgoDataPoint = tickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || tickerData.chartData?.[0];
+            const chartData = tickerData.chartData || [];
+            const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
             const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
             const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
             const volume24h = (tickerData.volume24h || 0) + ngnAmount;
@@ -143,7 +144,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
     }
 }
 
-export async function executeSellAction(userId: string, tickerId: string, ngnToGetBeforeFee: number) {
+export async function executeSellAction(userId: string, tickerId: string, tokenAmountToSell: number) {
     const firestore = getFirestoreInstance();
     
     let resolvedId = tickerId.trim();
@@ -170,23 +171,26 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
 
             const tickerData = tickerDoc.data();
             const userHolding = holdingDoc.data() as PortfolioHolding;
+
+            if (tokenAmountToSell <= 0) throw new Error("Invalid sell amount.");
+            if (tokenAmountToSell > userHolding.amount + 0.000001) throw new Error("Insufficient tokens in portfolio.");
+
+            // Bonding Curve Math: x * y = k
+            const k = tickerData.marketCap * tickerData.supply;
+            const newSupply = tickerData.supply + tokenAmountToSell;
+            const newMarketCap = k / newSupply;
+            
+            // Difference in market cap is the NGN out of the pool
+            const ngnToGetBeforeFee = tickerData.marketCap - newMarketCap;
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
 
-            const k = tickerData.marketCap * tickerData.supply;
-            if (ngnToGetBeforeFee >= tickerData.marketCap) throw new Error("Sell amount exceeds liquidity.");
-            
-            const tokensSold = (k / (tickerData.marketCap - ngnToGetBeforeFee)) - tickerData.supply;
-            if (tokensSold <= 0) throw new Error("Invalid sell amount.");
-            if (tokensSold > userHolding.amount + 0.000001) throw new Error("Insufficient tokens in portfolio.");
+            if (ngnToUser < 0) throw new Error("Sale value too small.");
 
-            const costBasis = tokensSold * userHolding.avgBuyPrice;
+            const costBasis = tokenAmountToSell * userHolding.avgBuyPrice;
             const realizedPnl = ngnToUser - costBasis;
-
-            const newSupply = tickerData.supply + tokensSold;
-            const newMarketCap = k / newSupply;
             const finalPrice = newMarketCap / newSupply;
-            const pricePerToken = ngnToGetBeforeFee / tokensSold;
+            const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
@@ -203,7 +207,7 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
 
             transaction.update(userRef, { balance: userDoc.data().balance + ngnToUser });
 
-            const newAmount = userHolding.amount - tokensSold;
+            const newAmount = userHolding.amount - tokenAmountToSell;
             if (newAmount > 0.000001) {
                 transaction.update(holdingRef, { amount: newAmount });
             } else {
@@ -212,7 +216,8 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
 
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
-            const price24hAgoDataPoint = tickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || tickerData.chartData?.[0];
+            const chartData = tickerData.chartData || [];
+            const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
             const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
             const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
             const volume24h = (tickerData.volume24h || 0) + ngnToGetBeforeFee;
@@ -241,7 +246,7 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
                 tickerIcon: tickerData.icon,
                 value: ngnToGetBeforeFee,
                 fee: fee, 
-                tokenAmount: tokensSold,
+                tokenAmount: tokenAmountToSell,
                 pricePerToken: pricePerToken,
                 realizedPnl: realizedPnl,
                 userId: userId,

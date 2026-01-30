@@ -487,11 +487,37 @@ export async function POST(req: NextRequest) {
 
         } else if (command.toLowerCase() === '/sell') {
             if (args.length < 2) {
-                await sendTelegramMessage(chatId, "Usage: <code>/sell &lt;address&gt; &lt;ngn_amount&gt;</code>\n\n<i>Note: Provide the amount of NGN you want to receive before fees.</i>");
+                await sendTelegramMessage(chatId, "Usage: <code>/sell &lt;address&gt; &lt;token_amount&gt;</code>\n\n<i>Tip: Enter 'all' to sell your entire holding.</i>");
                 return NextResponse.json({ ok: true });
             }
-            const result = await executeSellAction(userId, args[0], parseFloat(args[1]));
-            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>$${escapeHtmlForTelegram(result.tickerName)}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
+            
+            let resolvedId = args[0].trim();
+            if (resolvedId.toLowerCase().endsWith('cruz') && resolvedId.length > 5) {
+                resolvedId = resolvedId.slice(0, -4);
+            }
+
+            let amountToSell = 0;
+            if (args[1].toLowerCase() === 'all') {
+                const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
+                const q = query(portfolioRef, where('tickerId', '==', resolvedId));
+                const snap = await getDocs(q);
+                if (snap.empty) {
+                    await sendTelegramMessage(chatId, "❌ <b>You do not own this token.</b>");
+                    return NextResponse.json({ ok: true });
+                }
+                amountToSell = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
+            } else {
+                amountToSell = parseFloat(args[1].replace(/,/g, ''));
+            }
+
+            if (isNaN(amountToSell) || amountToSell <= 0) {
+                await sendTelegramMessage(chatId, "❌ <b>Invalid amount.</b>");
+                return NextResponse.json({ ok: true });
+            }
+
+            await sendTelegramMessage(chatId, `⏳ <b>Processing Sale...</b>`);
+            const result = await executeSellAction(userId, resolvedId, amountToSell);
+            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>${amountToSell.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
             else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
 
         } else if (command.toLowerCase() === '/burn') {
@@ -602,7 +628,7 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;tokens&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);

@@ -30,7 +30,7 @@ const buySchema = z.object({
 });
 
 const sellSchema = z.object({
-  ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
+  tokenAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }),
 });
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002; // 0.2%
@@ -85,11 +85,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const sellForm = useForm<z.infer<typeof sellSchema>>({
     resolver: zodResolver(sellSchema),
-    defaultValues: { ngnAmount: '' },
+    defaultValues: { tokenAmount: '' },
   });
 
   const ngnAmountToBuy = buyForm.watch('ngnAmount');
-  const ngnAmountToSell = sellForm.watch('ngnAmount');
+  const tokenAmountToSell = sellForm.watch('tokenAmount');
   
   const buyFee = useMemo(() => {
     return (ngnAmountToBuy || 0) * TRANSACTION_FEE_PERCENTAGE;
@@ -108,20 +108,22 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     return ticker.supply - newSupply;
   }, [ngnAmountForCurve, ticker]);
 
-  const tokensToSell = useMemo(() => {
-    if (!ngnAmountToSell || ngnAmountToSell <= 0 || !ticker || ticker.marketCap <= 0 || ngnAmountToSell >= ticker.marketCap) return 0;
+  const ngnToReceiveBeforeFee = useMemo(() => {
+    if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.supply <= 0) return 0;
     const k = ticker.marketCap * ticker.supply;
-    const tokens = (k / (ticker.marketCap - ngnAmountToSell)) - ticker.supply;
-    return tokens > 0 ? tokens : 0;
-  }, [ngnAmountToSell, ticker]);
+    const newSupply = ticker.supply + tokenAmountToSell;
+    const newMarketCap = k / newSupply;
+    const ngnOut = ticker.marketCap - newMarketCap;
+    return ngnOut > 0 ? ngnOut : 0;
+  }, [tokenAmountToSell, ticker]);
   
   const sellFee = useMemo(() => {
-    return (ngnAmountToSell || 0) * TRANSACTION_FEE_PERCENTAGE;
-  }, [ngnAmountToSell]);
+    return ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+  }, [ngnToReceiveBeforeFee]);
 
   const ngnToReceiveAfterFee = useMemo(() => {
-    return (ngnAmountToSell || 0) - sellFee;
-  }, [ngnAmountToSell, sellFee]);
+    return ngnToReceiveBeforeFee - sellFee;
+  }, [ngnToReceiveBeforeFee, sellFee]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0, reclaimableValue: 0 };
@@ -137,7 +139,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
     if (!user) return;
     setIsSubmitting(true);
-    const result = await executeSellAction(user.uid, ticker.id, values.ngnAmount);
+    const result = await executeSellAction(user.uid, ticker.id, values.tokenAmount);
     if (result.success) {
         toast({ title: "Sale Successful!", description: `You received approx. ₦${result.ngnToUser?.toLocaleString()}. (Fee: ₦${result.fee?.toLocaleString()})` });
         sellForm.reset();
@@ -159,6 +161,12 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     }
     setIsSubmitting(false);
   }
+
+  const handleQuickSell = (percentage: number) => {
+    if (!userHolding) return;
+    const amount = (userHolding.amount * percentage) / 100;
+    sellForm.setValue('tokenAmount', amount, { shouldValidate: true });
+  };
 
   const isLoading = profileLoading || holdingLoading;
   const hasPosition = userHolding && userHolding.amount > 0;
@@ -259,62 +267,57 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
           <Form {...sellForm}>
             <form onSubmit={sellForm.handleSubmit(onSellSubmit)} className="space-y-4">
                <div className="text-right text-sm text-muted-foreground">
-                You Own: {holdingLoading ? <Skeleton className="h-4 w-32 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]} (~₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>}
+                You Own: {holdingLoading ? <Skeleton className="h-4 w-32 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]}</span>}
               </div>
+              
+              <div className="grid grid-cols-4 gap-2">
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => handleQuickSell(25)}>25%</Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => handleQuickSell(50)}>50%</Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => handleQuickSell(75)}>75%</Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7" onClick={() => handleQuickSell(100)}>Max</Button>
+              </div>
+
               <FormField
                 control={sellForm.control}
-                name="ngnAmount"
+                name="tokenAmount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex justify-between items-center">
-                      <span>Receive Amount (before fee)</span>
-                       <Button 
-                        type="button" 
-                        variant="link" 
-                        size="sm" 
-                        className="h-auto px-1 py-0 text-xs text-primary"
-                        onClick={() => {
-                          const maxSellValue = Math.floor(positionPnl.reclaimableValue);
-                          sellForm.setValue('ngnAmount', maxSellValue, { shouldValidate: true });
-                        }}
-                        disabled={!hasPosition || positionPnl.reclaimableValue <= 0}
-                      >
-                        Max
-                      </Button>
-                    </FormLabel>
+                    <FormLabel>Amount of Tokens to Sell</FormLabel>
                     <FormControl>
                        <div className="relative">
-                        <Input type="number" placeholder="0.00" {...field} className="pr-12" />
-                        <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
+                        <Input type="number" step="any" placeholder="0.00" {...field} className="pr-12" />
+                        <span className="absolute inset-y-0 right-4 flex items-center text-xs font-bold text-muted-foreground">${ticker.name.split(' ')[0]}</span>
                       </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <div className="flex items-center justify-center text-muted-foreground">
-                  <ArrowRight className="h-5 w-5 animate-pulse" />
+                  <ArrowDown className="h-5 w-5 animate-pulse" />
               </div>
+
                <div>
-                  <FormLabel>You will sell approx.</FormLabel>
+                  <FormLabel>You will receive approx.</FormLabel>
                   <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
                       <p className="text-sm font-medium text-foreground transition-opacity duration-300">
-                          {tokensToSell.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                          <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
+                          ₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                   </div>
               </div>
+
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
-                      <span className="text-muted-foreground">Receive (before fee)</span>
-                      <span>₦{(ngnAmountToSell || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-muted-foreground">Gross Value</span>
+                      <span>₦{ngnToReceiveBeforeFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Fee (0.2%)</span>
                       <span className="text-destructive">- ₦{sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between font-bold">
-                      <span>You will receive approx.</span>
+                      <span>Net Received</span>
                       <span>₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
               </div>
