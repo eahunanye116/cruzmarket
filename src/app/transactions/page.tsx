@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -18,12 +18,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction } from '@/app/actions/wallet-actions';
+import { verifyPaystackDepositAction, requestWithdrawalAction } from '@/app/actions/wallet-actions';
+import { generateTelegramLinkingCode, unlinkTelegramAction, getTelegramBotUsername } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -156,9 +157,16 @@ export default function WalletPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [visibleAssets, setVisibleAssets] = useState(ITEMS_PER_PAGE);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [botUsername, setBotUsername] = useState('cruzmarketfunbot');
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  useEffect(() => {
+    getTelegramBotUsername().then(setBotUsername);
+  }, []);
 
   // Queries simplified to avoid manual index requirements. Sorting is handled in useMemo.
   const activitiesQuery = useMemo(() => {
@@ -237,6 +245,29 @@ export default function WalletPage() {
   }, [enrichedActivities]);
 
 
+  const handleGenerateCode = async () => {
+    if (!user) return;
+    setIsGenerating(true);
+    const result = await generateTelegramLinkingCode(user.uid);
+    if (result.success) {
+      toast({ title: 'Code Generated', description: 'Code is valid for 10 minutes.' });
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+    setIsGenerating(false);
+  };
+
+  const handleUnlink = async () => {
+    if (!user) return;
+    if (!confirm('Are you sure you want to disconnect Telegram?')) return;
+    setIsUnlinking(true);
+    const result = await unlinkTelegramAction(user.uid);
+    if (result.success) {
+      toast({ title: 'Unlinked', description: 'Telegram bot disconnected.' });
+    }
+    setIsUnlinking(false);
+  };
+
   const isLoading = profileLoading || activitiesLoading || tickersLoading || requestsLoading;
 
   const filteredAssets = useMemo(() => {
@@ -264,15 +295,77 @@ export default function WalletPage() {
       </div>
     );
   }
+
+  const isLinked = !!userProfile?.telegramChatId;
+  const activeCode = userProfile?.telegramLinkingCode;
+  const isCodeValid = activeCode && (activeCode.expiresAt as any).toDate() > new Date();
   
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center text-center mb-8">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-                <Wallet className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-4xl font-bold font-headline">My Wallet</h1>
-            <p className="mt-2 text-lg text-muted-foreground">View your balance, deposit funds, and see your transaction history.</p>
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-6xl">
+        <div className="mb-12">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Send className="h-5 w-5 text-[#229ED9]" /> Telegram Bot Connectivity
+                    </CardTitle>
+                    <CardDescription>
+                        Link your account to trade memes directly from Telegram.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {profileLoading ? (
+                        <Skeleton className="h-24 w-full" />
+                    ) : isLinked ? (
+                        <div className="rounded-lg border-2 border-accent/20 bg-accent/5 p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-6 w-6 text-accent" />
+                                <div>
+                                    <p className="font-bold">Telegram Connected</p>
+                                    <p className="text-sm text-muted-foreground">Chat ID: {userProfile?.telegramChatId}</p>
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={handleUnlink} disabled={isUnlinking}>
+                                <Trash2 className="h-4 w-4 mr-2" /> Disconnect
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="rounded-lg border-2 border-yellow-500/20 bg-yellow-500/5 p-4 flex items-start gap-3">
+                                <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Not Connected</p>
+                                    <p className="text-sm text-muted-foreground">Connect your account to enable snappy trading via the bot.</p>
+                                </div>
+                            </div>
+
+                            {!isCodeValid ? (
+                                <Button onClick={handleGenerateCode} disabled={isGenerating} className="w-full">
+                                    {isGenerating ? 'Generating...' : 'Connect Telegram Bot'}
+                                </Button>
+                            ) : (
+                                <div className="space-y-4 p-6 border-2 border-dashed rounded-lg text-center bg-muted/30">
+                                    <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">Your Secure Linking Code</p>
+                                    <p className="text-2xl sm:text-3xl font-mono font-bold tracking-tighter text-primary break-all">
+                                        {activeCode.code}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Expires in {Math.round(((activeCode.expiresAt as any).toDate().getTime() - Date.now()) / 1000 / 60)} minutes</p>
+                                    
+                                    <div className="flex flex-col gap-2 pt-2">
+                                        <Button asChild className="w-full bg-[#229ED9] hover:bg-[#229ED9]/90">
+                                            <a href={`https://t.me/${botUsername}?start=${activeCode.code}`} target="_blank" rel="noopener noreferrer">
+                                                <ExternalLink className="mr-2 h-4 w-4" /> Open Telegram Bot
+                                            </a>
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground">
+                                            Or send `/start {activeCode.code}` to @{botUsername}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
