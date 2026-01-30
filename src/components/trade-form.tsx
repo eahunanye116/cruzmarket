@@ -16,14 +16,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, query, where, getDocs, runTransaction, DocumentReference, serverTimestamp, addDoc, arrayUnion, writeBatch, onSnapshot } from 'firebase/firestore';
-import type { Ticker, PortfolioHolding, UserProfile, PlatformStats } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowDown, ArrowUp, Info } from 'lucide-react';
+import { doc, collection, query, where, runTransaction, DocumentReference, serverTimestamp, arrayUnion, onSnapshot } from 'firebase/firestore';
+import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
+import { Loader2, ArrowRight, ArrowDown, ArrowUp, Info, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { differenceInMinutes, sub } from 'date-fns';
+import { sub } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { executeBuyAction } from '@/app/actions/trade-actions';
 
 const buySchema = z.object({
   ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
@@ -39,16 +40,10 @@ const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 // Helper function to calculate trending score
 const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
-    // Give more weight to volume, but also consider price change.
-    // Normalize or scale these values as needed for your ecosystem.
     const volumeWeight = 0.7;
     const priceChangeWeight = 0.3;
-
-    // Use log to temper the effect of huge volumes
     const volumeScore = Math.log1p(volume24h) * volumeWeight; 
-    // Price change can be negative, let's use its magnitude but favor positive change
     const priceChangeScore = (priceChange24h > 0 ? priceChange24h : priceChange24h / 2) * priceChangeWeight;
-    
     return volumeScore + priceChangeScore;
 };
 
@@ -116,17 +111,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
      return (ngnAmountToBuy || 0) - buyFee;
   },[ngnAmountToBuy, buyFee])
 
-  // Bonding Curve Calculations
   const tokensToReceive = useMemo(() => {
     if (!ngnAmountForCurve || ngnAmountForCurve <= 0 || !ticker || ticker.marketCap <= 0) return 0;
-    
     const k = ticker.marketCap * ticker.supply;
     const newMarketCap = ticker.marketCap + ngnAmountForCurve;
     if (newMarketCap <= 0) return 0;
     const newSupply = k / newMarketCap;
-    const tokensOut = ticker.supply - newSupply;
-    
-    return tokensOut;
+    return ticker.supply - newSupply;
   }, [ngnAmountForCurve, ticker]);
 
   const tokensToSell = useMemo(() => {
@@ -146,11 +137,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0, reclaimableValue: 0 };
-    
     const reclaimableValue = calculateReclaimableValue(userHolding.amount, ticker);
     const fee = reclaimableValue * TRANSACTION_FEE_PERCENTAGE;
-    const currentValue = reclaimableValue - fee; // This is the post-fee value
-    
+    const currentValue = reclaimableValue - fee; 
     const initialCost = userHolding.amount * userHolding.avgBuyPrice;
     const pnl = currentValue - initialCost;
     const pnlPercent = initialCost > 0 ? (pnl / initialCost) * 100 : 0;
@@ -159,7 +148,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
     if (!firestore || !user || !userHolding) return;
-    
     setIsSubmitting(true);
     const ngnToGetBeforeFee = values.ngnAmount;
 
@@ -183,12 +171,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
             let newUserFees = currentUserFees;
             let newAdminFees = currentAdminFees;
-
-            if (user.uid === ADMIN_UID) {
-                newAdminFees += fee;
-            } else {
-                newUserFees += fee;
-            }
+            if (user.uid === ADMIN_UID) { newAdminFees += fee; } else { newUserFees += fee; }
             
             transaction.set(statsRef, { 
                 totalFeesGenerated: currentTotalFees + fee,
@@ -196,24 +179,18 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 totalAdminFees: newAdminFees
             }, { merge: true });
 
-            // Calculate tokens required based on desired NGN amount
             const k = currentTickerData.marketCap * currentTickerData.supply;
-            if (ngnToGetBeforeFee >= currentTickerData.marketCap) {
-                throw new Error("Sell amount cannot be greater than or equal to the market cap.");
-            }
+            if (ngnToGetBeforeFee >= currentTickerData.marketCap) throw new Error("Sell amount exceeds market cap.");
             const tokenAmount = (k / (currentTickerData.marketCap - ngnToGetBeforeFee)) - currentTickerData.supply;
             
-            if (tokenAmount <= 0) throw new Error("Calculated token amount is zero or negative.");
-            if (tokenAmount > userHolding.amount) {
-                throw new Error(`Insufficient tokens. You have ${userHolding.amount.toLocaleString()}, but ${tokenAmount.toLocaleString()} are required.`);
-            }
+            if (tokenAmount <= 0) throw new Error("Invalid token amount.");
+            if (tokenAmount > userHolding.amount) throw new Error("Insufficient tokens.");
             
             const costBasisOfSoldTokens = tokenAmount * userHolding.avgBuyPrice;
             const ngnToUser = ngnToGetBeforeFee - fee;
             const realizedPnl = ngnToUser - costBasisOfSoldTokens;
 
             const pricePerToken = ngnToGetBeforeFee / tokenAmount;
-
             const newSupply = currentTickerData.supply + tokenAmount;
             const newMarketCap = k / newSupply;
             const newPrice = newMarketCap / newSupply;
@@ -223,11 +200,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
             const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
             const newAmount = userHolding.amount - tokenAmount;
-            if (newAmount > 0.000001) { // Threshold to avoid dust
-                transaction.update(holdingRef, { amount: newAmount });
-            } else {
-                transaction.delete(holdingRef);
-            }
+            if (newAmount > 0.000001) { transaction.update(holdingRef, { amount: newAmount }); } else { transaction.delete(holdingRef); }
             
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
@@ -238,182 +211,43 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
             transaction.update(tickerRef, { 
-                price: newPrice,
-                marketCap: newMarketCap,
-                supply: newSupply,
-                volume24h,
-                priceChange24h,
-                trendingScore,
+                price: newPrice, marketCap: newMarketCap, supply: newSupply,
+                volume24h, priceChange24h, trendingScore,
                 chartData: arrayUnion({
-                    time: now.toISOString(),
-                    price: newPrice,
-                    volume: ngnToGetBeforeFee,
-                    marketCap: newMarketCap,
+                    time: now.toISOString(), price: newPrice, volume: ngnToGetBeforeFee, marketCap: newMarketCap,
                 })
             });
 
-            // Add activity to transaction
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
-                type: 'SELL',
-                tickerId: ticker.id,
-                tickerName: ticker.name,
-                tickerIcon: ticker.icon,
-                value: ngnToGetBeforeFee,
-                tokenAmount: tokenAmount,
-                pricePerToken: pricePerToken,
-                realizedPnl: realizedPnl,
-                userId: user.uid,
-                createdAt: serverTimestamp(),
+                type: 'SELL', tickerId: ticker.id, tickerName: ticker.name, tickerIcon: ticker.icon,
+                value: ngnToGetBeforeFee, tokenAmount: tokenAmount, pricePerToken: pricePerToken,
+                realizedPnl: realizedPnl, userId: user.uid, createdAt: serverTimestamp(),
             });
 
             return { ngnToUser, realizedPnl };
         });
 
-        toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}. Realized P/L: ₦${realizedPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+        toast({ title: "Sale Successful!", description: `You received approx. ₦${ngnToUser.toLocaleString()}.` });
         sellForm.reset();
-
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete sale." });
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
         setIsSubmitting(false);
     }
   }, [firestore, user, userHolding, ticker, toast, sellForm]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
-    if (!firestore || !user || !userProfile) return;
+    if (!user) return;
     setIsSubmitting(true);
-    try {
-        const { tokensOut } = await runTransaction(firestore, async (transaction) => {
-            const ngnAmount = values.ngnAmount;
-            
-            // --- 1. All READS must happen first ---
-            const userRef = doc(firestore, 'users', user.uid);
-            const tickerRef = doc(firestore, 'tickers', ticker.id);
-            const statsRef = doc(firestore, 'stats', 'platform');
-            
-            const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
-            const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
-            const statsDoc = await transaction.get(statsRef);
-            
-            let holdingRef: DocumentReference | null = null;
-            let currentHolding: PortfolioHolding | null = null;
-            if (userHolding) {
-                holdingRef = doc(firestore, `users/${user.uid}/portfolio`, userHolding.id);
-                const holdingDoc = await transaction.get(holdingRef);
-                if (holdingDoc.exists()) {
-                    currentHolding = holdingDoc.data() as PortfolioHolding;
-                }
-            }
-
-            // --- 2. Perform validation checks on read data ---
-            if (!userDoc.exists() || userDoc.data().balance < ngnAmount) {
-                throw new Error('Insufficient balance.');
-            }
-            if (!tickerDoc.exists()) {
-                throw new Error('Ticker not found.');
-            }
-            const currentTickerData = tickerDoc.data();
-            if (currentTickerData.marketCap <= 0) {
-                throw new Error("Market is not active.");
-            }
-
-            // --- 3. Calculations ---
-            const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
-            const ngnForCurve = ngnAmount - fee;
-            
-            const k = currentTickerData.marketCap * currentTickerData.supply;
-            const newMarketCap = currentTickerData.marketCap + ngnForCurve;
-            const newSupply = k / newMarketCap;
-            const tokensOut = currentTickerData.supply - newSupply;
-            const finalPrice = newMarketCap / newSupply;
-            const avgBuyPrice = ngnAmount / tokensOut;
-
-            if (tokensOut <= 0) throw new Error("Cannot buy zero or negative tokens.");
-            if (tokensOut > currentTickerData.supply) throw new Error("Not enough supply to fulfill this order.");
-
-            // --- 4. All WRITES must happen after reads ---
-            const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
-            const currentUserFees = statsDoc.data()?.totalUserFees || 0;
-            const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
-            let newUserFees = currentUserFees;
-            let newAdminFees = currentAdminFees;
-            if (user.uid === ADMIN_UID) {
-                newAdminFees += fee;
-            } else {
-                newUserFees += fee;
-            }
-            transaction.set(statsRef, { 
-                totalFeesGenerated: currentTotalFees + fee,
-                totalUserFees: newUserFees,
-                totalAdminFees: newAdminFees,
-            }, { merge: true });
-
-            const newBalance = userDoc.data().balance - ngnAmount;
-            transaction.update(userRef, { balance: newBalance });
-
-            if (currentHolding && holdingRef) {
-                const newAmount = currentHolding.amount + tokensOut;
-                const newTotalCost = (currentHolding.avgBuyPrice * currentHolding.amount) + ngnAmount;
-                const newAvgBuyPrice = newTotalCost / newAmount;
-                transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
-            } else {
-                const newHoldingRef = doc(collection(firestore, `users/${user.uid}/portfolio`));
-                transaction.set(newHoldingRef, {
-                    tickerId: ticker.id,
-                    amount: tokensOut,
-                    avgBuyPrice: avgBuyPrice,
-                    userId: user.uid
-                });
-            }
-
-            const now = new Date();
-            const twentyFourHoursAgo = sub(now, { hours: 24 });
-            const price24hAgoDataPoint = currentTickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || currentTickerData.chartData?.[0];
-            const price24hAgo = price24hAgoDataPoint?.price || currentTickerData.price;
-            const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
-            const volume24h = (currentTickerData.volume24h || 0) + ngnForCurve;
-            const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
-
-            transaction.update(tickerRef, { 
-                price: finalPrice,
-                marketCap: newMarketCap,
-                supply: newSupply,
-                volume24h,
-                priceChange24h,
-                trendingScore,
-                chartData: arrayUnion({
-                    time: now.toISOString(),
-                    price: finalPrice,
-                    volume: ngnForCurve,
-                    marketCap: newMarketCap,
-                })
-            });
-
-            const activityRef = doc(collection(firestore, 'activities'));
-            transaction.set(activityRef, {
-                type: 'BUY',
-                tickerId: ticker.id,
-                tickerName: ticker.name,
-                tickerIcon: ticker.icon,
-                value: ngnAmount,
-                tokenAmount: tokensOut,
-                pricePerToken: avgBuyPrice,
-                userId: user.uid,
-                createdAt: serverTimestamp(),
-            });
-
-            return { tokensOut };
-        });
-
-        toast({ title: "Purchase Successful!", description: `You bought ${tokensOut.toLocaleString()} ${ticker.name.split(' ')[0]}`});
+    const result = await executeBuyAction(user.uid, ticker.id, values.ngnAmount);
+    if (result.success) {
+        toast({ title: "Purchase Successful!", description: `You bought ${result.tokensOut?.toLocaleString()} ${ticker.name.split(' ')[0]}`});
         buyForm.reset();
-
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Oh no! Something went wrong.', description: e.message || "Could not complete purchase." });
-    } finally {
-        setIsSubmitting(false);
+    } else {
+        toast({ variant: 'destructive', title: 'Purchase Failed', description: result.error });
     }
+    setIsSubmitting(false);
   }
 
   const isLoading = profileLoading || holdingLoading;
@@ -427,186 +261,196 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     return <Skeleton className="h-96 w-full" />
   }
 
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(ticker.id);
+    toast({ title: 'ID Copied', description: 'Paste this in the Telegram bot to buy.' });
+  };
+
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className={cn("grid w-full", hasPosition ? "grid-cols-3" : "grid-cols-2")}>
-        <TabsTrigger value="buy">Buy</TabsTrigger>
-        <TabsTrigger value="sell">Sell</TabsTrigger>
-        {hasPosition && <TabsTrigger value="position">Position</TabsTrigger>}
-      </TabsList>
-      <TabsContent value="buy">
-        <Form {...buyForm}>
-          <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
-            <div className="text-right text-sm text-muted-foreground">
-              Balance: ₦{userProfile?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
-            </div>
-            <FormField
-              control={buyForm.control}
-              name="ngnAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center gap-1">
-                    <FormLabel>Amount to Spend</FormLabel>
-                     <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-5 w-5 text-primary/80 hover:text-primary">
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="max-w-xs text-sm">
-                          <h4 className="font-bold mb-2">How Trading Works</h4>
-                          <div className="space-y-2 text-muted-foreground">
-                            <p>All trades happen on a bonding curve, which means the price changes with every buy and sell.</p>
-                            <p>A 0.2% fee is applied to every transaction to support the platform.</p>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className={cn("grid w-full", hasPosition ? "grid-cols-3" : "grid-cols-2")}>
+          <TabsTrigger value="buy">Buy</TabsTrigger>
+          <TabsTrigger value="sell">Sell</TabsTrigger>
+          {hasPosition && <TabsTrigger value="position">Position</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="buy">
+          <Form {...buyForm}>
+            <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
+              <div className="text-right text-sm text-muted-foreground">
+                Balance: ₦{userProfile?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+              </div>
+              <FormField
+                control={buyForm.control}
+                name="ngnAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center gap-1">
+                      <FormLabel>Amount to Spend</FormLabel>
+                       <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-primary/80 hover:text-primary">
+                              <Info className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="max-w-xs text-sm">
+                            <h4 className="font-bold mb-2">How Trading Works</h4>
+                            <div className="space-y-2 text-muted-foreground">
+                              <p>All trades happen on a bonding curve, which means the price changes with every buy and sell.</p>
+                              <p>A 0.2% fee is applied to every transaction to support the platform.</p>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                    </div>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="number" placeholder="0.00" {...field} className="pr-12" />
+                        <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="flex items-center justify-center text-muted-foreground">
+                  <ArrowRight className="h-5 w-5 animate-pulse" />
+              </div>
+
+              <div>
+                  <FormLabel>You will receive approx.</FormLabel>
+                  <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
+                      <p className="text-sm font-medium text-foreground transition-opacity duration-300">
+                          {tokensToReceive.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                          <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
+                      </p>
                   </div>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type="number" placeholder="0.00" {...field} className="pr-12" />
-                      <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="flex items-center justify-center text-muted-foreground">
-                <ArrowRight className="h-5 w-5 animate-pulse" />
-            </div>
+              </div>
 
-            <div>
-                <FormLabel>You will receive approx.</FormLabel>
-                <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
-                    <p className="text-sm font-medium text-foreground transition-opacity duration-300">
-                        {tokensToReceive.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                        <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
-                    </p>
-                </div>
-            </div>
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
+                  <div className="flex justify-between">
+                      <span className="text-muted-foreground">Fee (0.2%)</span>
+                      <span>₦{buyFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                      <span>Total Cost</span>
+                      <span>₦{(ngnAmountToBuy || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+              </div>
 
-            <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fee (0.2%)</span>
-                    <span>₦{buyFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between font-bold">
-                    <span>Total Cost</span>
-                    <span>₦{(ngnAmountToBuy || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-            </div>
-
-            <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Buy ${ticker.name.split(' ')[0]}
-            </Button>
-          </form>
-        </Form>
-      </TabsContent>
-      <TabsContent value="sell">
-        <Form {...sellForm}>
-          <form onSubmit={sellForm.handleSubmit(onSellSubmit)} className="space-y-4">
-             <div className="text-right text-sm text-muted-foreground">
-              You Own: {holdingLoading ? <Skeleton className="h-4 w-32 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]} (~₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>}
-            </div>
-            <FormField
-              control={sellForm.control}
-              name="ngnAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex justify-between items-center">
-                    <span>Receive Amount (before fee)</span>
-                     <Button 
-                      type="button" 
-                      variant="link" 
-                      size="sm" 
-                      className="h-auto px-1 py-0 text-xs text-primary"
-                      onClick={() => {
-                        // Round down to avoid precision errors that might cause the transaction to fail
-                        const maxSellValue = Math.floor(positionPnl.reclaimableValue);
-                        sellForm.setValue('ngnAmount', maxSellValue, { shouldValidate: true });
-                      }}
-                      disabled={!hasPosition || positionPnl.reclaimableValue <= 0}
-                    >
-                      Max
-                    </Button>
-                  </FormLabel>
-                  <FormControl>
-                     <div className="relative">
-                      <Input type="number" placeholder="0.00" {...field} className="pr-12" />
-                      <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex items-center justify-center text-muted-foreground">
-                <ArrowRight className="h-5 w-5 animate-pulse" />
-            </div>
-             <div>
-                <FormLabel>You will sell approx.</FormLabel>
-                <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
-                    <p className="text-sm font-medium text-foreground transition-opacity duration-300">
-                        {tokensToSell.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                        <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
-                    </p>
-                </div>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Receive (before fee)</span>
-                    <span>₦{(ngnAmountToSell || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fee (0.2%)</span>
-                    <span className="text-destructive">- ₦{sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between font-bold">
-                    <span>You will receive approx.</span>
-                    <span>₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-            </div>
-
-            <Button type="submit" disabled={isSubmitting || !userHolding || userHolding.amount === 0} className="w-full">
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sell ${ticker.name.split(' ')[0]}
-            </Button>
-          </form>
-        </Form>
-      </TabsContent>
-      {hasPosition && userHolding && (
-        <TabsContent value="position">
-            <div className="space-y-4">
-                <div className="rounded-lg border bg-background/50 p-4 space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Amount Held</span>
-                        <span className="font-semibold">{userHolding.amount.toLocaleString()} ${ticker.name.split(' ')[0]}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Avg. Buy Price</span>
-                        <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Reclaimable Value</span>
-                        <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                     <div className="flex justify-between items-center text-sm font-bold">
-                        <span className="text-muted-foreground">Unrealized P/L</span>
-                        <div className={cn("flex items-center", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
-                          {positionPnl.pnl >= 0 ? <ArrowUp className="h-4 w-4 mr-1" /> : <ArrowDown className="h-4 w-4 mr-1" />}
-                          <span>{positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          <span className="ml-2">({positionPnl.pnlPercent.toFixed(2)}%)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+              <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Buy ${ticker.name.split(' ')[0]}
+              </Button>
+            </form>
+          </Form>
         </TabsContent>
-      )}
-    </Tabs>
+        <TabsContent value="sell">
+          <Form {...sellForm}>
+            <form onSubmit={sellForm.handleSubmit(onSellSubmit)} className="space-y-4">
+               <div className="text-right text-sm text-muted-foreground">
+                You Own: {holdingLoading ? <Skeleton className="h-4 w-32 inline-block" /> : <span>{userHolding?.amount?.toLocaleString() ?? 0} ${ticker.name.split(' ')[0]} (~₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>}
+              </div>
+              <FormField
+                control={sellForm.control}
+                name="ngnAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex justify-between items-center">
+                      <span>Receive Amount (before fee)</span>
+                       <Button 
+                        type="button" 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto px-1 py-0 text-xs text-primary"
+                        onClick={() => {
+                          const maxSellValue = Math.floor(positionPnl.reclaimableValue);
+                          sellForm.setValue('ngnAmount', maxSellValue, { shouldValidate: true });
+                        }}
+                        disabled={!hasPosition || positionPnl.reclaimableValue <= 0}
+                      >
+                        Max
+                      </Button>
+                    </FormLabel>
+                    <FormControl>
+                       <div className="relative">
+                        <Input type="number" placeholder="0.00" {...field} className="pr-12" />
+                        <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex items-center justify-center text-muted-foreground">
+                  <ArrowRight className="h-5 w-5 animate-pulse" />
+              </div>
+               <div>
+                  <FormLabel>You will sell approx.</FormLabel>
+                  <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
+                      <p className="text-sm font-medium text-foreground transition-opacity duration-300">
+                          {tokensToSell.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                          <span className="ml-2 font-bold text-primary">${ticker.name.split(' ')[0]}</span>
+                      </p>
+                  </div>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
+                  <div className="flex justify-between">
+                      <span className="text-muted-foreground">Receive (before fee)</span>
+                      <span>₦{(ngnAmountToSell || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                   <div className="flex justify-between">
+                      <span className="text-muted-foreground">Fee (0.2%)</span>
+                      <span className="text-destructive">- ₦{sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                      <span>You will receive approx.</span>
+                      <span>₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+              </div>
+
+              <Button type="submit" disabled={isSubmitting || !userHolding || userHolding.amount === 0} className="w-full">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Sell ${ticker.name.split(' ')[0]}
+              </Button>
+            </form>
+          </Form>
+        </TabsContent>
+        {hasPosition && userHolding && (
+          <TabsContent value="position">
+              <div className="space-y-4">
+                  <div className="rounded-lg border bg-background/50 p-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Amount Held</span>
+                          <span className="font-semibold">{userHolding.amount.toLocaleString()} ${ticker.name.split(' ')[0]}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Avg. Buy Price</span>
+                          <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Reclaimable Value</span>
+                          <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                       <div className="flex justify-between items-center text-sm font-bold">
+                          <span className="text-muted-foreground">Unrealized P/L</span>
+                          <div className={cn("flex items-center", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
+                            {positionPnl.pnl >= 0 ? <ArrowUp className="h-4 w-4 mr-1" /> : <ArrowDown className="h-4 w-4 mr-1" />}
+                            <span>{positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="ml-2">({positionPnl.pnlPercent.toFixed(2)}%)</span>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <div className="pt-4 border-t">
+        <Button variant="outline" className="w-full text-xs h-8" onClick={handleCopyId}>
+          <Copy className="h-3 w-3 mr-2" /> Copy Token ID for Telegram Buy
+        </Button>
+      </div>
+    </div>
   );
 }
-
-    

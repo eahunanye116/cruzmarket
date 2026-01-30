@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck } from 'lucide-react';
+import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
@@ -110,13 +110,22 @@ export function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" /> Settings
+                  </Link>
+                </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem asChild>
-                    <Link href="/admin">Admin Panel</Link>
+                    <Link href="/admin">
+                      <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
+                    </Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link href="/support">Support Chat</Link>
+                  <Link href="/support">
+                    <History className="mr-2 h-4 w-4" /> Support Chat
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut}>
                   Log out

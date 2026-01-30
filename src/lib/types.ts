@@ -56,6 +56,11 @@ export type UserProfile = {
   displayName: string;
   photoURL?: string;
   balance: number;
+  telegramChatId?: string;
+  telegramLinkingCode?: {
+    code: string;
+    expiresAt: Timestamp;
+  };
 };
 
 export type PlatformSettings = {
