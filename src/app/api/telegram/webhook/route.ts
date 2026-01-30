@@ -238,10 +238,15 @@ export async function POST(req: NextRequest) {
         const userId = userDoc.id;
         const userData = userDoc.data() as UserProfile;
 
-        // --- Handle Cancel ---
+        // --- Handle Cancel (Handled globally for linked users) ---
         if (text.toLowerCase() === '/cancel') {
+            const wasInSession = !!userData.botSession;
             await updateDoc(userDoc.ref, { botSession: null });
-            await sendTelegramMessage(chatId, "❌ <b>Operation cancelled.</b> Session cleared.");
+            if (wasInSession) {
+                await sendTelegramMessage(chatId, "⏹ <b>Creation Process Ended.</b>\n\nYour session has been cleared. You can start fresh by typing /create or explore the market with /top.");
+            } else {
+                await sendTelegramMessage(chatId, "ℹ️ <b>No active process to cancel.</b>");
+            }
             return NextResponse.json({ ok: true });
         }
 
@@ -359,7 +364,7 @@ export async function POST(req: NextRequest) {
                     data: {}
                 }
             });
-            await sendTelegramMessage(chatId, "🚀 <b>Launch a Ticker</b>\n\nFirst, enter the <b>Name</b> of your token (e.g., DogeCoin):");
+            await sendTelegramMessage(chatId, "🚀 <b>Launch a Ticker</b>\n\nFirst, enter the <b>Name</b> of your token (e.g., DogeCoin):\n\n<i>Type /cancel at any time to abort.</i>");
 
         } else if (command.toLowerCase() === '/top') {
             const tickersSnap = await getDocs(collection(firestore, 'tickers'));
@@ -399,7 +404,7 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt;\n/create - Launch token\n/top - Trending\n/latest - Newest\n/portfolio - My holdings\n/balance - Wallet\n/cancel - Abort creation");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt;\n/create - Launch token\n/top - Trending\n/latest - Newest\n/portfolio - My holdings\n/balance - Wallet\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);
