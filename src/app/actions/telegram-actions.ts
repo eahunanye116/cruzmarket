@@ -116,22 +116,19 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
  * Broadcasts a notification about a new ticker to the dedicated Telegram channel.
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
-    const channelId = process.env.TELEGRAM_CHANNEL_ID;
+    // Prioritize username provided by user, then .env, then hard fallback
+    const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-
-    if (!channelId) {
-        console.warn("BROADCAST_SKIPPED: TELEGRAM_CHANNEL_ID is not configured in .env");
-        return;
-    }
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot';
 
     const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
-    // Interactive Buy Buttons
+    // Deep-linking buttons for the bot
     const replyMarkup = {
         inline_keyboard: [
             [
-                { text: "💰 Buy ₦1,000", url: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot'}?start=buy_1000_${tickerId}` },
-                { text: "💰 Buy ₦5,000", url: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot'}?start=buy_5000_${tickerId}` }
+                { text: "💰 Buy ₦1,000", url: `https://t.me/${botUsername}?start=buy_1000_${tickerId}` },
+                { text: "💰 Buy ₦5,000", url: `https://t.me/${botUsername}?start=buy_5000_${tickerId}` }
             ],
             [
                 { text: "🔗 Open Platform", url: `${baseUrl}/ticker/${tickerId}` }

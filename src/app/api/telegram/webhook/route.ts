@@ -208,36 +208,59 @@ export async function POST(req: NextRequest) {
 
     try {
         const parts = text.split(' ');
-        let potentialCode = '';
-        if (text.startsWith('/start') && parts.length === 2) potentialCode = parts[1].trim();
-        else if (text.length === 16 && !text.includes(' ')) potentialCode = text.trim();
-
-        if (potentialCode) {
-            const usersRef = collection(firestore, 'users');
-            const q = query(usersRef, where('telegramLinkingCode.code', '==', potentialCode), limit(1));
-            const snapshot = await getDocs(q);
-
-            if (snapshot.empty) {
-                await sendTelegramMessage(chatId, "❌ <b>Invalid or expired code.</b>");
-            } else {
-                const userDoc = snapshot.docs[0];
-                const userData = userDoc.data() as UserProfile;
-                const expiry = userData.telegramLinkingCode?.expiresAt;
-
-                if (expiry && expiry.toDate() < new Date()) {
-                    await sendTelegramMessage(chatId, "❌ <b>Code expired.</b>");
-                } else {
-                    await updateDoc(userDoc.ref, { telegramChatId: chatId, telegramLinkingCode: null });
-                    await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/help - All commands`);
-                }
-            }
-            return NextResponse.json({ ok: true });
-        }
+        let startParam = '';
+        if (text.startsWith('/start') && parts.length === 2) startParam = parts[1].trim();
 
         const usersRef = collection(firestore, 'users');
         const userQuery = query(usersRef, where('telegramChatId', '==', chatId), limit(1));
         const userSnapshot = await getDocs(userQuery);
 
+        // --- Deep Link / Start Parameter Logic ---
+        if (startParam) {
+            // 1. Check for Buy deep links (buy_[amount]_[tickerId])
+            if (startParam.startsWith('buy_')) {
+                if (userSnapshot.empty) {
+                    await sendTelegramMessage(chatId, "🔒 <b>Account not linked.</b> Please link in Settings before you can trade.");
+                    return NextResponse.json({ ok: true });
+                }
+                const [, amountStr, tId] = startParam.split('_');
+                const amount = parseFloat(amountStr);
+                const userId = userSnapshot.docs[0].id;
+
+                await sendTelegramMessage(chatId, `⏳ <b>Processing Trade Request...</b>`);
+                const result = await executeBuyAction(userId, tId, amount);
+                if (result.success) {
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${result.tickerName}</b> via channel deep link.\nFee: ₦${result.fee?.toLocaleString()}`);
+                } else {
+                    await sendTelegramMessage(chatId, `❌ <b>Deep Link Trade Failed:</b> ${result.error}`);
+                }
+                return NextResponse.json({ ok: true });
+            }
+
+            // 2. Check for Account Linking codes (16 chars)
+            if (startParam.length === 16) {
+                const q = query(usersRef, where('telegramLinkingCode.code', '==', startParam), limit(1));
+                const snap = await getDocs(q);
+
+                if (snap.empty) {
+                    await sendTelegramMessage(chatId, "❌ <b>Invalid or expired code.</b>");
+                } else {
+                    const userDoc = snap.docs[0];
+                    const userData = userDoc.data() as UserProfile;
+                    const expiry = userData.telegramLinkingCode?.expiresAt;
+
+                    if (expiry && expiry.toDate() < new Date()) {
+                        await sendTelegramMessage(chatId, "❌ <b>Code expired.</b>");
+                    } else {
+                        await updateDoc(userDoc.ref, { telegramChatId: chatId, telegramLinkingCode: null });
+                        await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/help - All commands`);
+                    }
+                }
+                return NextResponse.json({ ok: true });
+            }
+        }
+
+        // --- Standard Authenticated Flow ---
         if (userSnapshot.empty) {
             if (text === '/start') {
                 await sendTelegramMessage(chatId, "Welcome to <b>CruzMarket Bot</b>! 🚀\n\nTo trade, go to <b>Settings</b> in the web app, generate a code, and send it here.");
