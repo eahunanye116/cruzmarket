@@ -1,4 +1,3 @@
-
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -40,7 +39,6 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const activitiesQuery = useMemo(() => {
     if (!firestore || !resolvedParams.id) return null;
-    // Simplified query to avoid composite index requirement
     return query(
       collection(firestore, 'activities'), 
       where('tickerId', '==', resolvedParams.id)

@@ -40,6 +40,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const holdingId = `holding_${resolvedId}`;
             const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             
+            // 1. EXECUTE ALL READS FIRST
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             const statsDoc = await transaction.get(statsRef);
@@ -62,6 +63,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
+            // 2. START WRITES
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
             const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
@@ -211,14 +213,13 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
             const tickerAddress = `${newTickerRef.id}cruz`;
             const now = new Date();
             
-            const tickerData = {
+            const tickerData: any = {
                 id: newTickerRef.id,
                 name: input.name,
                 slug: input.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
                 description: input.description,
                 icon: input.icon,
                 coverImage: input.coverImage,
-                videoUrl: input.videoUrl || undefined,
                 supply: finalSupply,
                 marketCap: finalMarketCap,
                 price: finalPrice,
@@ -235,9 +236,16 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 ]
             };
 
+            // Only add videoUrl if it's not empty
+            if (input.videoUrl) {
+                tickerData.videoUrl = input.videoUrl;
+            }
+
             transaction.set(newTickerRef, tickerData);
 
-            const holdingRef = doc(firestore, `users/${userId}/portfolio`, `holding_${newTickerRef.id}`);
+            // Use deterministic holding ID to prevent duplicates
+            const holdingId = `holding_${newTickerRef.id}`;
+            const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             transaction.set(holdingRef, {
                 tickerId: newTickerRef.id,
                 amount: tokensOut,

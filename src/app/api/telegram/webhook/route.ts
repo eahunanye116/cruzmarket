@@ -172,6 +172,19 @@ export async function POST(req: NextRequest) {
             }
 
             await editTelegramMessage(chatId, messageId, msg, { inline_keyboard: buttons });
+        } else if (data === 'skip_video') {
+            await updateDoc(userDoc.ref, {
+                'botSession.step': 'CREATE_MCAP',
+                'botSession.data.video': null
+            });
+            await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
+                inline_keyboard: [
+                    [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
+                    [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
+                    [{ text: "₦5,000,000 (Fee: ₦7,000)", callback_data: "set_mcap_5000000" }],
+                    [{ text: "₦10,000,000 (Fee: ₦9,990)", callback_data: "set_mcap_10000000" }]
+                ]
+            });
         } else if (data.startsWith('set_mcap_')) {
             const mcap = data.replace('set_mcap_', '');
             await updateDoc(userDoc.ref, {
@@ -290,8 +303,18 @@ export async function POST(req: NextRequest) {
                     await sendTelegramMessage(chatId, "❌ <b>Too short.</b> Description must be at least 10 characters.");
                     return NextResponse.json({ ok: true });
                 }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.description': text });
-                await sendTelegramMessage(chatId, "📊 <b>Step 5: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
+                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_VIDEO', 'botSession.data.description': text });
+                await sendTelegramMessage(chatId, "🎥 <b>Step 5: Video URL (Optional)</b>\n\nPaste a YouTube, TikTok, or Instagram URL if you want a video on your page. Otherwise, click skip.", {
+                    inline_keyboard: [[{ text: "⏭ Skip Step", callback_data: "skip_video" }]]
+                });
+            }
+            else if (step === 'CREATE_VIDEO') {
+                if (!isValidUrl(text)) {
+                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a valid video link or click skip.");
+                    return NextResponse.json({ ok: true });
+                }
+                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.video': text });
+                await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
                     inline_keyboard: [
                         [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
                         [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
@@ -314,6 +337,7 @@ export async function POST(req: NextRequest) {
                     icon: sessionData.icon,
                     coverImage: sessionData.cover,
                     description: sessionData.description,
+                    videoUrl: sessionData.video || undefined,
                     supply: 1000000000,
                     initialMarketCap: sessionData.mcap,
                     initialBuyNgn: buyAmount
