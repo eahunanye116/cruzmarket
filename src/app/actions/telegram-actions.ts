@@ -56,7 +56,6 @@ export async function setTelegramWebhookAction(baseUrl: string) {
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
     
     try {
-        const response = await fetch(`https://api.paystack.co/transaction/verify/placeholder`, { cache: 'no-store' }); // Test connectivity
         const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
         const result = await res.json();
         
@@ -114,46 +113,34 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
 }
 
 /**
- * Broadcasts a notification about a new ticker to all users who have linked their Telegram.
+ * Broadcasts a notification about a new ticker to the dedicated Telegram channel.
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
-    const firestore = getFirestoreInstance();
+    const channelId = process.env.TELEGRAM_CHANNEL_ID;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
-    try {
-        // Query all users who have a linked Telegram account
-        const usersRef = collection(firestore, 'users');
-        const q = query(usersRef, where('telegramChatId', '!=', null));
-        const snapshot = await getDocs(q);
+    if (!channelId) {
+        console.warn("BROADCAST_SKIPPED: TELEGRAM_CHANNEL_ID is not configured in .env");
+        return;
+    }
 
-        if (snapshot.empty) return;
+    const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
-        const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
-
-        // Interactive Buy Buttons
-        const replyMarkup = {
-            inline_keyboard: [
-                [
-                    { text: "💰 Buy ₦1,000", callback_data: `buy_1000_${tickerId}` },
-                    { text: "💰 Buy ₦5,000", callback_data: `buy_5000_${tickerId}` }
-                ],
-                [
-                    { text: "💰 Buy ₦10,000", callback_data: `buy_10000_${tickerId}` },
-                    { text: "✏️ Custom Amount", callback_data: `buy_custom_${tickerId}` }
-                ]
+    // Interactive Buy Buttons
+    const replyMarkup = {
+        inline_keyboard: [
+            [
+                { text: "💰 Buy ₦1,000", url: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot'}?start=buy_1000_${tickerId}` },
+                { text: "💰 Buy ₦5,000", url: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot'}?start=buy_5000_${tickerId}` }
+            ],
+            [
+                { text: "🔗 Open Platform", url: `${baseUrl}/ticker/${tickerId}` }
             ]
-        };
+        ]
+    };
 
-        // Send to all users
-        const promises = snapshot.docs.map(userDoc => {
-            const chatId = userDoc.data().telegramChatId;
-            if (chatId) {
-                return sendTelegramMessage(chatId, message, replyMarkup);
-            }
-            return Promise.resolve();
-        });
-
-        await Promise.all(promises);
+    try {
+        await sendTelegramMessage(channelId, message, replyMarkup);
     } catch (error) {
         console.error("BROADCAST_ERROR:", error);
     }
