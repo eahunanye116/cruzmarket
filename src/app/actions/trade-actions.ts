@@ -2,10 +2,11 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment } from 'firebase/firestore';
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
+import { revalidatePath } from 'next/cache';
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002;
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
@@ -126,7 +127,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
                 value: ngnAmount,
-                fee: fee, // Store the fee collected
+                fee: fee, 
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,
                 userId: userId,
@@ -188,7 +189,6 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
             const finalPrice = newMarketCap / newSupply;
             const pricePerToken = ngnToGetBeforeFee / tokensSold;
 
-            // Updates
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
             const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
@@ -241,7 +241,7 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
                 value: ngnToGetBeforeFee,
-                fee: fee, // Store the fee collected
+                fee: fee, 
                 tokenAmount: tokensSold,
                 pricePerToken: pricePerToken,
                 realizedPnl: realizedPnl,
@@ -255,6 +255,49 @@ export async function executeSellAction(userId: string, tickerId: string, ngnToG
         return result;
     } catch (error: any) {
         console.error('Sell execution failed:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function executeBurnHoldingsAction(userId: string, tickerIds: string[]) {
+    if (!userId || !tickerIds.length) return { success: false, error: 'User or Tickers missing.' };
+    const firestore = getFirestoreInstance();
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const statsRef = doc(firestore, 'stats', 'platform');
+            
+            for (const tickerId of tickerIds) {
+                const tickerRef = doc(firestore, 'tickers', tickerId);
+                const holdingId = `holding_${tickerId}`;
+                const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
+                
+                const tickerDoc = await transaction.get(tickerRef);
+                const holdingDoc = await transaction.get(holdingRef);
+                
+                if (holdingDoc.exists()) {
+                    const holdingData = holdingDoc.data() as PortfolioHolding;
+                    transaction.delete(holdingRef);
+                    
+                    const activityRef = doc(collection(firestore, 'activities'));
+                    transaction.set(activityRef, {
+                        type: 'BURN',
+                        tickerId: tickerId,
+                        tickerName: tickerDoc.exists() ? tickerDoc.data().name : 'Unknown Token',
+                        tickerIcon: tickerDoc.exists() ? tickerDoc.data().icon : '',
+                        tokenAmount: holdingData.amount,
+                        value: 0,
+                        userId: userId,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            }
+            
+            transaction.update(statsRef, { totalTokensBurned: increment(tickerIds.length) });
+        });
+        
+        revalidatePath('/portfolio');
+        return { success: true, message: `${tickerIds.length} tokens burned successfully.` };
+    } catch (error: any) {
         return { success: false, error: error.message };
     }
 }
@@ -373,7 +416,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerName: input.name,
                 tickerIcon: input.icon,
                 value: creationFee,
-                fee: creationFee, // The entire creation fee is a platform fee
+                fee: creationFee, 
                 userId: userId,
                 createdAt: serverTimestamp(),
             });
@@ -384,7 +427,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerName: input.name,
                 tickerIcon: input.icon,
                 value: initialBuyNgn,
-                fee: initialBuyFee, // The transaction fee part of the initial buy
+                fee: initialBuyFee, 
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,
                 userId: userId,

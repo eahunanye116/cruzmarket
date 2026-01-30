@@ -39,10 +39,10 @@
     },
     "activity": {
       "title": "Activity",
-      "description": "Represents a single trading or creation event in the activity feed.",
+      "description": "Represents a single trading, creation, or burn event in the activity feed.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL", "BURN"] },
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
@@ -94,143 +94,25 @@
     },
     "platformStats": {
       "title": "Platform Stats",
-      "description": "Stores global statistics for the platform, such as total fees generated.",
+      "description": "Stores global statistics for the platform, such as total fees generated and burned tokens.",
       "type": "object",
       "properties": {
         "totalFeesGenerated": {
           "type": "number",
-          "description": "The cumulative total of all fees (creation, buy, sell) collected in NGN. Sum of user and admin fees."
+          "description": "The cumulative total of all fees (creation, buy, sell) collected in NGN."
         },
         "totalUserFees": {
-            "type": "number",
-            "description": "The cumulative total of all fees generated from non-admin user trades."
+            "type": "number"
         },
         "totalAdminFees": {
+            "type": "number"
+        },
+        "totalTokensBurned": {
             "type": "number",
-            "description": "The cumulative total of all fees generated from admin user trades."
+            "description": "The total number of tokens (unique ticker holdings) burned by users."
         }
       },
-      "required": ["totalFeesGenerated", "totalUserFees", "totalAdminFees"]
-    },
-    "savedTone": {
-      "title": "Saved Tone",
-      "description": "Represents a custom AI tone saved by a user for generating content.",
-      "type": "object",
-      "properties": {
-        "tone": { "type": "string" },
-        "userId": { "type": "string" }
-      },
-      "required": ["tone", "userId"]
-    },
-    "blogPost": {
-      "title": "Blog Post",
-      "description": "Represents a single blog post.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "slug": { "type": "string" },
-        "content": { "type": "string", "description": "Markdown content of the post." },
-        "excerpt": { "type": "string" },
-        "coverImage": { "type": "string", "format": "uri" },
-        "authorId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" },
-        "isTrending": { "type": "boolean", "description": "Whether this post is featured in the 'Top Stories' section." }
-      },
-      "required": ["title", "slug", "content", "excerpt", "coverImage", "authorId", "createdAt", "updatedAt"]
-    },
-    "aiToneTrainingData": {
-      "title": "AI Tone Training Data",
-      "description": "A piece of text content used to train the AI's tone.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string", "description": "A name for this training data set." },
-        "content": { "type": "string", "description": "The text content for training." },
-        "userId": { "type": "string", "description": "The user who added this data." }
-      },
-      "required": ["name", "content", "userId"]
-    },
-    "deposit": {
-      "title": "Deposit",
-      "description": "Represents a successful Paystack deposit transaction to prevent duplicates.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "amount": { "type": "number" },
-        "processedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "amount", "processedAt"]
-    },
-    "withdrawalRequest": {
-      "title": "Withdrawal Request",
-      "description": "Represents a user's request to withdraw funds from their wallet.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "amount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
-        "bankName": { "type": "string" },
-        "accountNumber": { "type": "string" },
-        "accountName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "processedAt": { "type": "string", "format": "date-time" },
-        "rejectionReason": { "type": "string" }
-      },
-      "required": ["userId", "amount", "status", "bankName", "accountNumber", "accountName", "createdAt"]
-    },
-    "notification": {
-      "title": "Notification",
-      "description": "Represents a platform-wide notification sent by an admin.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "isHighPriority": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "authorId": { "type": "string" }
-      },
-      "required": ["title", "message", "isHighPriority", "createdAt", "authorId"]
-    },
-    "userNotification": {
-      "title": "User Notification",
-      "description": "Tracks the status of a notification for a specific user.",
-      "type": "object",
-      "properties": {
-        "notificationId": { "type": "string" },
-        "userId": { "type": "string" },
-        "isRead": { "type": "boolean" },
-        "isPopupDismissed": { "type": "boolean" }
-      },
-      "required": ["notificationId", "userId", "isRead", "isPopupDismissed"]
-    },
-    "chatConversation": {
-      "title": "Chat Conversation",
-      "description": "A support chat conversation between a user and admins.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "userPhotoURL": { "type": "string", "format": "uri" },
-        "subject": { "type": "string" },
-        "status": { "type": "string", "enum": ["open", "closed"] },
-        "lastMessageSnippet": { "type": "string" },
-        "lastMessageAt": { "type": "string", "format": "date-time" },
-        "isReadByAdmin": { "type": "boolean" },
-        "isReadByUser": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "userName", "userPhotoURL", "subject", "status", "lastMessageSnippet", "lastMessageAt", "isReadByAdmin", "isReadByUser", "createdAt"]
-    },
-    "chatMessage": {
-      "title": "Chat Message",
-      "description": "A single message within a support chat conversation.",
-      "type": "object",
-      "properties": {
-        "senderId": { "type": "string" },
-        "content": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["senderId", "content", "createdAt"]
+      "required": ["totalFeesGenerated", "totalUserFees", "totalAdminFees", "totalTokensBurned"]
     }
   },
   "auth": {
@@ -253,49 +135,9 @@
       "schema": { "$ref": "#/entities/portfolioHolding" },
       "description": "Sub-collection for a user's portfolio holdings."
     },
-    "/users/{userId}/savedTones/{toneId}": {
-      "schema": { "$ref": "#/entities/savedTone" },
-      "description": "Sub-collection for a user's saved AI tones."
-    },
-    "/users/{userId}/userNotifications/{userNotificationId}": {
-      "schema": { "$ref": "#/entities/userNotification" },
-      "description": "Sub-collection tracking notification read status for each user."
-    },
-    "/settings/privacy": {
-      "schema": { "$ref": "#/entities/platformSettings" },
-      "description": "Stores privacy and registration settings for the platform."
-    },
     "/stats/platform": {
       "schema": { "$ref": "#/entities/platformStats" },
       "description": "A singleton document to store global platform statistics."
-    },
-    "/blogPosts/{postId}": {
-      "schema": { "$ref": "#/entities/blogPost" },
-      "description": "Collection of all blog posts."
-    },
-    "/aiToneTrainingData/{dataId}": {
-      "schema": { "$ref": "#/entities/aiToneTrainingData" },
-      "description": "Collection of text samples to train the AI's tone."
-    },
-    "/deposits/{transactionReference}": {
-      "schema": { "$ref": "#/entities/deposit" },
-      "description": "Collection to track processed Paystack deposits by their reference ID to prevent double-crediting."
-    },
-    "/withdrawalRequests/{requestId}": {
-        "schema": { "$ref": "#/entities/withdrawalRequest" },
-        "description": "Collection of all user withdrawal requests."
-    },
-    "/notifications/{notificationId}": {
-      "schema": { "$ref": "#/entities/notification" },
-      "description": "Collection of all platform notifications."
-    },
-    "/chatConversations/{conversationId}": {
-      "schema": { "$ref": "#/entities/chatConversation" },
-      "description": "Collection of all support chat conversations."
-    },
-    "/chatConversations/{conversationId}/messages/{messageId}": {
-      "schema": { "$ref": "#/entities/chatMessage" },
-      "description": "Sub-collection for messages within a conversation."
     }
   }
 }

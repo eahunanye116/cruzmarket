@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -14,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User, History } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History, Flame } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,7 @@ export function UserManagement() {
   const totalFees = platformStats?.totalFeesGenerated ?? 0;
   const userFees = platformStats?.totalUserFees ?? 0;
   const adminFees = platformStats?.totalAdminFees ?? 0;
+  const totalBurned = platformStats?.totalTokensBurned ?? 0;
   
   const loading = usersLoading || statsLoading;
 
@@ -99,6 +101,10 @@ export function UserManagement() {
             (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
             {' '}
             <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+            <br />
+            <span className="flex items-center gap-1 mt-1 text-destructive font-bold">
+                <Flame className="h-4 w-4" /> Tokens Burned So Far: {totalBurned.toLocaleString()}
+            </span>
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -39,7 +39,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
@@ -128,6 +128,7 @@ export type PlatformStats = {
   totalFeesGenerated: number;
   totalUserFees: number;
   totalAdminFees: number;
+  totalTokensBurned: number;
 };
 
 export type Notification = {
