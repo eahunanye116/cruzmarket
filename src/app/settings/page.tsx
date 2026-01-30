@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useDoc, useFirestore } from '@/firebase';
@@ -21,7 +22,7 @@ export default function SettingsPage() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
-  const [botUsername, setBotUsername] = useState('');
+  const [botUsername, setBotUsername] = useState('cruzmarketfunbot');
 
   useEffect(() => {
     getTelegramBotUsername().then(setBotUsername);
