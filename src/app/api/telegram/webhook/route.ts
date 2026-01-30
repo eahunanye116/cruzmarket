@@ -252,23 +252,33 @@ export async function POST(req: NextRequest) {
 
             if (step === 'CREATE_NAME') {
                 if (text.length < 2 || text.length > 20) {
-                    return await sendTelegramMessage(chatId, "❌ <b>Invalid Name.</b> Must be between 2 and 20 characters.");
+                    await sendTelegramMessage(chatId, "❌ <b>Invalid Name.</b> Must be between 2 and 20 characters.");
+                    return NextResponse.json({ ok: true });
                 }
                 await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_ICON', 'botSession.data.name': text });
                 await sendTelegramMessage(chatId, "🖼 <b>Step 2: Icon URL</b>\n\nProvide a direct URL to a square image for your token icon.");
             } 
             else if (step === 'CREATE_ICON') {
-                if (!isValidUrl(text)) return await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                if (!isValidUrl(text)) {
+                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                    return NextResponse.json({ ok: true });
+                }
                 await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_COVER', 'botSession.data.icon': text });
                 await sendTelegramMessage(chatId, "🎨 <b>Step 3: Cover Image URL</b>\n\nProvide a direct URL to a widescreen (16:9) image for your token banner.");
             }
             else if (step === 'CREATE_COVER') {
-                if (!isValidUrl(text)) return await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                if (!isValidUrl(text)) {
+                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                    return NextResponse.json({ ok: true });
+                }
                 await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_DESC', 'botSession.data.cover': text });
                 await sendTelegramMessage(chatId, "📝 <b>Step 4: Description</b>\n\nWhat is your meme about? (Max 200 characters)");
             }
             else if (step === 'CREATE_DESC') {
-                if (text.length < 10) return await sendTelegramMessage(chatId, "❌ <b>Too short.</b> Description must be at least 10 characters.");
+                if (text.length < 10) {
+                    await sendTelegramMessage(chatId, "❌ <b>Too short.</b> Description must be at least 10 characters.");
+                    return NextResponse.json({ ok: true });
+                }
                 await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.description': text });
                 await sendTelegramMessage(chatId, "📊 <b>Step 5: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
                     inline_keyboard: [
@@ -281,7 +291,10 @@ export async function POST(req: NextRequest) {
             }
             else if (step === 'CREATE_BUY') {
                 const buyAmount = parseFloat(text.replace(/,/g, ''));
-                if (isNaN(buyAmount) || buyAmount < 1000) return await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦1,000.</b>");
+                if (isNaN(buyAmount) || buyAmount < 1000) {
+                    await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦1,000.</b>");
+                    return NextResponse.json({ ok: true });
+                }
                 
                 await sendTelegramMessage(chatId, "⏳ <b>Deploying Ticker...</b>");
                 const result = await executeCreateTickerAction({
