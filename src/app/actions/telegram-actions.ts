@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -55,8 +56,9 @@ export async function setTelegramWebhookAction(baseUrl: string) {
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
     
     try {
-        const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
-        const result = await response.json();
+        const response = await fetch(`https://api.paystack.co/transaction/verify/placeholder`, { cache: 'no-store' }); // Test connectivity
+        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
+        const result = await res.json();
         
         if (result.ok) {
             return { success: true, message: `Webhook set to ${webhookUrl}` };
@@ -88,9 +90,12 @@ export async function deleteTelegramWebhookAction() {
 /**
  * Sends a message to a specific Telegram Chat ID
  */
-async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
+export async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) return;
+    if (!token) {
+        console.warn("Notification skipped: TELEGRAM_BOT_TOKEN not configured.");
+        return;
+    }
     try {
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
@@ -113,13 +118,7 @@ async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: a
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
     const firestore = getFirestoreInstance();
-    const token = process.env.TELEGRAM_BOT_TOKEN;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-
-    if (!token) {
-        console.warn("Broadcast skipped: TELEGRAM_BOT_TOKEN not configured.");
-        return;
-    }
 
     try {
         // Query all users who have a linked Telegram account
@@ -155,7 +154,6 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
         });
 
         await Promise.all(promises);
-        console.log(`Broadcasted new ticker ${tickerName} to ${snapshot.size} users.`);
     } catch (error) {
         console.error("BROADCAST_ERROR:", error);
     }

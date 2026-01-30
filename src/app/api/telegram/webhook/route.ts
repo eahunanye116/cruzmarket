@@ -1,19 +1,18 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, query, where, getDocs, limit, updateDoc, doc } from 'firebase/firestore';
-import { UserProfile, Ticker, PortfolioHolding } from '@/lib/types';
+import { collection, query, where, getDocs, limit, updateDoc, doc, orderBy } from 'firebase/firestore';
+import { UserProfile, Ticker, PortfolioHolding, WithdrawalRequest } from '@/lib/types';
 import { executeBuyAction, executeSellAction, executeCreateTickerAction, executeBurnHoldingsAction } from '@/app/actions/trade-actions';
+import { requestWithdrawalAction } from '@/app/actions/wallet-actions';
 import { calculateReclaimableValue } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 
 async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) {
-        console.error("TELEGRAM_BOT_TOKEN missing in environment");
-        return;
-    }
+    if (!token) return;
     try {
-        const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -24,10 +23,6 @@ async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: a
                 reply_markup: replyMarkup
             }),
         });
-        const result = await response.json();
-        if (!result.ok) {
-            console.error("TELEGRAM_API_ERROR:", result.description);
-        }
     } catch (error) {
         console.error("TELEGRAM_FETCH_FAILED:", error);
     }
@@ -49,9 +44,7 @@ async function editTelegramMessage(chatId: string, messageId: number, text: stri
                 reply_markup: replyMarkup
             }),
         });
-    } catch (error) {
-        console.error("TELEGRAM_EDIT_FAILED:", error);
-    }
+    } catch (error) {}
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
@@ -235,7 +228,7 @@ export async function POST(req: NextRequest) {
                     await sendTelegramMessage(chatId, "❌ <b>Code expired.</b>");
                 } else {
                     await updateDoc(userDoc.ref, { telegramChatId: chatId, telegramLinkingCode: null });
-                    await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/help - All commands`);
+                    await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/help - All commands`);
                 }
             }
             return NextResponse.json({ ok: true });
@@ -259,7 +252,7 @@ export async function POST(req: NextRequest) {
         const userData = userDoc.data() as UserProfile;
 
         if (text === '/start') {
-            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/top - Trending tickers\n/help - All commands`);
+            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/top - Trending tickers\n/help - All commands`);
             return NextResponse.json({ ok: true });
         }
 
@@ -267,94 +260,153 @@ export async function POST(req: NextRequest) {
             const wasInSession = !!userData.botSession;
             await updateDoc(userDoc.ref, { botSession: null });
             if (wasInSession) {
-                await sendTelegramMessage(chatId, "⏹ <b>Creation Process Ended.</b>\n\nYour session has been cleared. You can start fresh by typing /create or explore the market with /top.");
+                await sendTelegramMessage(chatId, "⏹ <b>Process Ended.</b>\n\nYour session has been cleared. You can start fresh or explore the market with /top.");
             } else {
                 await sendTelegramMessage(chatId, "ℹ️ <b>No active process to cancel.</b>");
             }
             return NextResponse.json({ ok: true });
         }
 
-        if (userData.botSession?.type === 'CREATE_TICKER') {
-            const step = userData.botSession.step;
-            const sessionData = userData.botSession.data;
+        // --- SESSION HANDLING (Withdrawal & Ticker Creation) ---
+        if (userData.botSession) {
+            const { type, step, data: sessionData } = userData.botSession;
 
-            if (step === 'CREATE_NAME') {
-                if (text.length < 2 || text.length > 20) {
-                    await sendTelegramMessage(chatId, "❌ <b>Invalid Name.</b> Must be between 2 and 20 characters.");
-                    return NextResponse.json({ ok: true });
+            // 1. Withdrawal Flow
+            if (type === 'WITHDRAW_FUNDS') {
+                if (step === 'WITHDRAW_AMOUNT') {
+                    const amount = parseFloat(text.replace(/,/g, ''));
+                    if (isNaN(amount) || amount < 10000) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid Amount.</b> Minimum withdrawal is ₦10,000.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    if (amount > userData.balance) {
+                        await sendTelegramMessage(chatId, `❌ <b>Insufficient Balance.</b> Your wallet has ₦${userData.balance.toLocaleString()}.`);
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'WITHDRAW_BANK', 'botSession.data.amount': amount });
+                    await sendTelegramMessage(chatId, "🏦 <b>Step 2: Bank Name</b>\n\nEnter the name of your bank (e.g., Kuda Bank, Zenith Bank).");
+                } 
+                else if (step === 'WITHDRAW_BANK') {
+                    if (text.length < 2) {
+                        await sendTelegramMessage(chatId, "❌ <b>Bank name is too short.</b>");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'WITHDRAW_ACCOUNT_NUM', 'botSession.data.bank': text });
+                    await sendTelegramMessage(chatId, "🔢 <b>Step 3: Account Number</b>\n\nEnter your 10-digit NGN account number.");
                 }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_ICON', 'botSession.data.name': text });
-                await sendTelegramMessage(chatId, "🖼 <b>Step 2: Icon URL</b>\n\nProvide a direct URL to a square image for your token icon.");
-            } 
-            else if (step === 'CREATE_ICON') {
-                if (!isValidUrl(text)) {
-                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
-                    return NextResponse.json({ ok: true });
+                else if (step === 'WITHDRAW_ACCOUNT_NUM') {
+                    if (!/^\d{10}$/.test(text)) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid Format.</b> Please enter exactly 10 digits.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'WITHDRAW_ACCOUNT_NAME', 'botSession.data.accountNumber': text });
+                    await sendTelegramMessage(chatId, "👤 <b>Step 4: Account Name</b>\n\nEnter the full name associated with this bank account.");
                 }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_COVER', 'botSession.data.icon': text });
-                await sendTelegramMessage(chatId, "🎨 <b>Step 3: Cover Image URL</b>\n\nProvide a direct URL to a widescreen (16:9) image for your token banner.");
-            }
-            else if (step === 'CREATE_COVER') {
-                if (!isValidUrl(text)) {
-                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
-                    return NextResponse.json({ ok: true });
-                }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_DESC', 'botSession.data.cover': text });
-                await sendTelegramMessage(chatId, "📝 <b>Step 4: Description</b>\n\nWhat is your meme about? (Max 200 characters)");
-            }
-            else if (step === 'CREATE_DESC') {
-                if (text.length < 10) {
-                    await sendTelegramMessage(chatId, "❌ <b>Too short.</b> Description must be at least 10 characters.");
-                    return NextResponse.json({ ok: true });
-                }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_VIDEO', 'botSession.data.description': text });
-                await sendTelegramMessage(chatId, "🎥 <b>Step 5: Video URL (Optional)</b>\n\nPaste a YouTube, TikTok, or Instagram URL if you want a video on your page. Otherwise, click skip.", {
-                    inline_keyboard: [[{ text: "⏭ Skip Step", callback_data: "skip_video" }]]
-                });
-            }
-            else if (step === 'CREATE_VIDEO') {
-                if (!isValidUrl(text)) {
-                    await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a valid video link or click skip.");
-                    return NextResponse.json({ ok: true });
-                }
-                await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.video': text });
-                await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
-                    inline_keyboard: [
-                        [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
-                        [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
-                        [{ text: "₦5,000,000 (Fee: ₦7,000)", callback_data: "set_mcap_5000000" }],
-                        [{ text: "₦10,000,000 (Fee: ₦9,990)", callback_data: "set_mcap_10000000" }]
-                    ]
-                });
-            }
-            else if (step === 'CREATE_BUY') {
-                const buyAmount = parseFloat(text.replace(/,/g, ''));
-                if (isNaN(buyAmount) || buyAmount < 1000) {
-                    await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦1,000.</b>");
-                    return NextResponse.json({ ok: true });
-                }
-                
-                await sendTelegramMessage(chatId, "⏳ <b>Deploying Ticker...</b>");
-                const result = await executeCreateTickerAction({
-                    userId,
-                    name: sessionData.name,
-                    icon: sessionData.icon,
-                    coverImage: sessionData.cover,
-                    description: sessionData.description,
-                    videoUrl: sessionData.video || undefined,
-                    supply: 1000000000,
-                    initialMarketCap: sessionData.mcap,
-                    initialBuyNgn: buyAmount
-                });
+                else if (step === 'WITHDRAW_ACCOUNT_NAME') {
+                    if (text.length < 3) {
+                        await sendTelegramMessage(chatId, "❌ <b>Name is too short.</b>");
+                        return NextResponse.json({ ok: true });
+                    }
+                    
+                    await sendTelegramMessage(chatId, "⏳ <b>Submitting Request...</b>");
+                    const result = await requestWithdrawalAction({
+                        userId,
+                        amount: sessionData.amount,
+                        bankName: sessionData.bank,
+                        accountNumber: sessionData.accountNumber,
+                        accountName: text
+                    });
 
-                if (result.success) {
-                    await updateDoc(userDoc.ref, { botSession: null });
-                    await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${sessionData.name}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
-                } else {
-                    await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
+                    if (result.success) {
+                        await updateDoc(userDoc.ref, { botSession: null });
+                        await sendTelegramMessage(chatId, `✅ <b>Request Submitted!</b>\n\nYour request for <b>₦${sessionData.amount.toLocaleString()}</b> has been received. Our team will process it shortly.\n\nType /withdrawals to check status.`);
+                    } else {
+                        await sendTelegramMessage(chatId, `❌ <b>Submission Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
+                    }
                 }
+                return NextResponse.json({ ok: true });
             }
-            return NextResponse.json({ ok: true });
+
+            // 2. Ticker Creation Flow
+            if (type === 'CREATE_TICKER') {
+                if (step === 'CREATE_NAME') {
+                    if (text.length < 2 || text.length > 20) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid Name.</b> Must be between 2 and 20 characters.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_ICON', 'botSession.data.name': text });
+                    await sendTelegramMessage(chatId, "🖼 <b>Step 2: Icon URL</b>\n\nProvide a direct URL to a square image for your token icon.");
+                } 
+                else if (step === 'CREATE_ICON') {
+                    if (!isValidUrl(text)) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_COVER', 'botSession.data.icon': text });
+                    await sendTelegramMessage(chatId, "🎨 <b>Step 3: Cover Image URL</b>\n\nProvide a direct URL to a widescreen (16:9) image for your token banner.");
+                }
+                else if (step === 'CREATE_COVER') {
+                    if (!isValidUrl(text)) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a direct image link.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_DESC', 'botSession.data.cover': text });
+                    await sendTelegramMessage(chatId, "📝 <b>Step 4: Description</b>\n\nWhat is your meme about? (Max 200 characters)");
+                }
+                else if (step === 'CREATE_DESC') {
+                    if (text.length < 10) {
+                        await sendTelegramMessage(chatId, "❌ <b>Too short.</b> Description must be at least 10 characters.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_VIDEO', 'botSession.data.description': text });
+                    await sendTelegramMessage(chatId, "🎥 <b>Step 5: Video URL (Optional)</b>\n\nPaste a YouTube, TikTok, or Instagram URL if you want a video on your page. Otherwise, click skip.", {
+                        inline_keyboard: [[{ text: "⏭ Skip Step", callback_data: "skip_video" }]]
+                    });
+                }
+                else if (step === 'CREATE_VIDEO') {
+                    if (!isValidUrl(text)) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid URL.</b> Please provide a valid video link or click skip.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.video': text });
+                    await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
+                        inline_keyboard: [
+                            [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
+                            [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
+                            [{ text: "₦5,000,000 (Fee: ₦7,000)", callback_data: "set_mcap_5000000" }],
+                            [{ text: "₦10,000,000 (Fee: ₦9,990)", callback_data: "set_mcap_10000000" }]
+                        ]
+                    });
+                }
+                else if (step === 'CREATE_BUY') {
+                    const buyAmount = parseFloat(text.replace(/,/g, ''));
+                    if (isNaN(buyAmount) || buyAmount < 1000) {
+                        await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦1,000.</b>");
+                        return NextResponse.json({ ok: true });
+                    }
+                    
+                    await sendTelegramMessage(chatId, "⏳ <b>Deploying Ticker...</b>");
+                    const result = await executeCreateTickerAction({
+                        userId,
+                        name: sessionData.name,
+                        icon: sessionData.icon,
+                        coverImage: sessionData.cover,
+                        description: sessionData.description,
+                        videoUrl: sessionData.video || undefined,
+                        supply: 1000000000,
+                        initialMarketCap: sessionData.mcap,
+                        initialBuyNgn: buyAmount
+                    });
+
+                    if (result.success) {
+                        await updateDoc(userDoc.ref, { botSession: null });
+                        await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${sessionData.name}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
+                    } else {
+                        await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
+                    }
+                }
+                return NextResponse.json({ ok: true });
+            }
         }
 
         if (message.reply_to_message) {
@@ -421,17 +473,42 @@ export async function POST(req: NextRequest) {
             });
             await sendTelegramMessage(chatId, "🚀 <b>Launch a Ticker</b>\n\nFirst, enter the <b>Name</b> of your token (e.g., DogeCoin):\n\n<i>Type /cancel at any time to abort.</i>");
 
+        } else if (command.toLowerCase() === '/withdraw') {
+            await updateDoc(userDoc.ref, {
+                botSession: {
+                    type: 'WITHDRAW_FUNDS',
+                    step: 'WITHDRAW_AMOUNT',
+                    data: {}
+                }
+            });
+            await sendTelegramMessage(chatId, `💸 <b>Withdraw Funds</b>\n\nHow much NGN would you like to withdraw?\n\n<b>Min:</b> ₦10,000\n<b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
+
+        } else if (command.toLowerCase() === '/withdrawals') {
+            const requestsRef = collection(firestore, 'withdrawalRequests');
+            const q = query(requestsRef, where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(5));
+            const snap = await getDocs(q);
+            
+            if (snap.empty) {
+                await sendTelegramMessage(chatId, "No withdrawal history found.");
+            } else {
+                let msg = "💳 <b>Recent Withdrawals</b>\n\n";
+                snap.forEach(d => {
+                    const r = d.data() as WithdrawalRequest;
+                    const date = format(r.createdAt.toDate(), 'dd MMM');
+                    const statusIcon = r.status === 'completed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
+                    msg += `${statusIcon} <b>₦${r.amount.toLocaleString()}</b> - ${date}\n`;
+                    msg += `Status: ${r.status.toUpperCase()}\n`;
+                    if (r.status === 'rejected' && r.rejectionReason) msg += `Reason: ${r.rejectionReason}\n`;
+                    msg += "\n";
+                });
+                await sendTelegramMessage(chatId, msg);
+            }
+
         } else if (command.toLowerCase() === '/top') {
             const tickersSnap = await getDocs(collection(firestore, 'tickers'));
             let tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
             tickers.sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
             await sendTelegramMessage(chatId, formatTickerList(tickers.slice(0, 5), "🔥 Top Volume", 0), { inline_keyboard: [[{ text: "Next 5 ➡️", callback_data: "page_top_5" }]] });
-
-        } else if (command.toLowerCase() === '/latest') {
-            const tickersSnap = await getDocs(collection(firestore, 'tickers'));
-            let tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
-            tickers.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-            await sendTelegramMessage(chatId, formatTickerList(tickers.slice(0, 5), "🆕 Latest", 0), { inline_keyboard: [[{ text: "Next 5 ➡️", callback_data: "page_latest_5" }]] });
 
         } else if (command.toLowerCase() === '/portfolio') {
             const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
@@ -466,7 +543,7 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/top - Trending by volume\n/latest - Newest launches\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;ngn&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);

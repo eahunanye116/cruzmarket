@@ -6,6 +6,7 @@ import { getFirestoreInstance } from '@/firebase/server';
 import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
+import { sendTelegramMessage } from './telegram-actions';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -135,7 +136,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
 export async function approveWithdrawalAction(requestId: string) {
     const firestore = getFirestoreInstance();
     try {
-        await runTransaction(firestore, async (transaction) => {
+        const result = await runTransaction(firestore, async (transaction) => {
             const requestRef = doc(firestore, 'withdrawalRequests', requestId);
             const requestDoc = await transaction.get(requestRef);
             if (!requestDoc.exists() || requestDoc.data().status !== 'pending') {
@@ -149,9 +150,10 @@ export async function approveWithdrawalAction(requestId: string) {
                 throw new Error('User not found.');
             }
 
-            const userBalance = userDoc.data().balance;
+            const userData = userDoc.data() as UserProfile;
+            const userBalance = userData.balance;
             if (userBalance < requestData.amount) {
-                throw new Error('User has insufficient balance for this withdrawal. They may have spent funds after requesting.');
+                throw new Error('User has insufficient balance for this withdrawal.');
             }
 
             // Debit user balance
@@ -171,7 +173,15 @@ export async function approveWithdrawalAction(requestId: string) {
                 userId: requestData.userId,
                 createdAt: serverTimestamp(),
             });
+
+            return { telegramChatId: userData.telegramChatId, amount: requestData.amount };
         });
+
+        // Notify user via Telegram if linked
+        if (result.telegramChatId) {
+            const msg = `✅ <b>Withdrawal Approved!</b>\n\nYour request for <b>₦${result.amount.toLocaleString()}</b> has been processed and funds have been sent to your bank account.\n\n<i>Thank you for choosing CruzMarket!</i>`;
+            await sendTelegramMessage(result.telegramChatId, msg);
+        }
 
         revalidatePath('/admin');
         revalidatePath('/transactions');
@@ -190,11 +200,27 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
     const firestore = getFirestoreInstance();
     try {
         const requestRef = doc(firestore, 'withdrawalRequests', requestId);
+        const requestSnap = await getDoc(requestRef);
+        
+        if (!requestSnap.exists()) throw new Error("Request not found.");
+        const requestData = requestSnap.data();
+
         await updateDoc(requestRef, {
             status: 'rejected',
             rejectionReason: reason,
             processedAt: serverTimestamp(),
         });
+
+        // Notify user via Telegram if linked
+        const userRef = doc(firestore, 'users', requestData.userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            const userData = userSnap.data() as UserProfile;
+            if (userData.telegramChatId) {
+                const msg = `❌ <b>Withdrawal Rejected</b>\n\nYour request for <b>₦${requestData.amount.toLocaleString()}</b> was rejected.\n\n<b>Reason:</b> ${reason}\n\n<i>Funds remain in your platform wallet.</i>`;
+                await sendTelegramMessage(userData.telegramChatId, msg);
+            }
+        }
         
         revalidatePath('/admin');
         revalidatePath('/transactions');

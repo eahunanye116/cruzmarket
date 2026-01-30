@@ -53,7 +53,7 @@ export type Activity = {
 };
 
 export type BotSession = {
-  type: 'CREATE_TICKER';
+  type: 'CREATE_TICKER' | 'WITHDRAW_FUNDS';
   step: string;
   data: Record<string, any>;
 }
