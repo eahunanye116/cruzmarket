@@ -559,16 +559,26 @@ export async function POST(req: NextRequest) {
 
         } else if (command.toLowerCase() === '/withdrawals') {
             const requestsRef = collection(firestore, 'withdrawalRequests');
-            const q = query(requestsRef, where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(5));
+            // Simplified query to avoid composite index requirements
+            const q = query(requestsRef, where('userId', '==', userId));
             const snap = await getDocs(q);
             
             if (snap.empty) {
                 await sendTelegramMessage(chatId, "No withdrawal history found.");
             } else {
+                // Sort results locally to avoid index errors
+                const requests = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() } as WithdrawalRequest))
+                    .sort((a, b) => {
+                        const timeA = a.createdAt?.toMillis() || 0;
+                        const timeB = b.createdAt?.toMillis() || 0;
+                        return timeB - timeA;
+                    })
+                    .slice(0, 5);
+
                 let msg = "💳 <b>Recent Withdrawals</b>\n\n";
-                snap.forEach(d => {
-                    const r = d.data() as WithdrawalRequest;
-                    const date = format(r.createdAt.toDate(), 'dd MMM');
+                requests.forEach(r => {
+                    const date = r.createdAt ? format(r.createdAt.toDate(), 'dd MMM') : 'N/A';
                     const statusIcon = r.status === 'completed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
                     msg += `${statusIcon} <b>₦${r.amount.toLocaleString()}</b> - ${date}\n`;
                     msg += `Status: ${r.status.toUpperCase()}\n`;
