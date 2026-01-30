@@ -1,7 +1,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where } from 'firebase/firestore';
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
@@ -262,52 +262,70 @@ export async function executeBurnHoldingsAction(userId: string, tickerIds: strin
     if (!userId || !tickerIds.length) return { success: false, error: 'User or Tickers missing.' };
     const firestore = getFirestoreInstance();
     try {
+        // STEP 1: Find all actual documents in the portfolio sub-collection that match these tickerIds.
+        // This handles older tickers that might not follow the current document naming scheme.
+        const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
+        const allMatchingDocs = [];
+        
+        // We iterate because 'in' queries are limited to 30 items, and manual iteration is safer for portfolio sweeps.
+        for (const tid of tickerIds) {
+            const q = query(portfolioRef, where('tickerId', '==', tid));
+            const snap = await getDocs(q);
+            allMatchingDocs.push(...snap.docs);
+        }
+
+        if (allMatchingDocs.length === 0) {
+            return { success: true, message: 'No holdings found to burn.' };
+        }
+
+        // STEP 2: Execute the permanent burn within a transaction.
         await runTransaction(firestore, async (transaction) => {
             const statsRef = doc(firestore, 'stats', 'platform');
+            const statsDoc = await transaction.get(statsRef);
             
-            // READ PHASE: Collect all necessary data before performing any writes
-            const holdingsToBurn = [];
-            for (const tickerId of tickerIds) {
-                const tickerRef = doc(firestore, 'tickers', tickerId);
-                const holdingId = `holding_${tickerId}`;
-                const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
-                
-                const tickerDoc = await transaction.get(tickerRef);
-                const holdingDoc = await transaction.get(holdingRef);
-                
-                if (holdingDoc.exists()) {
-                    holdingsToBurn.push({
-                        holdingRef,
-                        tickerId,
-                        tickerName: tickerDoc.exists() ? tickerDoc.data().name : 'Unknown Token',
-                        tickerIcon: tickerDoc.exists() ? tickerDoc.data().icon : '',
-                        amount: holdingDoc.data().amount
-                    });
+            // READ PHASE: Get ticker info for all tokens being burned to log them correctly.
+            const tickerInfoMap: Record<string, { name: string, icon: string }> = {};
+            for (const hDoc of allMatchingDocs) {
+                const tid = hDoc.data().tickerId;
+                if (!tickerInfoMap[tid]) {
+                    const tRef = doc(firestore, 'tickers', tid);
+                    const tSnap = await transaction.get(tRef);
+                    tickerInfoMap[tid] = tSnap.exists() 
+                        ? { name: tSnap.data().name, icon: tSnap.data().icon }
+                        : { name: 'Unknown Token', icon: '' };
                 }
             }
 
-            // WRITE PHASE: Now that all reads are finished, we can perform all writes
-            for (const item of holdingsToBurn) {
-                transaction.delete(item.holdingRef);
+            // WRITE PHASE: Delete documents and log activity.
+            for (const hDoc of allMatchingDocs) {
+                const data = hDoc.data();
+                const info = tickerInfoMap[data.tickerId];
+                
+                transaction.delete(hDoc.ref);
                 
                 const activityRef = doc(collection(firestore, 'activities'));
                 transaction.set(activityRef, {
                     type: 'BURN',
-                    tickerId: item.tickerId,
-                    tickerName: item.tickerName,
-                    tickerIcon: item.tickerIcon,
-                    tokenAmount: item.amount,
+                    tickerId: data.tickerId,
+                    tickerName: info.name,
+                    tickerIcon: info.icon,
+                    tokenAmount: data.amount,
                     value: 0,
                     userId: userId,
                     createdAt: serverTimestamp(),
                 });
             }
             
-            transaction.update(statsRef, { totalTokensBurned: increment(holdingsToBurn.length) });
+            // Update platform statistics.
+            const currentTotalBurned = statsDoc.data()?.totalTokensBurned || 0;
+            transaction.set(statsRef, { 
+                totalTokensBurned: currentTotalBurned + allMatchingDocs.length 
+            }, { merge: true });
         });
         
         revalidatePath('/portfolio');
-        return { success: true, message: `${tickerIds.length} tokens burned successfully.` };
+        revalidatePath('/admin');
+        return { success: true, message: `${allMatchingDocs.length} holding documents burned successfully.` };
     } catch (error: any) {
         console.error('Burn failed:', error);
         return { success: false, error: error.message };
