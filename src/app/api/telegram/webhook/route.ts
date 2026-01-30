@@ -17,7 +17,7 @@ async function sendTelegramMessage(chatId: string, text: string) {
             body: JSON.stringify({ 
                 chat_id: chatId, 
                 text, 
-                parse_mode: 'HTML', // Using HTML for better reliability with user-provided strings
+                parse_mode: 'HTML',
                 disable_web_page_preview: true 
             }),
         });
@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
         let potentialCode = '';
 
         if (text.startsWith('/start') && parts.length === 2) {
-            potentialCode = parts[1];
+            potentialCode = parts[1].trim();
         } else if (text.length === 16 && !text.includes(' ')) {
-            potentialCode = text;
+            potentialCode = text.trim();
         }
 
         if (potentialCode) {
@@ -84,10 +84,10 @@ export async function POST(req: NextRequest) {
                     // LINK SUCCESS
                     await updateDoc(userDoc.ref, {
                         telegramChatId: chatId,
-                        telegramLinkingCode: null // Clear code after use
+                        telegramLinkingCode: null 
                     });
                     
-                    const successMsg = `✅ <b>Success! Account Connected.</b>\n\nWelcome, <b>${userData.displayName || 'Trader'}</b>! Your wallet is now linked to this Telegram chat.\n\n<b>Available Commands:</b>\n/buy &lt;token_id&gt; &lt;amount&gt;\n/balance - Check your NGN wallet\n/help - Show all commands\n\n<i>Tip: You can copy Token IDs from the ticker page in the web app.</i>`;
+                    const successMsg = `✅ <b>Success! Account Connected.</b>\n\nWelcome, <b>${userData.displayName || 'Trader'}</b>! Your wallet is now linked to this Telegram chat.\n\n<b>Available Commands:</b>\n/buy &lt;token_address&gt; &lt;amount&gt;\n/balance - Check your NGN wallet\n/help - Show all commands\n\n<i>Tip: You can copy Token Addresses (e.g. iqOc...cruz) directly from the ticker page.</i>`;
                     await sendTelegramMessage(chatId, successMsg);
                 }
             }
@@ -119,11 +119,11 @@ export async function POST(req: NextRequest) {
 
         if (command.toLowerCase() === '/buy') {
             if (args.length < 2) {
-                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;token_id&gt; &lt;amount_ngn&gt;</code>\n\nExample: <code>/buy iqOc...ruz 5000</code>");
+                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;token_address&gt; &lt;amount_ngn&gt;</code>\n\nExample: <code>/buy iqOc...ruz 5000</code>");
                 return NextResponse.json({ ok: true });
             }
 
-            const tickerId = args[0];
+            const tickerIdInput = args[0].trim();
             const amount = parseFloat(args[1].replace(/,/g, ''));
 
             if (isNaN(amount) || amount < 100) {
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
 
             await sendTelegramMessage(chatId, `⏳ <b>Processing buy order...</b>`);
             
-            const result = await executeBuyAction(userId, tickerId, amount);
+            const result = await executeBuyAction(userId, tickerIdInput, amount);
 
             if (result.success) {
                 await sendTelegramMessage(chatId, `🚀 <b>Purchase Successful!</b>\n\nYou bought approximately <b>${result.tokensOut?.toLocaleString()} $${result.tickerName?.split(' ')[0]}</b>.\n\n<b>New Balance:</b> ₦${(userData.balance - amount).toLocaleString()}`);
@@ -143,10 +143,12 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Your Wallet Balance:</b>\n₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>CruzMarket Bot Commands</b>\n\n<code>/buy &lt;id&gt; &lt;ngn&gt;</code> - Buy a ticker instantly\n<code>/balance</code> - Check your NGN balance\n<code>/help</code> - Show this message");
+            await sendTelegramMessage(chatId, "🤖 <b>CruzMarket Bot Commands</b>\n\n<code>/buy &lt;address&gt; &lt;ngn&gt;</code> - Buy a ticker instantly\n<code>/balance</code> - Check your NGN balance\n<code>/help</code> - Show this message");
         } else {
-            if (text.length > 15 && !text.includes(' ')) {
-                await sendTelegramMessage(chatId, `🔍 <b>Detected Token ID:</b>\n<code>${text}</code>\n\nReply with <code>/buy ${text} 1000</code> to purchase ₦1,000 worth.`);
+            // Check if user just pasted an ID
+            const potentialId = text.trim();
+            if (potentialId.length > 15 && !potentialId.includes(' ')) {
+                await sendTelegramMessage(chatId, `🔍 <b>Detected Token Address:</b>\n<code>${potentialId}</code>\n\nReply with <code>/buy ${potentialId} 1000</code> to purchase ₦1,000 worth.`);
             } else {
                 await sendTelegramMessage(chatId, "❓ Unknown command. Type /help for available options.");
             }

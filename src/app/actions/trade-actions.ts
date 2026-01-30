@@ -19,10 +19,17 @@ const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
 export async function executeBuyAction(userId: string, tickerId: string, ngnAmount: number) {
     const firestore = getFirestoreInstance();
     
+    // Resolve actual ID from address if needed. 
+    // Public addresses end in 'cruz' (e.g., 'IDcruz'). We strip 'cruz' to get the internal document ID.
+    let resolvedId = tickerId.trim();
+    if (resolvedId.toLowerCase().endsWith('cruz') && resolvedId.length > 5) {
+        resolvedId = resolvedId.slice(0, -4);
+    }
+    
     try {
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
-            const tickerRef = doc(firestore, 'tickers', tickerId);
+            const tickerRef = doc(firestore, 'tickers', resolvedId);
             const statsRef = doc(firestore, 'stats', 'platform');
             
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
@@ -66,15 +73,8 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             // Update User Balance
             transaction.update(userRef, { balance: userDoc.data().balance - ngnAmount });
 
-            // Update Portfolio
-            const portfolioCol = collection(firestore, `users/${userId}/portfolio`);
-            // We need to find if holding exists. Since we're in a transaction we'd need a query, 
-            // but for simplicity in this shared action, we will use a collection path check if we had the ID.
-            // Actually, for the Telegram bot, we'll just check for any document matching tickerId.
-            // Note: In Firestore transactions, you should ideally have the document ID.
-            // To make this robust, we'd need a predictable ID for holdings, e.g., `holding_${tickerId}`.
-            
-            const holdingId = `holding_${tickerId}`;
+            // Update Portfolio with predictable ID
+            const holdingId = `holding_${resolvedId}`;
             const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             const holdingDoc = await transaction.get(holdingRef);
 
@@ -86,7 +86,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 transaction.update(holdingRef, { amount: newAmount, avgBuyPrice: newAvgBuyPrice });
             } else {
                 transaction.set(holdingRef, {
-                    tickerId: tickerId,
+                    tickerId: resolvedId,
                     amount: tokensOut,
                     avgBuyPrice: avgBuyPrice,
                     userId: userId
@@ -119,7 +119,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
                 type: 'BUY',
-                tickerId: tickerId,
+                tickerId: resolvedId,
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
                 value: ngnAmount,
