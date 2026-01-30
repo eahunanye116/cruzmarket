@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -8,7 +7,7 @@ import { calculateReclaimableValue } from '@/lib/utils';
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002;
 
-async function sendTelegramMessage(chatId: string, text: string) {
+async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
         console.error("TELEGRAM_ERROR: Cannot send message because TELEGRAM_BOT_TOKEN is missing from environment variables.");
@@ -22,7 +21,8 @@ async function sendTelegramMessage(chatId: string, text: string) {
                 chat_id: chatId, 
                 text, 
                 parse_mode: 'HTML',
-                disable_web_page_preview: true 
+                disable_web_page_preview: true,
+                reply_markup: replyMarkup
             }),
         });
         const result = await response.json();
@@ -32,6 +32,18 @@ async function sendTelegramMessage(chatId: string, text: string) {
     } catch (error) {
         console.error("TELEGRAM_FETCH_FAILED:", error);
     }
+}
+
+async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+        });
+    } catch (e) {}
 }
 
 export async function POST(req: NextRequest) {
@@ -48,6 +60,52 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
     }
 
+    const firestore = getFirestoreInstance();
+
+    // --- A. Handle Callback Queries (Buttons) ---
+    if (body.callback_query) {
+        const callback = body.callback_query;
+        const chatId = callback.message.chat.id.toString();
+        const data = callback.data as string;
+
+        await answerCallbackQuery(callback.id);
+
+        const usersRef = collection(firestore, 'users');
+        const userQuery = query(usersRef, where('telegramChatId', '==', chatId), limit(1));
+        const userSnapshot = await getDocs(userQuery);
+
+        if (userSnapshot.empty) {
+            await sendTelegramMessage(chatId, "🔒 <b>Your account is not linked.</b> Please connect it in Settings.");
+            return NextResponse.json({ ok: true });
+        }
+
+        const userId = userSnapshot.docs[0].id;
+
+        if (data.startsWith('buy_')) {
+            const parts = data.split('_');
+            const amountStr = parts[1];
+            const tickerId = parts[2];
+
+            if (amountStr === 'custom') {
+                await sendTelegramMessage(chatId, `💸 <b>Custom Buy</b>\n\nBuying Token: <code>${tickerId}cruz</code>\n\nHow much NGN would you like to spend?\n\n(Reply to this message with just the number, e.g. 5000)`, {
+                    force_reply: true,
+                    selective: true
+                });
+            } else {
+                const amount = parseFloat(amountStr);
+                await sendTelegramMessage(chatId, `⏳ <b>Processing buy for ₦${amount.toLocaleString()}...</b>`);
+                const result = await executeBuyAction(userId, tickerId, amount);
+                if (result.success) {
+                    await sendTelegramMessage(chatId, `🚀 <b>Purchase Successful!</b>\n\nYou bought approximately <b>${result.tokensOut?.toLocaleString()} $${result.tickerName?.split(' ')[0]}</b>.`);
+                } else {
+                    await sendTelegramMessage(chatId, `❌ <b>Order Failed:</b>\n${result.error}`);
+                }
+            }
+        }
+        return NextResponse.json({ ok: true });
+    }
+
+    // --- B. Handle Messages ---
     const message = body.message;
     if (!message || !message.text) {
         return NextResponse.json({ ok: true });
@@ -55,9 +113,6 @@ export async function POST(req: NextRequest) {
 
     const chatId = message.chat.id.toString();
     const text = message.text.trim();
-    const firestore = getFirestoreInstance();
-
-    console.log(`Telegram Bot: Received message "${text}" from Chat ID ${chatId}`);
 
     try {
         // --- 1. Handle Account Linking ---
@@ -85,7 +140,6 @@ export async function POST(req: NextRequest) {
                 if (expiry && expiry.toDate() < new Date()) {
                     await sendTelegramMessage(chatId, "❌ <b>This linking code has expired.</b>\n\nPlease generate a new one in the app.");
                 } else {
-                    // LINK SUCCESS
                     await updateDoc(userDoc.ref, {
                         telegramChatId: chatId,
                         telegramLinkingCode: null 
@@ -118,7 +172,32 @@ export async function POST(req: NextRequest) {
         const userId = userDoc.id;
         const userData = userDoc.data() as UserProfile;
 
-        // --- 4. Handle Commands for Linked Users ---
+        // --- 4. Handle Replies (Custom Amount) ---
+        if (message.reply_to_message) {
+            const promptText = message.reply_to_message.text;
+            if (promptText && promptText.includes('Custom Buy')) {
+                // Extract Ticker ID from prompt
+                const match = promptText.match(/([a-zA-Z0-9]{15,})cruz/);
+                if (match) {
+                    const tickerId = match[1];
+                    const amount = parseFloat(text.replace(/,/g, ''));
+                    if (isNaN(amount) || amount < 100) {
+                        await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦100.</b> Please try clicking the button again.");
+                        return NextResponse.json({ ok: true });
+                    }
+                    await sendTelegramMessage(chatId, `⏳ <b>Processing custom buy order...</b>`);
+                    const result = await executeBuyAction(userId, tickerId, amount);
+                    if (result.success) {
+                        await sendTelegramMessage(chatId, `🚀 <b>Purchase Successful!</b>\n\nYou bought approximately <b>${result.tokensOut?.toLocaleString()} $${result.tickerName?.split(' ')[0]}</b>.`);
+                    } else {
+                        await sendTelegramMessage(chatId, `❌ <b>Order Failed:</b>\n${result.error}`);
+                    }
+                    return NextResponse.json({ ok: true });
+                }
+            }
+        }
+
+        // --- 5. Handle Commands ---
         const [command, ...args] = text.split(' ');
 
         if (command.toLowerCase() === '/buy') {
@@ -161,7 +240,6 @@ export async function POST(req: NextRequest) {
             let totalPositionValue = 0;
             let messageText = "<b>📊 My Portfolio</b>\n\n";
 
-            // Merge duplicates for Telegram display
             const mergedHoldings: Record<string, PortfolioHolding> = {};
             holdingsSnapshot.forEach(hDoc => {
                 const h = hDoc.data() as PortfolioHolding;
@@ -201,7 +279,6 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/help') {
             await sendTelegramMessage(chatId, "🤖 <b>CruzMarket Bot Commands</b>\n\n<code>/buy &lt;address&gt; &lt;ngn&gt;</code> - Buy a ticker instantly\n<code>/portfolio</code> - View your current holdings and value\n<code>/balance</code> - Check your NGN wallet balance\n<code>/help</code> - Show this message\n\n<i>Tip: You can copy Token Addresses directly from any ticker page in the web app.</i>");
         } else {
-            // Check if user just pasted an ID
             const potentialId = text.trim();
             if (potentialId.length > 15 && !potentialId.includes(' ')) {
                 await sendTelegramMessage(chatId, `🔍 <b>Detected Token Address:</b>\n<code>${potentialId}</code>\n\nReply with <code>/buy ${potentialId} 1000</code> to purchase ₦1,000 worth.`);

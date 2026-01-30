@@ -78,7 +78,7 @@ export async function deleteTelegramWebhookAction() {
         if (result.ok) {
             return { success: true, message: "Webhook removed." };
         } else {
-            return { success: false, error: result.description };
+            return { success: false, result.description };
         }
     } catch (error: any) {
         return { success: false, error: error.message };
@@ -88,7 +88,7 @@ export async function deleteTelegramWebhookAction() {
 /**
  * Sends a message to a specific Telegram Chat ID
  */
-async function sendTelegramMessage(chatId: string, text: string) {
+async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) return;
     try {
@@ -99,7 +99,8 @@ async function sendTelegramMessage(chatId: string, text: string) {
                 chat_id: chatId, 
                 text, 
                 parse_mode: 'HTML',
-                disable_web_page_preview: false 
+                disable_web_page_preview: false,
+                reply_markup: replyMarkup 
             }),
         });
     } catch (error) {
@@ -130,11 +131,25 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
 
         const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
-        // Send to all users. In a large app, you'd use a queue or batching, but for a prototype this works.
+        // Interactive Buy Buttons
+        const replyMarkup = {
+            inline_keyboard: [
+                [
+                    { text: "💰 Buy ₦1,000", callback_data: `buy_1000_${tickerId}` },
+                    { text: "💰 Buy ₦5,000", callback_data: `buy_5000_${tickerId}` }
+                ],
+                [
+                    { text: "💰 Buy ₦10,000", callback_data: `buy_10000_${tickerId}` },
+                    { text: "✏️ Custom Amount", callback_data: `buy_custom_${tickerId}` }
+                ]
+            ]
+        };
+
+        // Send to all users
         const promises = snapshot.docs.map(userDoc => {
             const chatId = userDoc.data().telegramChatId;
             if (chatId) {
-                return sendTelegramMessage(chatId, message);
+                return sendTelegramMessage(chatId, message, replyMarkup);
             }
             return Promise.resolve();
         });
