@@ -45,7 +45,21 @@ export default function PortfolioPage() {
 
   const enrichedPortfolio = useMemo(() => {
     if (!portfolio || !tickers) return [];
-    return portfolio.map(holding => {
+
+    // Group and merge holdings by tickerId to handle potential duplicate docs in DB
+    const merged: Record<string, PortfolioHolding> = {};
+    portfolio.forEach(h => {
+      if (!merged[h.tickerId]) {
+        merged[h.tickerId] = { ...h };
+      } else {
+        const existing = merged[h.tickerId];
+        const totalCost = (existing.avgBuyPrice * existing.amount) + (h.avgBuyPrice * h.amount);
+        existing.amount += h.amount;
+        existing.avgBuyPrice = existing.amount > 0 ? totalCost / existing.amount : 0;
+      }
+    });
+
+    return Object.values(merged).map(holding => {
       const ticker = tickers.find(t => t.id === holding.tickerId);
       if (!ticker) return null;
 

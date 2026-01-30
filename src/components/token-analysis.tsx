@@ -35,7 +35,17 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
       return emptyAnalysis;
     }
 
-    const sortedHoldings = [...holdings].sort((a, b) => b.amount - a.amount);
+    // Group by userId to handle potential duplicate documents for the same user/ticker
+    const mergedByUser: Record<string, PortfolioHolding> = {};
+    holdings.forEach(h => {
+        if (!mergedByUser[h.userId]) {
+            mergedByUser[h.userId] = { ...h };
+        } else {
+            mergedByUser[h.userId].amount += h.amount;
+        }
+    });
+
+    const sortedHoldings = Object.values(mergedByUser).sort((a, b) => b.amount - a.amount);
     
     const totalHolders = sortedHoldings.length;
     const totalHeldSupply = sortedHoldings.reduce((acc, h) => acc + h.amount, 0);

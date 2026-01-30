@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -160,8 +161,21 @@ export async function POST(req: NextRequest) {
             let totalPositionValue = 0;
             let messageText = "<b>📊 My Portfolio</b>\n\n";
 
+            // Merge duplicates for Telegram display
+            const mergedHoldings: Record<string, PortfolioHolding> = {};
             holdingsSnapshot.forEach(hDoc => {
-                const holding = hDoc.data() as PortfolioHolding;
+                const h = hDoc.data() as PortfolioHolding;
+                if (!mergedHoldings[h.tickerId]) {
+                    mergedHoldings[h.tickerId] = { ...h };
+                } else {
+                    const existing = mergedHoldings[h.tickerId];
+                    const totalCost = (existing.avgBuyPrice * existing.amount) + (h.avgBuyPrice * h.amount);
+                    existing.amount += h.amount;
+                    existing.avgBuyPrice = existing.amount > 0 ? totalCost / existing.amount : 0;
+                }
+            });
+
+            Object.values(mergedHoldings).forEach(holding => {
                 const ticker = tickers.find(t => t.id === holding.tickerId);
                 if (ticker) {
                     const reclaimableValue = calculateReclaimableValue(holding.amount, ticker);

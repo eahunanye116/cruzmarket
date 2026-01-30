@@ -174,8 +174,11 @@ export function CreateTickerForm() {
         const initialPrice = tickerData.marketCap / tickerData.supply;
 
         const newTickerRef = doc(tickersCollectionRef);
-        const portfolioColRef = collection(firestore, `users/${user.uid}/portfolio`);
-        const holdingRef = doc(portfolioColRef);
+        
+        // --- FIX: Use deterministic ID for portfolio holding ---
+        const holdingId = `holding_${newTickerRef.id}`;
+        const holdingRef = doc(firestore, `users/${user.uid}/portfolio`, holdingId);
+        
         transaction.set(holdingRef, {
             tickerId: newTickerRef.id,
             amount: tokensOut,
@@ -384,7 +387,7 @@ export function CreateTickerForm() {
                     <FormLabel>Starting Market Cap</FormLabel>
                      <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary"><Info className="h-5 w-5" /></Button>
                         </PopoverTrigger>
                         <PopoverContent side="right" className="max-w-xs text-sm">
                             <p>This is the initial valuation of your token. A higher market cap requires a higher creation fee but makes the price less volatile. A lower market cap is cheaper to launch but means the price will move more dramatically with early buys.</p>
@@ -476,7 +479,3 @@ export function CreateTickerForm() {
     </Form>
   );
 }
-
-    
-
-    
