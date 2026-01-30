@@ -6,8 +6,7 @@ import { doc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Ban, Settings, Send, CheckCircle2, AlertCircle, Trash2, Copy, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
+import { Ban, Settings, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
 import { generateTelegramLinkingCode, unlinkTelegramAction, getTelegramBotUsername } from '@/app/actions/telegram-actions';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -125,8 +124,10 @@ export default function SettingsPage() {
                 </Button>
               ) : (
                 <div className="space-y-4 p-6 border-2 border-dashed rounded-lg text-center bg-muted/30">
-                  <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">Your Linking Code</p>
-                  <p className="text-5xl font-mono font-bold tracking-tighter text-primary">{activeCode.code}</p>
+                  <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">Your Secure Linking Code</p>
+                  <p className="text-2xl sm:text-3xl font-mono font-bold tracking-tighter text-primary break-all">
+                    {activeCode.code}
+                  </p>
                   <p className="text-xs text-muted-foreground">Expires in {Math.round((activeCode.expiresAt.toDate().getTime() - Date.now()) / 1000 / 60)} minutes</p>
                   
                   <div className="flex flex-col gap-2 pt-2">

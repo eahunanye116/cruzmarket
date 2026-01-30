@@ -4,10 +4,12 @@ import { getFirestoreInstance } from '@/firebase/server';
 import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { UserProfile } from '@/lib/types';
+import crypto from 'crypto';
 
 export async function generateTelegramLinkingCode(userId: string) {
     const firestore = getFirestoreInstance();
-    const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
+    // Generate a secure 16-character hex string (8 bytes)
+    const code = crypto.randomBytes(8).toString('hex'); 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     try {
