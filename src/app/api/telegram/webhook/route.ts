@@ -74,6 +74,24 @@ function formatTickerList(tickers: Ticker[], title: string, startIdx: number): s
     return msg;
 }
 
+function formatPortfolioList(mergedHoldings: [string, number][], tickers: Ticker[], startIdx: number, pageSize: number): string {
+    let msg = "<b>📊 Portfolio</b>\n\n";
+    const page = mergedHoldings.slice(startIdx, startIdx + pageSize);
+    
+    if (page.length === 0) return msg + "No assets found on this page.";
+
+    page.forEach(([tId, amount], i) => {
+        const ticker = tickers.find(t => t.id === tId);
+        if (ticker) {
+            const val = calculateReclaimableValue(amount, ticker) * 0.998;
+            msg += `${startIdx + i + 1}. <b>$${ticker.name}</b>\n`;
+            msg += `Value: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
+            msg += `Address: <code>${ticker.tickerAddress}</code>\n\n`;
+        }
+    });
+    return msg;
+}
+
 function isValidUrl(url: string) {
     try {
         new URL(url);
@@ -116,6 +134,7 @@ export async function POST(req: NextRequest) {
 
         const userDoc = userSnapshot.docs[0];
         const userId = userDoc.id;
+        const userData = userDoc.data() as UserProfile;
 
         if (data.startsWith('buy_')) {
             const parts = data.split('_');
@@ -152,6 +171,38 @@ export async function POST(req: NextRequest) {
             const [, type, offsetStr] = data.split('_');
             const offset = parseInt(offsetStr);
             const PAGE_SIZE = 5;
+
+            if (type === 'portfolio') {
+                const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
+                const holdingsSnap = await getDocs(portfolioRef);
+                const tickersSnap = await getDocs(collection(firestore, 'tickers'));
+                const tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
+                
+                const merged: Record<string, number> = {};
+                holdingsSnap.forEach(hDoc => {
+                    const h = hDoc.data() as PortfolioHolding;
+                    merged[h.tickerId] = (merged[h.tickerId] || 0) + h.amount;
+                });
+                const mergedEntries = Object.entries(merged);
+
+                let totalVal = 0;
+                mergedEntries.forEach(([tId, amount]) => {
+                    const ticker = tickers.find(t => t.id === tId);
+                    if (ticker) totalVal += calculateReclaimableValue(amount, ticker) * 0.998;
+                });
+
+                let msg = formatPortfolioList(mergedEntries, tickers, offset, PAGE_SIZE);
+                msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
+                
+                const buttons = [];
+                const row = [];
+                if (offset > 0) row.push({ text: "⬅️ Previous 5", callback_data: `page_portfolio_${Math.max(0, offset - PAGE_SIZE)}` });
+                if (offset + PAGE_SIZE < mergedEntries.length) row.push({ text: "Next 5 ➡️", callback_data: `page_portfolio_${offset + PAGE_SIZE}` });
+                if (row.length > 0) buttons.push(row);
+
+                await editTelegramMessage(chatId, messageId, msg, { inline_keyboard: buttons });
+                return NextResponse.json({ ok: true });
+            }
 
             const tickersSnap = await getDocs(collection(firestore, 'tickers'));
             let tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
@@ -548,20 +599,27 @@ export async function POST(req: NextRequest) {
                 merged[h.tickerId] = (merged[h.tickerId] || 0) + h.amount;
             });
 
-            let msg = "<b>📊 Portfolio</b>\n\n";
-            let totalVal = 0;
+            const mergedEntries = Object.entries(merged);
+            const PAGE_SIZE = 5;
             
-            Object.entries(merged).forEach(([tId, amount]) => {
+            let totalVal = 0;
+            mergedEntries.forEach(([tId, amount]) => {
                 const ticker = tickers.find(t => t.id === tId);
                 if (ticker) {
-                    const val = calculateReclaimableValue(amount, ticker) * 0.998;
-                    totalVal += val;
-                    msg += `<b>$${ticker.name}</b>: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
+                    totalVal += calculateReclaimableValue(amount, ticker) * 0.998;
                 }
             });
+
+            let msg = formatPortfolioList(mergedEntries, tickers, 0, PAGE_SIZE);
             msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
             msg += `\n\n<i>Tip: Use <code>/burn &lt;address&gt;</code> to clear dust.</i>`;
-            await sendTelegramMessage(chatId, msg);
+
+            const buttons = [];
+            if (mergedEntries.length > PAGE_SIZE) {
+                buttons.push([{ text: "Next 5 ➡️", callback_data: `page_portfolio_5` }]);
+            }
+
+            await sendTelegramMessage(chatId, msg, { inline_keyboard: buttons });
 
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
