@@ -174,13 +174,20 @@ export async function approveWithdrawalAction(requestId: string) {
                 createdAt: serverTimestamp(),
             });
 
-            return { telegramChatId: userData.telegramChatId, amount: requestData.amount };
+            return { 
+                telegramChatId: userData.telegramChatId || null, 
+                amount: requestData.amount,
+                userEmail: userData.email 
+            };
         });
 
         // Notify user via Telegram if linked
         if (result.telegramChatId) {
+            console.log(`Notifying user ${result.userEmail} of withdrawal approval via Telegram Chat ID: ${result.telegramChatId}`);
             const msg = `✅ <b>Withdrawal Approved!</b>\n\nYour request for <b>₦${result.amount.toLocaleString()}</b> has been processed and funds have been sent to your bank account.\n\n<i>Thank you for choosing CruzMarket!</i>`;
             await sendTelegramMessage(result.telegramChatId, msg);
+        } else {
+            console.warn(`User ${result.userEmail} has no Telegram Chat ID linked. Skipping notification.`);
         }
 
         revalidatePath('/admin');
@@ -217,8 +224,11 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
         if (userSnap.exists()) {
             const userData = userSnap.data() as UserProfile;
             if (userData.telegramChatId) {
+                console.log(`Notifying user ${userData.email} of withdrawal rejection via Telegram Chat ID: ${userData.telegramChatId}`);
                 const msg = `❌ <b>Withdrawal Rejected</b>\n\nYour request for <b>₦${requestData.amount.toLocaleString()}</b> was rejected.\n\n<b>Reason:</b> ${reason}\n\n<i>Funds remain in your platform wallet.</i>`;
                 await sendTelegramMessage(userData.telegramChatId, msg);
+            } else {
+                console.warn(`User ${userData.email} has no Telegram Chat ID linked. Skipping rejection notification.`);
             }
         }
         
