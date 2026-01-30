@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     const text = message.text.trim();
 
     try {
-        // --- 1. Account Linking ---
+        // --- 1. Account Linking (Commands with codes like /start <token>) ---
         const parts = text.split(' ');
         let potentialCode = '';
         if (text.startsWith('/start') && parts.length === 2) potentialCode = parts[1].trim();
@@ -219,24 +219,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
         }
 
-        if (text === '/start') {
-            await sendTelegramMessage(chatId, "Welcome to <b>CruzMarket Bot</b>! 🚀\n\nTo trade, go to <b>Settings</b> in the web app, generate a code, and send it here.");
-            return NextResponse.json({ ok: true });
-        }
-
-        // --- Identify User ---
+        // --- Identify User by Chat ID ---
         const usersRef = collection(firestore, 'users');
         const userQuery = query(usersRef, where('telegramChatId', '==', chatId), limit(1));
         const userSnapshot = await getDocs(userQuery);
 
+        // Fallback for non-linked users sending plain commands
         if (userSnapshot.empty) {
-            await sendTelegramMessage(chatId, "🔒 <b>Account not linked.</b> Please link in Settings.");
+            if (text === '/start') {
+                await sendTelegramMessage(chatId, "Welcome to <b>CruzMarket Bot</b>! 🚀\n\nTo trade, go to <b>Settings</b> in the web app, generate a code, and send it here.");
+            } else {
+                await sendTelegramMessage(chatId, "🔒 <b>Account not linked.</b> Please link in Settings.");
+            }
             return NextResponse.json({ ok: true });
         }
 
         const userDoc = userSnapshot.docs[0];
         const userId = userDoc.id;
         const userData = userDoc.data() as UserProfile;
+
+        // Personalized start for linked users
+        if (text === '/start') {
+            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/create - Launch a token\n/portfolio - View holdings\n/top - Trending tickers\n/help - All commands`);
+            return NextResponse.json({ ok: true });
+        }
 
         // --- Handle Cancel (Handled globally for linked users) ---
         if (text.toLowerCase() === '/cancel') {
