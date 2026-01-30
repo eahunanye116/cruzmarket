@@ -1,4 +1,3 @@
-
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -7,6 +6,7 @@ import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query
 import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
 import { sendTelegramMessage } from './telegram-actions';
+import { escapeHtmlForTelegram } from '@/lib/utils';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -15,7 +15,7 @@ type PaystackVerificationResponse = {
     message: string;
     data: {
         status: 'success' | 'failed';
-        amount: number; // The amount is in the smallest currency unit (kobo for NGN)
+        amount: number; 
         currency: 'NGN';
         customer: {
             email: string;
@@ -61,7 +61,6 @@ export async function verifyPaystackDepositAction(reference: string) {
         
         const amountInNaira = amount / 100;
 
-        // Use the new centralized function to process the deposit
         await processDeposit(transactionReference, userId, amountInNaira);
         
         return { success: true, message: `Deposit of ₦${amountInNaira.toLocaleString()} was successful.` };
@@ -91,12 +90,10 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         }
         const userProfile = userDoc.data() as UserProfile;
 
-        // Basic check for current request
         if (userProfile.balance < payload.amount) {
             throw new Error('Insufficient balance.');
         }
 
-        // Fetch all user requests and filter locally to avoid index requirements
         const requestsRef = collection(firestore, 'withdrawalRequests');
         const userRequestsQuery = query(
             requestsRef, 
@@ -112,7 +109,6 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
             }
         });
 
-        // Ensure total pending + new request doesn't exceed current balance
         if (totalPending + payload.amount > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
             throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
@@ -156,16 +152,12 @@ export async function approveWithdrawalAction(requestId: string) {
                 throw new Error('User has insufficient balance for this withdrawal.');
             }
 
-            // Debit user balance
             transaction.update(userRef, { balance: userBalance - requestData.amount });
-
-            // Update request status
             transaction.update(requestRef, { 
                 status: 'completed', 
                 processedAt: serverTimestamp() 
             });
 
-            // Create activity log
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
                 type: 'WITHDRAWAL',
@@ -181,13 +173,10 @@ export async function approveWithdrawalAction(requestId: string) {
             };
         });
 
-        // Notify user via Telegram if linked
         if (result.telegramChatId) {
-            console.log(`Notifying user ${result.userEmail} of withdrawal approval via Telegram Chat ID: ${result.telegramChatId}`);
-            const msg = `✅ <b>Withdrawal Approved!</b>\n\nYour request for <b>₦${result.amount.toLocaleString()}</b> has been processed and funds have been sent to your bank account.\n\n<i>Thank you for choosing CruzMarket!</i>`;
+            const amountFormatted = result.amount.toLocaleString();
+            const msg = `✅ <b>Withdrawal Approved!</b>\n\nYour request for <b>₦${amountFormatted}</b> has been processed and funds have been sent to your bank account.\n\n<i>Thank you for choosing CruzMarket!</i>`;
             await sendTelegramMessage(result.telegramChatId, msg);
-        } else {
-            console.warn(`User ${result.userEmail} has no Telegram Chat ID linked. Skipping notification.`);
         }
 
         revalidatePath('/admin');
@@ -218,17 +207,15 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
             processedAt: serverTimestamp(),
         });
 
-        // Notify user via Telegram if linked
         const userRef = doc(firestore, 'users', requestData.userId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
             const userData = userSnap.data() as UserProfile;
             if (userData.telegramChatId) {
-                console.log(`Notifying user ${userData.email} of withdrawal rejection via Telegram Chat ID: ${userData.telegramChatId}`);
-                const msg = `❌ <b>Withdrawal Rejected</b>\n\nYour request for <b>₦${requestData.amount.toLocaleString()}</b> was rejected.\n\n<b>Reason:</b> ${reason}\n\n<i>Funds remain in your platform wallet.</i>`;
+                const amountFormatted = requestData.amount.toLocaleString();
+                const safeReason = escapeHtmlForTelegram(reason);
+                const msg = `❌ <b>Withdrawal Rejected</b>\n\nYour request for <b>₦${amountFormatted}</b> was rejected.\n\n<b>Reason:</b> ${safeReason}\n\n<i>Funds remain in your platform wallet.</i>`;
                 await sendTelegramMessage(userData.telegramChatId, msg);
-            } else {
-                console.warn(`User ${userData.email} has no Telegram Chat ID linked. Skipping rejection notification.`);
             }
         }
         

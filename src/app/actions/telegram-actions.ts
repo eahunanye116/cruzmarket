@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -49,7 +48,7 @@ export async function unlinkTelegramAction(userId: string) {
 }
 
 export async function getTelegramBotUsername() {
-    return process.env.TELEGRAM_BOT_USERNAME || DEFAULT_BOT_USERNAME;
+    return DEFAULT_BOT_USERNAME;
 }
 
 export async function setTelegramWebhookAction(baseUrl: string) {
@@ -61,7 +60,6 @@ export async function setTelegramWebhookAction(baseUrl: string) {
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
     
     try {
-        // FIXED: Corrected the endpoint from api.paystack.co to api.telegram.org
         const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
         const result = await res.json();
         
@@ -98,10 +96,17 @@ export async function deleteTelegramWebhookAction() {
 export async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
-        console.warn("Notification skipped: TELEGRAM_BOT_TOKEN not configured.");
-        return;
+        console.warn("TELEGRAM_SEND_SKIPPED: TELEGRAM_BOT_TOKEN not configured.");
+        return { success: false, error: "Token not configured" };
     }
+    
+    if (!chatId) {
+        console.warn("TELEGRAM_SEND_SKIPPED: No chatId provided.");
+        return { success: false, error: "No chatId" };
+    }
+
     try {
+        console.log(`TELEGRAM_SENDing to ${chatId}: ${text.substring(0, 50)}...`);
         const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -109,17 +114,23 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
                 chat_id: chatId, 
                 text, 
                 parse_mode: 'HTML',
-                disable_web_page_preview: false,
+                disable_web_page_preview: true,
                 reply_markup: replyMarkup 
             }),
         });
         
+        const result = await response.json();
+        
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error("TELEGRAM_API_ERROR:", errorData);
+            console.error("TELEGRAM_API_ERROR:", result);
+            return { success: false, error: result.description || "API Error" };
         }
-    } catch (error) {
-        console.error("TELEGRAM_SEND_ERROR:", error);
+        
+        console.log(`TELEGRAM_SEND_SUCCESS to ${chatId}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error("TELEGRAM_FETCH_ERROR:", error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -127,16 +138,12 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
  * Broadcasts a notification about a new ticker to the dedicated Telegram channel.
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
-    // Public channel username
     const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-    const botUsername = DEFAULT_BOT_USERNAME; // Strictly use the specific bot name
-
-    console.log(`Broadcasting new ticker to ${channelId} using bot: @${botUsername}`);
+    const botUsername = DEFAULT_BOT_USERNAME;
 
     const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
-    // Deep-linking buttons for the bot
     const replyMarkup = {
         inline_keyboard: [
             [
@@ -149,9 +156,5 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
         ]
     };
 
-    try {
-        await sendTelegramMessage(channelId, message, replyMarkup);
-    } catch (error) {
-        console.error("BROADCAST_ERROR:", error);
-    }
+    await sendTelegramMessage(channelId, message, replyMarkup);
 }

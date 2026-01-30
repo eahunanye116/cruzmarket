@@ -1,32 +1,12 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, updateDoc, doc, orderBy } from 'firebase/firestore';
 import { UserProfile, Ticker, PortfolioHolding, WithdrawalRequest } from '@/lib/types';
 import { executeBuyAction, executeSellAction, executeCreateTickerAction, executeBurnHoldingsAction } from '@/app/actions/trade-actions';
 import { requestWithdrawalAction } from '@/app/actions/wallet-actions';
-import { calculateReclaimableValue } from '@/lib/utils';
+import { calculateReclaimableValue, escapeHtmlForTelegram } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
-
-async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) return;
-    try {
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                chat_id: chatId, 
-                text, 
-                parse_mode: 'HTML',
-                disable_web_page_preview: true,
-                reply_markup: replyMarkup
-            }),
-        });
-    } catch (error) {
-        console.error("TELEGRAM_FETCH_FAILED:", error);
-    }
-}
+import { sendTelegramMessage } from '@/app/actions/telegram-actions';
 
 async function editTelegramMessage(chatId: string, messageId: number, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -65,7 +45,7 @@ function formatTickerList(tickers: Ticker[], title: string, startIdx: number): s
 
     tickers.forEach((t, i) => {
         const age = t.createdAt ? formatDistanceToNow(t.createdAt.toDate(), { addSuffix: true }).replace('about ', '') : 'new';
-        msg += `${startIdx + i + 1}. <b>$${t.name}</b>\n`;
+        msg += `${startIdx + i + 1}. <b>$${escapeHtmlForTelegram(t.name)}</b>\n`;
         msg += `Price: ₦${t.price.toLocaleString(undefined, { maximumFractionDigits: 8 })}\n`;
         msg += `Vol (24h): ₦${(t.volume24h || 0).toLocaleString()}\n`;
         msg += `Age: ${age}\n`;
@@ -84,7 +64,7 @@ function formatPortfolioList(mergedHoldings: [string, number][], tickers: Ticker
         const ticker = tickers.find(t => t.id === tId);
         if (ticker) {
             const val = calculateReclaimableValue(amount, ticker) * 0.998;
-            msg += `${startIdx + i + 1}. <b>$${ticker.name}</b>\n`;
+            msg += `${startIdx + i + 1}. <b>$${escapeHtmlForTelegram(ticker.name)}</b>\n`;
             msg += `Value: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
             msg += `Address: <code>${ticker.tickerAddress}</code>\n\n`;
         }
@@ -114,7 +94,6 @@ export async function POST(req: NextRequest) {
 
     const firestore = getFirestoreInstance();
 
-    // --- A. Handle Callback Queries ---
     if (body.callback_query) {
         const callback = body.callback_query;
         const chatId = callback.message.chat.id.toString();
@@ -151,9 +130,9 @@ export async function POST(req: NextRequest) {
                 await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                 const result = await executeBuyAction(userId, tickerId, amount);
                 if (result.success) {
-                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${result.tickerName}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
                 } else {
-                    await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
+                    await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                 }
             }
         } else if (data.startsWith('confirm_burn_')) {
@@ -165,7 +144,7 @@ export async function POST(req: NextRequest) {
             if (result.success) {
                 await editTelegramMessage(chatId, messageId, `🔥 <b>Burn Successful!</b>\n\nThe asset has been permanently removed from your portfolio.\n\n<i>Platform stats updated.</i>`);
             } else {
-                await editTelegramMessage(chatId, messageId, `❌ <b>Burn Failed:</b> ${result.error}`);
+                await editTelegramMessage(chatId, messageId, `❌ <b>Burn Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
             }
         } else if (data.startsWith('page_')) {
             const [, type, offsetStr] = data.split('_');
@@ -250,7 +229,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
     }
 
-    // --- B. Handle Messages ---
     const message = body.message;
     if (!message || !message.text) return NextResponse.json({ ok: true });
 
@@ -266,9 +244,7 @@ export async function POST(req: NextRequest) {
         const userQuery = query(usersRef, where('telegramChatId', '==', chatId), limit(1));
         const userSnapshot = await getDocs(userQuery);
 
-        // --- Deep Link / Start Parameter Logic ---
         if (startParam) {
-            // 1. Check for Buy deep links (buy_[amount]_[tickerId])
             if (startParam.startsWith('buy_')) {
                 if (userSnapshot.empty) {
                     await sendTelegramMessage(chatId, "🔒 <b>Account not linked.</b> Please link in Settings before you can trade.");
@@ -281,14 +257,13 @@ export async function POST(req: NextRequest) {
                 await sendTelegramMessage(chatId, `⏳ <b>Processing Trade Request...</b>`);
                 const result = await executeBuyAction(userId, tId, amount);
                 if (result.success) {
-                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${result.tickerName}</b> via channel deep link.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> via channel deep link.\nFee: ₦${result.fee?.toLocaleString()}`);
                 } else {
-                    await sendTelegramMessage(chatId, `❌ <b>Deep Link Trade Failed:</b> ${result.error}`);
+                    await sendTelegramMessage(chatId, `❌ <b>Deep Link Trade Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                 }
                 return NextResponse.json({ ok: true });
             }
 
-            // 2. Check for Account Linking codes (16 chars)
             if (startParam.length === 16) {
                 const q = query(usersRef, where('telegramLinkingCode.code', '==', startParam), limit(1));
                 const snap = await getDocs(q);
@@ -304,14 +279,13 @@ export async function POST(req: NextRequest) {
                         await sendTelegramMessage(chatId, "❌ <b>Code expired.</b>");
                     } else {
                         await updateDoc(userDoc.ref, { telegramChatId: chatId, telegramLinkingCode: null });
-                        await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${userData.displayName}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/help - All commands`);
+                        await sendTelegramMessage(chatId, `✅ <b>Account Connected!</b> Welcome, <b>${escapeHtmlForTelegram(userData.displayName)}</b>.\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/help - All commands`);
                     }
                 }
                 return NextResponse.json({ ok: true });
             }
         }
 
-        // --- Standard Authenticated Flow ---
         if (userSnapshot.empty) {
             if (text === '/start') {
                 await sendTelegramMessage(chatId, "Welcome to <b>CruzMarket Bot</b>! 🚀\n\nTo trade, go to <b>Settings</b> in the web app, generate a code, and send it here.");
@@ -326,7 +300,7 @@ export async function POST(req: NextRequest) {
         const userData = userDoc.data() as UserProfile;
 
         if (text === '/start') {
-            await sendTelegramMessage(chatId, `Welcome back, <b>${userData.displayName}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/top - Trending tickers\n/help - All commands`);
+            await sendTelegramMessage(chatId, `Welcome back, <b>${escapeHtmlForTelegram(userData.displayName)}</b>! 🚀\n\nYou're connected to CruzMarket. Ready to find the next moonshot?\n\n/buy - Purchase tokens\n/sell - Sell tokens\n/create - Launch a token\n/portfolio - View holdings\n/withdraw - Request funds\n/top - Trending tickers\n/help - All commands`);
             return NextResponse.json({ ok: true });
         }
 
@@ -341,11 +315,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
         }
 
-        // --- SESSION HANDLING (Withdrawal & Ticker Creation) ---
         if (userData.botSession) {
             const { type, step, data: sessionData } = userData.botSession;
 
-            // 1. Withdrawal Flow
             if (type === 'WITHDRAW_FUNDS') {
                 if (step === 'WITHDRAW_AMOUNT') {
                     const amount = parseFloat(text.replace(/,/g, ''));
@@ -395,13 +367,12 @@ export async function POST(req: NextRequest) {
                         await updateDoc(userDoc.ref, { botSession: null });
                         await sendTelegramMessage(chatId, `✅ <b>Request Submitted!</b>\n\nYour request for <b>₦${sessionData.amount.toLocaleString()}</b> has been received. Our team will process it shortly.\n\nType /withdrawals to check status.`);
                     } else {
-                        await sendTelegramMessage(chatId, `❌ <b>Submission Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
+                        await sendTelegramMessage(chatId, `❌ <b>Submission Failed:</b> ${escapeHtmlForTelegram(result.error)}\n\nType /cancel to clear session.`);
                     }
                 }
                 return NextResponse.json({ ok: true });
             }
 
-            // 2. Ticker Creation Flow
             if (type === 'CREATE_TICKER') {
                 if (step === 'CREATE_NAME') {
                     if (text.length < 2 || text.length > 20) {
@@ -474,9 +445,9 @@ export async function POST(req: NextRequest) {
 
                     if (result.success) {
                         await updateDoc(userDoc.ref, { botSession: null });
-                        await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${sessionData.name}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
+                        await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${escapeHtmlForTelegram(sessionData.name)}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
                     } else {
-                        await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${result.error}\n\nType /cancel to clear session.`);
+                        await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${escapeHtmlForTelegram(result.error)}\n\nType /cancel to clear session.`);
                     }
                 }
                 return NextResponse.json({ ok: true });
@@ -496,8 +467,8 @@ export async function POST(req: NextRequest) {
                     }
                     await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                     const result = await executeBuyAction(userId, tickerId, amount);
-                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.\nFee: ₦${result.fee?.toLocaleString()}`);
-                    else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
+                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                     return NextResponse.json({ ok: true });
                 }
             }
@@ -511,8 +482,8 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ ok: true });
             }
             const result = await executeBuyAction(userId, args[0], parseFloat(args[1]));
-            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${result.tickerName}.\nFee: ₦${result.fee?.toLocaleString()}`);
-            else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
+            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: ₦${result.fee?.toLocaleString()}`);
+            else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
 
         } else if (command.toLowerCase() === '/sell') {
             if (args.length < 2) {
@@ -520,8 +491,8 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ ok: true });
             }
             const result = await executeSellAction(userId, args[0], parseFloat(args[1]));
-            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>$${result.tickerName}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
-            else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${result.error}`);
+            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>$${escapeHtmlForTelegram(result.tickerName)}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
+            else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
 
         } else if (command.toLowerCase() === '/burn') {
             if (args.length < 1) {
@@ -559,14 +530,12 @@ export async function POST(req: NextRequest) {
 
         } else if (command.toLowerCase() === '/withdrawals') {
             const requestsRef = collection(firestore, 'withdrawalRequests');
-            // Simplified query to avoid composite index requirements
             const q = query(requestsRef, where('userId', '==', userId));
             const snap = await getDocs(q);
             
             if (snap.empty) {
                 await sendTelegramMessage(chatId, "No withdrawal history found.");
             } else {
-                // Sort results locally to avoid index errors
                 const requests = snap.docs
                     .map(d => ({ id: d.id, ...d.data() } as WithdrawalRequest))
                     .sort((a, b) => {
@@ -582,7 +551,7 @@ export async function POST(req: NextRequest) {
                     const statusIcon = r.status === 'completed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
                     msg += `${statusIcon} <b>₦${r.amount.toLocaleString()}</b> - ${date}\n`;
                     msg += `Status: ${r.status.toUpperCase()}\n`;
-                    if (r.status === 'rejected' && r.rejectionReason) msg += `Reason: ${r.rejectionReason}\n`;
+                    if (r.status === 'rejected' && r.rejectionReason) msg += `Reason: ${escapeHtmlForTelegram(r.rejectionReason)}\n`;
                     msg += "\n";
                 });
                 await sendTelegramMessage(chatId, msg);
@@ -602,7 +571,6 @@ export async function POST(req: NextRequest) {
             const tickersSnap = await getDocs(collection(firestore, 'tickers'));
             const tickers = tickersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Ticker));
             
-            // Merge duplicate holdings in memory for accurate display
             const merged: Record<string, number> = {};
             holdingsSnap.forEach(hDoc => {
                 const h = hDoc.data() as PortfolioHolding;
