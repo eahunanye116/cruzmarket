@@ -44,7 +44,7 @@ export async function unlinkTelegramAction(userId: string) {
 }
 
 export async function getTelegramBotUsername() {
-    return process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot';
+    return process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
 }
 
 export async function setTelegramWebhookAction(baseUrl: string) {
@@ -124,7 +124,7 @@ export async function broadcastNewTickerNotification(tickerName: string, tickerA
     // Public channel username
     const channelId = '@Cruzmarketfun_Tickers';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CruzMarketBot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'cruzmarketfunbot';
 
     const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
 
