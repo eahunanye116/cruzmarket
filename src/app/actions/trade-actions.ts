@@ -31,10 +31,14 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const userRef = doc(firestore, 'users', userId);
             const tickerRef = doc(firestore, 'tickers', resolvedId);
             const statsRef = doc(firestore, 'stats', 'platform');
+            const holdingId = `holding_${resolvedId}`;
+            const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
             
+            // --- CRITICAL: ALL READS MUST HAPPEN BEFORE ANY WRITES ---
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             const statsDoc = await transaction.get(statsRef);
+            const holdingDoc = await transaction.get(holdingRef);
             
             if (!userDoc.exists()) throw new Error('User not found.');
             if (userDoc.data().balance < ngnAmount) throw new Error('Insufficient balance.');
@@ -53,7 +57,9 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
-            // Update Stats
+            // --- NOW EXECUTE ALL WRITES ---
+
+            // 1. Update Stats
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
             const currentAdminFees = statsDoc.data()?.totalAdminFees || 0;
@@ -70,14 +76,10 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 totalAdminFees: newAdminFees,
             }, { merge: true });
 
-            // Update User Balance
+            // 2. Update User Balance
             transaction.update(userRef, { balance: userDoc.data().balance - ngnAmount });
 
-            // Update Portfolio with predictable ID
-            const holdingId = `holding_${resolvedId}`;
-            const holdingRef = doc(firestore, `users/${userId}/portfolio`, holdingId);
-            const holdingDoc = await transaction.get(holdingRef);
-
+            // 3. Update Portfolio
             if (holdingDoc.exists()) {
                 const currentHolding = holdingDoc.data() as PortfolioHolding;
                 const newAmount = currentHolding.amount + tokensOut;
@@ -93,6 +95,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 });
             }
 
+            // 4. Update Ticker Data
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const price24hAgoDataPoint = tickerData.chartData?.find(d => new Date(d.time) <= twentyFourHoursAgo) || tickerData.chartData?.[0];
@@ -116,6 +119,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 })
             });
 
+            // 5. Log Activity
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
                 type: 'BUY',
