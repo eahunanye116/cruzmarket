@@ -45,21 +45,24 @@ export default function TokenTransactionHistoryPage() {
     const tickerRef = firestore ? doc(firestore, 'tickers', tickerId) : null;
     const { data: ticker, loading: tickerLoading } = useDoc<Ticker>(tickerRef);
 
+    // To avoid requiring a composite index (userId + tickerId), we query only by userId
+    // and then filter for the specific tickerId in-memory.
     const activitiesQuery = useMemo(() => {
-        if (!user || !firestore || !tickerId) return null;
-        // Simplified query to avoid composite index requirement
+        if (!user || !firestore) return null;
         return query(
             collection(firestore, 'activities'),
-            where('userId', '==', user.uid),
-            where('tickerId', '==', tickerId)
+            where('userId', '==', user.uid)
         );
-    }, [user, firestore, tickerId]);
+    }, [user, firestore]);
     const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
     const activities = useMemo(() => {
-        if (!unsortedActivities) return [];
-        return [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-    }, [unsortedActivities]);
+        if (!unsortedActivities || !tickerId) return [];
+        // Filter by tickerId and sort by date descending in-memory
+        return [...unsortedActivities]
+            .filter(act => act.tickerId === tickerId)
+            .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    }, [unsortedActivities, tickerId]);
 
     const summary = useMemo(() => {
         if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, totalFees: 0, tradeCount: 0 };
