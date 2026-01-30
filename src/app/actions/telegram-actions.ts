@@ -78,7 +78,7 @@ export async function deleteTelegramWebhookAction() {
         if (result.ok) {
             return { success: true, message: "Webhook removed." };
         } else {
-            return { success: false, result.description };
+            return { success: false, error: result.description || 'Failed to remove webhook.' };
         }
     } catch (error: any) {
         return { success: false, error: error.message };
