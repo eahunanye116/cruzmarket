@@ -165,7 +165,7 @@ export function TelegramManagement() {
                 <CardContent className="space-y-4 text-sm text-muted-foreground">
                     <p className="text-destructive font-bold">If your bot works in FireStudio but stops on Vercel:</p>
                     <ul className="list-decimal list-inside space-y-2">
-                        <li>Go to <b>Vercel Dashboard > Project Settings > Environment Variables</b>.</li>
+                        <li>Go to <b>Vercel Dashboard &gt; Project Settings &gt; Environment Variables</b>.</li>
                         <li>Add <code>TELEGRAM_BOT_TOKEN</code> with your bot's token.</li>
                         <li>Add <code>PAYSTACK_SECRET_KEY</code> and <code>NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY</code>.</li>
                         <li><b>Redeploy</b> your project on Vercel so it picks up the new variables.</li>
