@@ -51,10 +51,29 @@ export async function getTelegramBotUsername() {
     return DEFAULT_BOT_USERNAME;
 }
 
+export async function getTelegramWebhookInfoAction() {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+        return { success: false, error: "Bot token is not configured in environment variables." };
+    }
+
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+        const result = await res.json();
+        if (result.ok) {
+            return { success: true, info: result.result };
+        } else {
+            return { success: false, error: result.description || "Failed to fetch info" };
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
 export async function setTelegramWebhookAction(baseUrl: string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
-        return { success: false, error: "Bot token is not configured in .env" };
+        return { success: false, error: "Bot token is not configured in environment variables." };
     }
 
     const webhookUrl = `${baseUrl}/api/telegram/webhook`;
