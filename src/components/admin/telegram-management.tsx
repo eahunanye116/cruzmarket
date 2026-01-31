@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function TelegramManagement() {
     const { toast } = useToast();
-    const [baseUrl, setBaseUrl] = useState('');
+    const [baseUrl, setBaseUrl] = useState('https://cruzmarket.fun');
     const [botUsername, setBotUsername] = useState('');
     const [isSetting, setIsSetting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -22,13 +22,16 @@ export function TelegramManagement() {
 
     useEffect(() => {
         const origin = window.location.origin;
-        setBaseUrl(origin);
-        getTelegramBotUsername().then(setBotUsername);
         
         if (origin.includes('cloudworkstations.dev') || origin.includes('localhost') || origin.includes('webcontainer.io')) {
             setIsWorkstation(true);
+            // Default to production URL in development to prevent accidents
+            setBaseUrl('https://cruzmarket.fun');
+        } else {
+            setBaseUrl(origin);
         }
         
+        getTelegramBotUsername().then(setBotUsername);
         handleCheckStatus();
     }, []);
 
@@ -79,9 +82,9 @@ export function TelegramManagement() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Environment Warning</AlertTitle>
                     <AlertDescription>
-                        You are currently in a <b>Development Environment</b>. If you set the webhook here, your bot will stop working as soon as you close FireStudio.
+                        You are currently in a <b>Development Environment</b>. 
                         <br /><br />
-                        <b>To fix:</b> Open your live site (e.g., <code>https://cruzmarket.fun</code>) and set the webhook from there.
+                        I have pre-filled the production URL (<code>https://cruzmarket.fun</code>) below. Click <b>"Set Webhook"</b> to ensure your bot works permanently on Vercel.
                     </AlertDescription>
                 </Alert>
             )}
@@ -101,7 +104,7 @@ export function TelegramManagement() {
                             <Label htmlFor="base-url">App Base URL</Label>
                             <Input 
                                 id="base-url"
-                                placeholder="https://your-app.com" 
+                                placeholder="https://cruzmarket.fun" 
                                 value={baseUrl} 
                                 onChange={(e) => setBaseUrl(e.target.value)} 
                             />
@@ -169,7 +172,7 @@ export function TelegramManagement() {
                         <li>Add <code>TELEGRAM_BOT_TOKEN</code> with your bot's token.</li>
                         <li>Add <code>PAYSTACK_SECRET_KEY</code> and <code>NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY</code>.</li>
                         <li><b>Redeploy</b> your project on Vercel so it picks up the new variables.</li>
-                        <li>Open your <b>live site</b> (not the FireStudio one) and click <b>"Set Webhook"</b> here.</li>
+                        <li>Ensure the Active URL shown above is <code>https://cruzmarket.fun/api/telegram/webhook</code>.</li>
                     </ul>
                 </CardContent>
             </Card>

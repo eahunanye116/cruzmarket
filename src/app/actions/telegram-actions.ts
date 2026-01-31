@@ -8,6 +8,7 @@ import crypto from 'crypto';
 
 // Hardcoded to ensure accuracy as requested by the user
 const DEFAULT_BOT_USERNAME = 'cruzmarketfunbot';
+const PRODUCTION_URL = 'https://cruzmarket.fun';
 
 export async function generateTelegramLinkingCode(userId: string) {
     const firestore = getFirestoreInstance();
@@ -76,9 +77,12 @@ export async function setTelegramWebhookAction(baseUrl: string) {
         return { success: false, error: "Bot token is not configured in environment variables." };
     }
 
-    const webhookUrl = `${baseUrl}/api/telegram/webhook`;
+    // Force production URL if provided base is just a slash or empty, or use the provided one
+    const finalBaseUrl = baseUrl && baseUrl !== '/' ? baseUrl : PRODUCTION_URL;
+    const webhookUrl = `${finalBaseUrl}/api/telegram/webhook`;
     
     try {
+        console.log(`Setting Telegram Webhook to: ${webhookUrl}`);
         const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
         const result = await res.json();
         
@@ -158,7 +162,7 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
  */
 export async function broadcastNewTickerNotification(tickerName: string, tickerAddress: string, tickerId: string) {
     const channelId = '@Cruzmarketfun_Tickers';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || PRODUCTION_URL;
     const botUsername = DEFAULT_BOT_USERNAME;
 
     const message = `🚀 <b>New Token Launched!</b>\n\n<b>$${tickerName}</b>\n\nToken Address:\n<code>${tickerAddress}</code>\n\n<a href="${baseUrl}/ticker/${tickerId}">Trade now on CruzMarket</a>`;
