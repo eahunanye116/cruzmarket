@@ -113,10 +113,17 @@ export type WithdrawalRequest = {
   id: string;
   userId: string;
   amount: number;
+  withdrawalType: 'ngn' | 'crypto';
   status: 'pending' | 'completed' | 'rejected';
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
+  // NGN Fields
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  // Crypto Fields
+  cryptoCoin?: string;
+  cryptoNetwork?: string;
+  cryptoAddress?: string;
+  
   createdAt: Timestamp;
   processedAt?: Timestamp;
   rejectionReason?: string;

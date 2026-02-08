@@ -7,19 +7,16 @@ import { WithdrawalRequest, UserProfile, Ticker, PortfolioHolding } from '@/lib/
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, History } from 'lucide-react';
+import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Landmark, Coins } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
-import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Textarea } from '../ui/textarea';
 import { approveWithdrawalAction, rejectWithdrawalAction } from '@/app/actions/wallet-actions';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { calculateReclaimableValue } from '@/lib/utils';
-import Link from 'next/link';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export function WithdrawalManagement() {
     const firestore = useFirestore();
@@ -38,15 +35,7 @@ export function WithdrawalManagement() {
     const usersQuery = firestore ? collection(firestore, 'users') : null;
     const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
 
-    const tickersQuery = firestore ? collection(firestore, 'tickers') : null;
-    const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
-
-    const portfolioQuery = (selectedRequest && firestore) 
-        ? query(collection(firestore, `users/${selectedRequest.userId}/portfolio`))
-        : null;
-    const { data: selectedUserPortfolio, loading: portfolioLoading } = useCollection<PortfolioHolding>(portfolioQuery);
-
-    const loading = requestsLoading || usersLoading || tickersLoading;
+    const loading = requestsLoading || usersLoading;
 
     const enrichedRequests = useMemo(() => {
         if (!requests || !users) return [];
@@ -57,16 +46,6 @@ export function WithdrawalManagement() {
             }))
             .filter(req => filterStatus === 'all' || req.status === filterStatus);
     }, [requests, users, filterStatus]);
-
-    const portfolioValue = useMemo(() => {
-        if (!selectedUserPortfolio || !tickers) return 0;
-        return selectedUserPortfolio.reduce((acc, holding) => {
-            const ticker = tickers.find(t => t.id === holding.tickerId);
-            if (!ticker) return acc;
-            const reclaimable = calculateReclaimableValue(holding.amount, ticker);
-            return acc + (reclaimable * 0.998);
-        }, 0);
-    }, [selectedUserPortfolio, tickers]);
 
     const handleApprove = async (requestId: string) => {
         setProcessingId(requestId);
@@ -96,8 +75,8 @@ export function WithdrawalManagement() {
         setIsDetailsOpen(true);
     };
 
-    const handleCopyAccountNumber = (num: string) => {
-        navigator.clipboard.writeText(num);
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
         toast({ title: 'Copied!' });
     };
     
@@ -138,10 +117,10 @@ export function WithdrawalManagement() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>User</TableHead>
-                                    <TableHead>Balance</TableHead>
                                     <TableHead>Amount</TableHead>
-                                    <TableHead>Bank</TableHead>
+                                    <TableHead>Details</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -149,13 +128,24 @@ export function WithdrawalManagement() {
                             <TableBody>
                                 {enrichedRequests.map((req) => (
                                     <TableRow key={req.id}>
+                                        <TableCell>
+                                            {req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4 text-primary" /> : <Landmark className="h-4 w-4 text-muted-foreground" />}
+                                        </TableCell>
                                         <TableCell>{req.user?.displayName || req.user?.email || 'Unknown'}</TableCell>
-                                        <TableCell className="text-primary font-semibold">₦{req.user?.balance.toLocaleString() || '0'}</TableCell>
-                                        <TableCell>₦{req.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <div className="text-xs">
-                                                <p className="font-semibold">{req.accountName}</p>
-                                                <p className="text-muted-foreground">{req.bankName}</p>
+                                                {req.withdrawalType === 'crypto' ? (
+                                                    <>
+                                                        <p className="font-semibold">{req.cryptoCoin?.toUpperCase()} ({req.cryptoNetwork})</p>
+                                                        <p className="text-muted-foreground truncate max-w-[150px]">{req.cryptoAddress}</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="font-semibold">{req.accountName}</p>
+                                                        <p className="text-muted-foreground">{req.bankName}</p>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>{getStatusBadge(req.status)}</TableCell>
@@ -231,13 +221,26 @@ export function WithdrawalManagement() {
                                 <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
                             </div>
                             <div className="space-y-2">
-                                <p className="text-sm font-bold">Bank Details</p>
-                                <p className="text-sm">Account: {selectedRequest.accountName}</p>
-                                <p className="text-sm">Bank: {selectedRequest.bankName}</p>
-                                <div className="flex justify-between items-center bg-muted p-2 rounded">
-                                    <p className="font-mono">{selectedRequest.accountNumber}</p>
-                                    <Button size="sm" variant="ghost" onClick={() => handleCopyAccountNumber(selectedRequest.accountNumber)}><Copy className="h-4 w-4" /></Button>
-                                </div>
+                                <p className="text-sm font-bold">{selectedRequest.withdrawalType === 'crypto' ? 'Crypto Address' : 'Bank Details'}</p>
+                                {selectedRequest.withdrawalType === 'crypto' ? (
+                                    <div className="space-y-2">
+                                        <p className="text-sm">Coin: {selectedRequest.cryptoCoin?.toUpperCase()}</p>
+                                        <p className="text-sm">Network: {selectedRequest.cryptoNetwork}</p>
+                                        <div className="flex justify-between items-center bg-muted p-2 rounded">
+                                            <p className="font-mono text-xs break-all">{selectedRequest.cryptoAddress}</p>
+                                            <Button size="sm" variant="ghost" onClick={() => handleCopy(selectedRequest.cryptoAddress!)}><Copy className="h-4 w-4" /></Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <p className="text-sm">Account: {selectedRequest.accountName}</p>
+                                        <p className="text-sm">Bank: {selectedRequest.bankName}</p>
+                                        <div className="flex justify-between items-center bg-muted p-2 rounded">
+                                            <p className="font-mono">{selectedRequest.accountNumber}</p>
+                                            <Button size="sm" variant="ghost" onClick={() => handleCopy(selectedRequest.accountNumber!)}><Copy className="h-4 w-4" /></Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

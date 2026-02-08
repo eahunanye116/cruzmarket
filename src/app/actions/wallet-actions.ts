@@ -73,13 +73,10 @@ export async function verifyPaystackDepositAction(reference: string) {
 
 /**
  * Creates a NowPayments direct payment for crypto deposits.
- * Note: price_currency is explicitly 'usd' as requested.
  */
 export async function createNowPaymentsPaymentAction(amount: number, payCurrency: string, userId: string) {
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
-
-    console.log(`NOWPAYMENTS: Initiating payment for user ${userId}, amount ${amount} USD in ${payCurrency}`);
 
     try {
         const response = await fetch('https://api.nowpayments.io/v1/payment', {
@@ -101,7 +98,6 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
         const result = await response.json();
 
         if (result.payment_id) {
-            console.log(`NOWPAYMENTS_SUCCESS: Payment created: ${result.payment_id}`);
             return { 
                 success: true, 
                 paymentDetails: {
@@ -112,11 +108,9 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
                 }
             };
         } else {
-            console.error('NOWPAYMENTS_INVALID_RESPONSE:', result);
-            return { success: false, error: result.message || 'Failed to initiate payment. Ensure the selected currency is supported.' };
+            return { success: false, error: result.message || 'Failed to initiate payment.' };
         }
     } catch (error: any) {
-        console.error('NOWPAYMENTS_FETCH_EXCEPTION:', error);
         return { success: false, error: `Network error: ${error.message}` };
     }
 }
@@ -124,9 +118,15 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
 type WithdrawalRequestPayload = {
     userId: string;
     amount: number;
-    bankName: string;
-    accountNumber: string;
-    accountName: string;
+    withdrawalType: 'ngn' | 'crypto';
+    // NGN
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+    // Crypto
+    cryptoCoin?: string;
+    cryptoNetwork?: string;
+    cryptoAddress?: string;
 }
 
 export async function requestWithdrawalAction(payload: WithdrawalRequestPayload) {
@@ -161,7 +161,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
 
         if (totalPending + payload.amount > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
-            throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
+            throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals.`);
         }
 
         await addDoc(requestsRef, {
@@ -186,7 +186,7 @@ export async function approveWithdrawalAction(requestId: string) {
             const requestRef = doc(firestore, 'withdrawalRequests', requestId);
             const requestDoc = await transaction.get(requestRef);
             if (!requestDoc.exists() || requestDoc.data().status !== 'pending') {
-                throw new Error('Withdrawal request is not valid or has already been processed.');
+                throw new Error('Withdrawal request is not valid.');
             }
             const requestData = requestDoc.data();
 
@@ -199,7 +199,7 @@ export async function approveWithdrawalAction(requestId: string) {
             const userData = userDoc.data() as UserProfile;
             const userBalance = userData.balance;
             if (userBalance < requestData.amount) {
-                throw new Error('User has insufficient balance for this withdrawal.');
+                throw new Error('User has insufficient balance.');
             }
 
             transaction.update(userRef, { balance: userBalance - requestData.amount });
@@ -219,7 +219,7 @@ export async function approveWithdrawalAction(requestId: string) {
 
         revalidatePath('/admin');
         revalidatePath('/transactions');
-        return { success: true, message: 'Withdrawal approved and funds deducted from user wallet.' };
+        return { success: true, message: 'Withdrawal approved.' };
     } catch (error: any) {
         console.error('Error approving withdrawal:', error);
         return { success: false, error: error.message };
@@ -234,10 +234,6 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
     const firestore = getFirestoreInstance();
     try {
         const requestRef = doc(firestore, 'withdrawalRequests', requestId);
-        const requestSnap = await getDoc(requestRef);
-        
-        if (!requestSnap.exists()) throw new Error("Request not found.");
-
         await updateDoc(requestRef, {
             status: 'rejected',
             rejectionReason: reason,
@@ -248,7 +244,6 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
         revalidatePath('/transactions');
         return { success: true, message: 'Withdrawal request has been rejected.' };
     } catch (error: any) {
-        console.error('Error rejecting withdrawal:', error);
         return { success: false, error: error.message };
     }
 }
