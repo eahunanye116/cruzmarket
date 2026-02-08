@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from 'next/link';
@@ -31,7 +32,7 @@ function UserBalance() {
 
   return (
     <div className="font-semibold text-primary">
-      ₦{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      $${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
     </div>
   )
 }

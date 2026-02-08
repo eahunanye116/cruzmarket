@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,10 +26,10 @@ import { executeCreateTickerAction } from "@/app/actions/trade-actions";
 
 
 const marketCapOptions = {
-  '100000': { fee: 1000, label: '₦100,000' },
-  '1000000': { fee: 4000, label: '₦1,000,000' },
-  '5000000': { fee: 7000, label: '₦5,000,000' },
-  '10000000': { fee: 9990, label: '₦10,000,000' },
+  '100': { fee: 1, label: '$100' },
+  '1000': { fee: 4, label: '$1,000' },
+  '5000': { fee: 7, label: '$5,000' },
+  '10000': { fee: 10, label: '$10,000' },
 };
 
 const formSchema = z.object({
@@ -51,7 +52,7 @@ const formSchema = z.object({
   initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
     message: "Please select a valid market cap option.",
   }),
-  initialBuyNgn: z.coerce.number().min(1000, { message: "Minimum initial buy is ₦1,000."}),
+  initialBuyUsd: z.coerce.number().min(5, { message: "Minimum initial buy is $5."}),
 });
 
 export function CreateTickerForm() {
@@ -69,13 +70,13 @@ export function CreateTickerForm() {
       videoUrl: "",
       description: "",
       supply: 1000000000,
-      initialMarketCap: '100000',
-      initialBuyNgn: 1000,
+      initialMarketCap: '100',
+      initialBuyUsd: 5,
     },
   });
   
   const selectedMarketCap = form.watch('initialMarketCap') as keyof typeof marketCapOptions;
-  const initialBuyValue = form.watch('initialBuyNgn') || 0;
+  const initialBuyValue = form.watch('initialBuyUsd') || 0;
   
   const creationFee = marketCapOptions[selectedMarketCap]?.fee || 0;
   const totalCost = creationFee + initialBuyValue;
@@ -97,7 +98,7 @@ export function CreateTickerForm() {
         videoUrl: values.videoUrl,
         supply: values.supply,
         initialMarketCap: Number(values.initialMarketCap),
-        initialBuyNgn: values.initialBuyNgn,
+        initialBuyUsd: values.initialBuyUsd,
     });
 
     if (result.success && result.tickerId) {
@@ -267,7 +268,7 @@ export function CreateTickerForm() {
                     <SelectItem key={value} value={value}>
                       <div className="flex justify-between w-full">
                         <span>{label}</span>
-                        <span className="text-muted-foreground ml-4">Fee: ₦{fee.toLocaleString()}</span>
+                        <span className="text-muted-foreground ml-4">Fee: ${fee.toLocaleString()}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -303,7 +304,7 @@ export function CreateTickerForm() {
         />
         <FormField
           control={form.control}
-          name="initialBuyNgn"
+          name="initialBuyUsd"
           render={({ field }) => (
             <FormItem>
                <div className="flex items-center gap-1.5">
@@ -313,21 +314,21 @@ export function CreateTickerForm() {
                             <Button variant="ghost" size="icon" className="h-4 w-4 text-primary/80 hover:text-primary"><Info className="h-3 w-3" /></Button>
                         </PopoverTrigger>
                         <PopoverContent side="right" className="max-w-xs text-sm">
-                           <p>The amount in NGN you want to automatically buy when the token is created. This makes you the very first investor and helps establish an initial price history. A minimum of ₦1,000 is required, and a 0.2% fee applies.</p>
+                           <p>The amount in USD you want to automatically buy when the token is created. This makes you the very first investor and helps establish an initial price history. A minimum of $5 is required, and a 0.2% fee applies.</p>
                         </PopoverContent>
                     </Popover>
                 </div>
               <FormControl>
-                <Input type="number" placeholder="1000" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
+                <Input type="number" placeholder="5" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <div className="rounded-lg border bg-muted/50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">Creation Fee: ₦{creationFee.toLocaleString()}</p>
-            {initialBuyValue > 0 && <p className="text-sm text-muted-foreground">Initial Buy: ₦{initialBuyValue.toLocaleString()}</p>}
-            <p className="font-bold text-lg mt-1">Total Cost: ₦{totalCost.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Creation Fee: ${creationFee.toLocaleString()}</p>
+            {initialBuyValue > 0 && <p className="text-sm text-muted-foreground">Initial Buy: ${initialBuyValue.toLocaleString()}</p>}
+            <p className="font-bold text-lg mt-1">Total Cost: ${totalCost.toLocaleString()}</p>
         </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
           {isSubmitting ? (

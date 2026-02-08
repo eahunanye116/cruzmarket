@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -47,11 +48,11 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 // Deposit Form Schemas
 const depositSchema = z.object({
-    amount: z.coerce.number().min(100, { message: 'Minimum deposit is ₦100.' }),
+    amount: z.coerce.number().min(20, { message: 'Minimum deposit is $20.' }),
 });
 
 const cryptoDepositSchema = z.object({
-    amount: z.coerce.number().min(1000, { message: 'Minimum crypto deposit is ₦1,000.' }),
+    amount: z.coerce.number().min(20, { message: 'Minimum crypto deposit is $20.' }),
     payCurrency: z.string().min(1, { message: 'Please select a currency.' }),
 });
 
@@ -62,14 +63,15 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
 
     const form = useForm<z.infer<typeof depositSchema>>({
         resolver: zodResolver(depositSchema),
-        defaultValues: { amount: 1000 },
+        defaultValues: { amount: 20 },
     });
     const amount = form.watch('amount');
 
     const paystackConfig = {
         reference: new Date().getTime().toString(),
         email: user.email!,
-        amount: (amount || 0) * 100, // Amount in kobo
+        amount: (amount || 0) * 100, // Amount in cents
+        currency: 'USD',
         publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
         metadata: {
             userId: user.uid,
@@ -123,9 +125,9 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                             name="amount"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Amount (NGN)</FormLabel>
+                                    <FormLabel>Amount (USD)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="e.g., 5000" {...field} />
+                                        <Input type="number" placeholder="e.g., 50" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -133,7 +135,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                         />
                         <Button type="submit" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
-                            Deposit ₦{amount ? amount.toLocaleString() : 0}
+                            Deposit ${amount ? amount.toLocaleString() : 0}
                         </Button>
                     </form>
                 </Form>
@@ -149,7 +151,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
 
     const form = useForm<z.infer<typeof cryptoDepositSchema>>({
         resolver: zodResolver(cryptoDepositSchema),
-        defaultValues: { amount: 5000, payCurrency: 'usdttrc20' },
+        defaultValues: { amount: 50, payCurrency: 'usdttrc20' },
     });
     const amount = form.watch('amount');
 
@@ -234,9 +236,9 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                             name="amount"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Amount (NGN Equivalent)</FormLabel>
+                                    <FormLabel>Amount (USD Equivalent)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="e.g., 10000" {...field} />
+                                        <Input type="number" placeholder="e.g., 100" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -267,7 +269,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                         />
                         <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Bitcoin className="mr-2" />}
-                            Start ₦{amount ? amount.toLocaleString() : 0} Payment
+                            Start ${amount ? amount.toLocaleString() : 0} Payment
                         </Button>
                     </form>
                 </Form>
@@ -510,14 +512,14 @@ export default function WalletPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Your Balance</CardTitle>
-                    <CardDescription>Your available NGN balance.</CardDescription>
+                    <CardDescription>Your available USD balance.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? (
                         <Skeleton className="h-10 w-48" />
                     ) : (
                         <p className="text-3xl font-bold font-headline text-primary">
-                            ₦{(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     )}
                 </CardContent>
@@ -551,7 +553,7 @@ export default function WalletPage() {
                         <TableBody>
                             {withdrawalRequests.map(req => (
                                 <TableRow key={req.id}>
-                                    <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
+                                    <TableCell className="font-bold">${req.amount.toLocaleString()}</TableCell>
                                     <TableCell>
                                         <div className="text-xs">
                                             <p className="font-semibold">{req.bankName}</p>
@@ -644,7 +646,7 @@ export default function WalletPage() {
                             </TableCell>
                             <TableCell>{asset.tradeCount}</TableCell>
                             <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>
-                                {asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto' })}
+                                {asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'USD', signDisplay: 'auto' })}
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                                 {formatDistanceToNow(asset.lastActivity, { addSuffix: true })}
@@ -695,7 +697,7 @@ export default function WalletPage() {
                                      <Badge variant={activity.type === 'DEPOSIT' ? 'secondary' : 'outline'}>{activity.type}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {activity.value.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}
+                                    {activity.value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                 </TableCell>
                                 <TableCell>
                                     {formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}

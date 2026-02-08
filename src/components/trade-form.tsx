@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -26,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { executeBuyAction, executeSellAction } from '@/app/actions/trade-actions';
 
 const buySchema = z.object({
-  ngnAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(100, { message: 'Minimum buy is ₦100.' }),
+  usdAmount: z.coerce.number().positive({ message: 'Amount must be positive.' }).min(1, { message: 'Minimum buy is $1.' }),
 });
 
 const sellSchema = z.object({
@@ -80,7 +81,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
     resolver: zodResolver(buySchema),
-    defaultValues: { ngnAmount: '' },
+    defaultValues: { usdAmount: '' },
   });
 
   const sellForm = useForm<z.infer<typeof sellSchema>>({
@@ -88,42 +89,42 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     defaultValues: { tokenAmount: '' },
   });
 
-  const ngnAmountToBuy = buyForm.watch('ngnAmount');
+  const usdAmountToBuy = buyForm.watch('usdAmount');
   const tokenAmountToSell = sellForm.watch('tokenAmount');
   
   const buyFee = useMemo(() => {
-    return (ngnAmountToBuy || 0) * TRANSACTION_FEE_PERCENTAGE;
-  }, [ngnAmountToBuy]);
+    return (usdAmountToBuy || 0) * TRANSACTION_FEE_PERCENTAGE;
+  }, [usdAmountToBuy]);
   
-  const ngnAmountForCurve = useMemo(() => {
-     return (ngnAmountToBuy || 0) - buyFee;
-  },[ngnAmountToBuy, buyFee])
+  const usdAmountForCurve = useMemo(() => {
+     return (usdAmountToBuy || 0) - buyFee;
+  },[usdAmountToBuy, buyFee])
 
   const tokensToReceive = useMemo(() => {
-    if (!ngnAmountForCurve || ngnAmountForCurve <= 0 || !ticker || ticker.marketCap <= 0) return 0;
+    if (!usdAmountForCurve || usdAmountForCurve <= 0 || !ticker || ticker.marketCap <= 0) return 0;
     const k = ticker.marketCap * ticker.supply;
-    const newMarketCap = ticker.marketCap + ngnAmountForCurve;
+    const newMarketCap = ticker.marketCap + usdAmountForCurve;
     if (newMarketCap <= 0) return 0;
     const newSupply = k / newMarketCap;
     return ticker.supply - newSupply;
-  }, [ngnAmountForCurve, ticker]);
+  }, [usdAmountForCurve, ticker]);
 
-  const ngnToReceiveBeforeFee = useMemo(() => {
+  const usdToReceiveBeforeFee = useMemo(() => {
     if (!tokenAmountToSell || tokenAmountToSell <= 0 || !ticker || ticker.supply <= 0) return 0;
     const k = ticker.marketCap * ticker.supply;
     const newSupply = ticker.supply + tokenAmountToSell;
     const newMarketCap = k / newSupply;
-    const ngnOut = ticker.marketCap - newMarketCap;
-    return ngnOut > 0 ? ngnOut : 0;
+    const usdOut = ticker.marketCap - newMarketCap;
+    return usdOut > 0 ? usdOut : 0;
   }, [tokenAmountToSell, ticker]);
   
   const sellFee = useMemo(() => {
-    return ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
-  }, [ngnToReceiveBeforeFee]);
+    return usdToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+  }, [usdToReceiveBeforeFee]);
 
-  const ngnToReceiveAfterFee = useMemo(() => {
-    return ngnToReceiveBeforeFee - sellFee;
-  }, [ngnToReceiveBeforeFee, sellFee]);
+  const usdToReceiveAfterFee = useMemo(() => {
+    return usdToReceiveBeforeFee - sellFee;
+  }, [usdToReceiveBeforeFee, sellFee]);
   
   const positionPnl = useMemo(() => {
     if (!userHolding || !ticker) return { pnl: 0, pnlPercent: 0, currentValue: 0, reclaimableValue: 0 };
@@ -141,7 +142,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
     const result = await executeSellAction(user.uid, ticker.id, values.tokenAmount);
     if (result.success) {
-        toast({ title: "Sale Successful!", description: `You received approx. ₦${result.ngnToUser?.toLocaleString()}. (Fee: ₦${result.fee?.toLocaleString()})` });
+        toast({ title: "Sale Successful!", description: `You received approx. $${result.usdToUser?.toLocaleString()}. (Fee: $${result.fee?.toLocaleString()})` });
         sellForm.reset();
     } else {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
@@ -152,9 +153,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!user) return;
     setIsSubmitting(true);
-    const result = await executeBuyAction(user.uid, ticker.id, values.ngnAmount);
+    const result = await executeBuyAction(user.uid, ticker.id, values.usdAmount);
     if (result.success) {
-        toast({ title: "Purchase Successful!", description: `You bought ${result.tokensOut?.toLocaleString()} ${ticker.name.split(' ')[0]}. (Fee: ₦${result.fee?.toLocaleString()})`});
+        toast({ title: "Purchase Successful!", description: `You bought ${result.tokensOut?.toLocaleString()} ${ticker.name.split(' ')[0]}. (Fee: $${result.fee?.toLocaleString()})`});
         buyForm.reset();
     } else {
         toast({ variant: 'destructive', title: 'Purchase Failed', description: result.error });
@@ -196,11 +197,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
           <Form {...buyForm}>
             <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
               <div className="text-right text-sm text-muted-foreground">
-                Balance: ₦{userProfile?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                Balance: ${userProfile?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
               </div>
               <FormField
                 control={buyForm.control}
-                name="ngnAmount"
+                name="usdAmount"
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center gap-1">
@@ -223,7 +224,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                     <FormControl>
                       <div className="relative">
                         <Input type="number" placeholder="0.00" {...field} className="pr-12" />
-                        <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">NGN</span>
+                        <span className="absolute inset-y-0 right-4 flex items-center text-sm font-bold text-muted-foreground">USD</span>
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -248,11 +249,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
                       <span className="text-muted-foreground">Fee (0.2%)</span>
-                      <span>₦{buyFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>${buyFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between font-bold">
                       <span>Total Cost</span>
-                      <span>₦{(ngnAmountToBuy || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>${(usdAmountToBuy || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
               </div>
 
@@ -302,7 +303,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                   <FormLabel>You will receive approx.</FormLabel>
                   <div className="w-full h-10 px-3 py-2 flex items-center rounded-md border border-dashed bg-muted/50">
                       <p className="text-sm font-medium text-foreground transition-opacity duration-300">
-                          ₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ${usdToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                   </div>
               </div>
@@ -310,15 +311,15 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
                       <span className="text-muted-foreground">Gross Value</span>
-                      <span>₦{ngnToReceiveBeforeFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>${usdToReceiveBeforeFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Fee (0.2%)</span>
-                      <span className="text-destructive">- ₦{sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-destructive">- ${sellFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between font-bold">
                       <span>Net Received</span>
-                      <span>₦{ngnToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>${usdToReceiveAfterFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
               </div>
 
@@ -339,17 +340,17 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                       </div>
                       <div className="flex justify-between items-center text-sm">
                           <span className="text-muted-foreground">Avg. Buy Price</span>
-                          <span className="font-semibold">₦{userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
+                          <span className="font-semibold">${userHolding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                           <span className="text-muted-foreground">Reclaimable Value</span>
-                          <span className="font-semibold">₦{positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="font-semibold">${positionPnl.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                        <div className="flex justify-between items-center text-sm font-bold">
                           <span className="text-muted-foreground">Unrealized P/L</span>
                           <div className={cn("flex items-center", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
                             {positionPnl.pnl >= 0 ? <ArrowUp className="h-4 w-4 mr-1" /> : <ArrowDown className="h-4 w-4 mr-1" />}
-                            <span>{positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>${positionPnl.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             <span className="ml-2">({positionPnl.pnlPercent.toFixed(2)}%)</span>
                           </div>
                       </div>

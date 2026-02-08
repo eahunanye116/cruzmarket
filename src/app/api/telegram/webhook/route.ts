@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, updateDoc, doc, orderBy } from 'firebase/firestore';
@@ -46,8 +47,8 @@ function formatTickerList(tickers: Ticker[], title: string, startIdx: number): s
     tickers.forEach((t, i) => {
         const age = t.createdAt ? formatDistanceToNow(t.createdAt.toDate(), { addSuffix: true }).replace('about ', '') : 'new';
         msg += `${startIdx + i + 1}. <b>$${escapeHtmlForTelegram(t.name)}</b>\n`;
-        msg += `Price: ₦${t.price.toLocaleString(undefined, { maximumFractionDigits: 8 })}\n`;
-        msg += `Vol (24h): ₦${(t.volume24h || 0).toLocaleString()}\n`;
+        msg += `Price: $${t.price.toLocaleString(undefined, { maximumFractionDigits: 8 })}\n`;
+        msg += `Vol (24h): $${(t.volume24h || 0).toLocaleString()}\n`;
         msg += `Age: ${age}\n`;
         msg += `Address: <code>${t.tickerAddress}</code>\n\n`;
     });
@@ -65,7 +66,7 @@ function formatPortfolioList(mergedHoldings: [string, number][], tickers: Ticker
         if (ticker) {
             const val = calculateReclaimableValue(amount, ticker) * 0.998;
             msg += `${startIdx + i + 1}. <b>$${escapeHtmlForTelegram(ticker.name)}</b>\n`;
-            msg += `Value: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
+            msg += `Value: $${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
             msg += `Address: <code>${ticker.tickerAddress}</code>\n\n`;
         }
     });
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
             const tickerId = parts[2];
 
             if (amountStr === 'custom') {
-                await sendTelegramMessage(chatId, `💸 <b>Custom Buy</b>\n\nBuying Token: <code>${tickerId}cruz</code>\n\nHow much NGN would you like to spend?\n\n(Reply with just the number)`, {
+                await sendTelegramMessage(chatId, `💸 <b>Custom Buy</b>\n\nBuying Token: <code>${tickerId}cruz</code>\n\nHow much USD would you like to spend?\n\n(Reply with just the number)`, {
                     force_reply: true,
                     selective: true
                 });
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
                 await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                 const result = await executeBuyAction(userId, tickerId, amount);
                 if (result.success) {
-                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b>.\nFee: $${result.fee?.toLocaleString()}`);
                 } else {
                     await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                 }
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 let msg = formatPortfolioList(mergedEntries, tickers, offset, PAGE_SIZE);
-                msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
+                msg += `\n<b>Total Position Value</b>: $${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: $${userData.balance.toLocaleString()}\n<b>Total Equity</b>: $${(totalVal + userData.balance).toLocaleString()}`;
                 
                 const buttons = [];
                 const row = [];
@@ -212,10 +213,10 @@ export async function POST(req: NextRequest) {
             });
             await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
                 inline_keyboard: [
-                    [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
-                    [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
-                    [{ text: "₦5,000,000 (Fee: ₦7,000)", callback_data: "set_mcap_5000000" }],
-                    [{ text: "₦10,000,000 (Fee: ₦9,990)", callback_data: "set_mcap_10000000" }]
+                    [{ text: "$100 (Fee: $1)", callback_data: "set_mcap_100" }],
+                    [{ text: "$1,000 (Fee: $4)", callback_data: "set_mcap_1000" }],
+                    [{ text: "$5,000 (Fee: $7)", callback_data: "set_mcap_5000" }],
+                    [{ text: "$10,000 (Fee: $10)", callback_data: "set_mcap_10000" }]
                 ]
             });
         } else if (data.startsWith('set_mcap_')) {
@@ -224,7 +225,7 @@ export async function POST(req: NextRequest) {
                 'botSession.step': 'CREATE_BUY',
                 'botSession.data.mcap': Number(mcap)
             });
-            await sendTelegramMessage(chatId, `💰 <b>Final Step: Initial Buy</b>\n\nHow much NGN do you want to automatically buy when the token launches?\n\n<b>Minimum:</b> 1,000\n<b>Fee:</b> 0.2%\n\n<i>Note: This helps establish an initial price.</i>`);
+            await sendTelegramMessage(chatId, `💰 <b>Final Step: Initial Buy</b>\n\nHow much USD do you want to automatically buy when the token launches?\n\n<b>Minimum:</b> 5\n<b>Fee:</b> 0.2%\n\n<i>Note: This helps establish an initial price.</i>`);
         }
         return NextResponse.json({ ok: true });
     }
@@ -257,7 +258,7 @@ export async function POST(req: NextRequest) {
                 await sendTelegramMessage(chatId, `⏳ <b>Processing Trade Request...</b>`);
                 const result = await executeBuyAction(userId, tId, amount);
                 if (result.success) {
-                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> via channel deep link.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    await sendTelegramMessage(chatId, `🚀 <b>Success!</b>\n\nYou bought <b>${result.tokensOut?.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> via channel deep link.\nFee: $${result.fee?.toLocaleString()}`);
                 } else {
                     await sendTelegramMessage(chatId, `❌ <b>Deep Link Trade Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                 }
@@ -321,12 +322,12 @@ export async function POST(req: NextRequest) {
             if (type === 'WITHDRAW_FUNDS') {
                 if (step === 'WITHDRAW_AMOUNT') {
                     const amount = parseFloat(text.replace(/,/g, ''));
-                    if (isNaN(amount) || amount < 10000) {
-                        await sendTelegramMessage(chatId, "❌ <b>Invalid Amount.</b> Minimum withdrawal is ₦10,000.");
+                    if (isNaN(amount) || amount < 20) {
+                        await sendTelegramMessage(chatId, "❌ <b>Invalid Amount.</b> Minimum withdrawal is $20.");
                         return NextResponse.json({ ok: true });
                     }
                     if (amount > userData.balance) {
-                        await sendTelegramMessage(chatId, `❌ <b>Insufficient Balance.</b> Your wallet has ₦${userData.balance.toLocaleString()}.`);
+                        await sendTelegramMessage(chatId, `❌ <b>Insufficient Balance.</b> Your wallet has $${userData.balance.toLocaleString()}.`);
                         return NextResponse.json({ ok: true });
                     }
                     await updateDoc(userDoc.ref, { 'botSession.step': 'WITHDRAW_BANK', 'botSession.data.amount': amount });
@@ -338,7 +339,7 @@ export async function POST(req: NextRequest) {
                         return NextResponse.json({ ok: true });
                     }
                     await updateDoc(userDoc.ref, { 'botSession.step': 'WITHDRAW_ACCOUNT_NUM', 'botSession.data.bank': text });
-                    await sendTelegramMessage(chatId, "🔢 <b>Step 3: Account Number</b>\n\nEnter your 10-digit NGN account number.");
+                    await sendTelegramMessage(chatId, "🔢 <b>Step 3: Account Number</b>\n\nEnter your 10-digit account number.");
                 }
                 else if (step === 'WITHDRAW_ACCOUNT_NUM') {
                     if (!/^\d{10}$/.test(text)) {
@@ -365,7 +366,7 @@ export async function POST(req: NextRequest) {
 
                     if (result.success) {
                         await updateDoc(userDoc.ref, { botSession: null });
-                        await sendTelegramMessage(chatId, `✅ <b>Request Submitted!</b>\n\nYour request for <b>₦${sessionData.amount.toLocaleString()}</b> has been received. Our team will process it shortly.\n\nType /withdrawals to check status.`);
+                        await sendTelegramMessage(chatId, `✅ <b>Request Submitted!</b>\n\nYour request for <b>$${sessionData.amount.toLocaleString()}</b> has been received. Our team will process it shortly.\n\nType /withdrawals to check status.`);
                     } else {
                         await sendTelegramMessage(chatId, `❌ <b>Submission Failed:</b> ${escapeHtmlForTelegram(result.error)}\n\nType /cancel to clear session.`);
                     }
@@ -416,17 +417,17 @@ export async function POST(req: NextRequest) {
                     await updateDoc(userDoc.ref, { 'botSession.step': 'CREATE_MCAP', 'botSession.data.video': text });
                     await sendTelegramMessage(chatId, "📊 <b>Step 6: Market Cap</b>\n\nChoose your starting valuation. Higher MCAPs cost more to launch but are more stable.", {
                         inline_keyboard: [
-                            [{ text: "₦100,000 (Fee: ₦1,000)", callback_data: "set_mcap_100000" }],
-                            [{ text: "₦1,000,000 (Fee: ₦4,000)", callback_data: "set_mcap_1000000" }],
-                            [{ text: "₦5,000,000 (Fee: ₦7,000)", callback_data: "set_mcap_5000000" }],
-                            [{ text: "₦10,000,000 (Fee: ₦9,990)", callback_data: "set_mcap_10000000" }]
+                            [{ text: "$100 (Fee: $1)", callback_data: "set_mcap_100" }],
+                            [{ text: "$1,000 (Fee: $4)", callback_data: "set_mcap_1000" }],
+                            [{ text: "$5,000 (Fee: $7)", callback_data: "set_mcap_5000" }],
+                            [{ text: "$10,000 (Fee: $10)", callback_data: "set_mcap_10000" }]
                         ]
                     });
                 }
                 else if (step === 'CREATE_BUY') {
                     const buyAmount = parseFloat(text.replace(/,/g, ''));
-                    if (isNaN(buyAmount) || buyAmount < 1000) {
-                        await sendTelegramMessage(chatId, "❌ <b>Minimum buy is ₦1,000.</b>");
+                    if (isNaN(buyAmount) || buyAmount < 5) {
+                        await sendTelegramMessage(chatId, "❌ <b>Minimum buy is $5.</b>");
                         return NextResponse.json({ ok: true });
                     }
                     
@@ -440,12 +441,12 @@ export async function POST(req: NextRequest) {
                         videoUrl: sessionData.video || undefined,
                         supply: 1000000000,
                         initialMarketCap: sessionData.mcap,
-                        initialBuyNgn: buyAmount
+                        initialBuyUsd: buyAmount
                     });
 
                     if (result.success) {
                         await updateDoc(userDoc.ref, { botSession: null });
-                        await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${escapeHtmlForTelegram(sessionData.name)}</b> is now live.\nFee: ₦${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
+                        await sendTelegramMessage(chatId, `🚀 <b>Ticker Launched!</b>\n\nYour token <b>$${escapeHtmlForTelegram(sessionData.name)}</b> is now live.\nFee: $${result.fee?.toLocaleString()}\n\nView it at: cruzmarket.fun/ticker/${result.tickerId}`);
                     } else {
                         await sendTelegramMessage(chatId, `❌ <b>Launch Failed:</b> ${escapeHtmlForTelegram(result.error)}\n\nType /cancel to clear session.`);
                     }
@@ -461,13 +462,13 @@ export async function POST(req: NextRequest) {
                 if (match) {
                     const tickerId = match[1];
                     const amount = parseFloat(text.replace(/,/g, ''));
-                    if (isNaN(amount) || amount < 100) {
-                        await sendTelegramMessage(chatId, "❌ <b>Min buy is ₦100.</b>");
+                    if (isNaN(amount) || amount < 1) {
+                        await sendTelegramMessage(chatId, "❌ <b>Min buy is $1.</b>");
                         return NextResponse.json({ ok: true });
                     }
                     await sendTelegramMessage(chatId, `⏳ <b>Processing...</b>`);
                     const result = await executeBuyAction(userId, tickerId, amount);
-                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: ₦${result.fee?.toLocaleString()}`);
+                    if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: $${result.fee?.toLocaleString()}`);
                     else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
                     return NextResponse.json({ ok: true });
                 }
@@ -478,11 +479,11 @@ export async function POST(req: NextRequest) {
 
         if (command.toLowerCase() === '/buy') {
             if (args.length < 2) {
-                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;address&gt; &lt;amount&gt;</code>");
+                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;address&gt; &lt;amount_usd&gt;</code>");
                 return NextResponse.json({ ok: true });
             }
             const result = await executeBuyAction(userId, args[0], parseFloat(args[1]));
-            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: ₦${result.fee?.toLocaleString()}`);
+            if (result.success) await sendTelegramMessage(chatId, `🚀 <b>Success!</b> Bought $${escapeHtmlForTelegram(result.tickerName)}.\nFee: $${result.fee?.toLocaleString()}`);
             else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
 
         } else if (command.toLowerCase() === '/sell') {
@@ -517,7 +518,7 @@ export async function POST(req: NextRequest) {
 
             await sendTelegramMessage(chatId, `⏳ <b>Processing Sale...</b>`);
             const result = await executeSellAction(userId, resolvedId, amountToSell);
-            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>${amountToSell.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> and received <b>₦${result.ngnToUser?.toLocaleString()}</b>.\nFee: ₦${result.fee?.toLocaleString()}`);
+            if (result.success) await sendTelegramMessage(chatId, `💰 <b>Sale Successful!</b>\n\nYou sold <b>${amountToSell.toLocaleString()} $${escapeHtmlForTelegram(result.tickerName)}</b> and received <b>$${result.usdToUser?.toLocaleString()}</b>.\nFee: $${result.fee?.toLocaleString()}`);
             else await sendTelegramMessage(chatId, `❌ <b>Failed:</b> ${escapeHtmlForTelegram(result.error)}`);
 
         } else if (command.toLowerCase() === '/burn') {
@@ -530,7 +531,7 @@ export async function POST(req: NextRequest) {
                 resolvedId = resolvedId.slice(0, -4);
             }
             
-            await sendTelegramMessage(chatId, `⚠️ <b>Permanent Burn Warning</b>\n\nYou are about to burn your holdings for <code>${args[0]}</code>.\n\n<b>This action is irreversible.</b> You will receive ₦0.00 in return.\n\nDo you want to proceed?`, {
+            await sendTelegramMessage(chatId, `⚠️ <b>Permanent Burn Warning</b>\n\nYou are about to burn your holdings for <code>${args[0]}</code>.\n\n<b>This action is irreversible.</b> You will receive $0.00 in return.\n\nDo you want to proceed?`, {
                 inline_keyboard: [[{ text: "🔥 Confirm Permanent Burn", callback_data: `confirm_burn_${resolvedId}` }]]
             });
 
@@ -552,7 +553,7 @@ export async function POST(req: NextRequest) {
                     data: {}
                 }
             });
-            await sendTelegramMessage(chatId, `💸 <b>Withdraw Funds</b>\n\nHow much NGN would you like to withdraw?\n\n<b>Min:</b> ₦10,000\n<b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
+            await sendTelegramMessage(chatId, `💸 <b>Withdraw Funds</b>\n\nHow much USD would you like to withdraw?\n\n<b>Min:</b> $20\n<b>Balance:</b> $${userData.balance.toLocaleString()}`);
 
         } else if (command.toLowerCase() === '/withdrawals') {
             const requestsRef = collection(firestore, 'withdrawalRequests');
@@ -575,7 +576,7 @@ export async function POST(req: NextRequest) {
                 requests.forEach(r => {
                     const date = r.createdAt ? format(r.createdAt.toDate(), 'dd MMM') : 'N/A';
                     const statusIcon = r.status === 'completed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
-                    msg += `${statusIcon} <b>₦${r.amount.toLocaleString()}</b> - ${date}\n`;
+                    msg += `${statusIcon} <b>$${r.amount.toLocaleString()}</b> - ${date}\n`;
                     msg += `Status: ${r.status.toUpperCase()}\n`;
                     if (r.status === 'rejected' && r.rejectionReason) msg += `Reason: ${escapeHtmlForTelegram(r.rejectionReason)}\n`;
                     msg += "\n";
@@ -615,7 +616,7 @@ export async function POST(req: NextRequest) {
             });
 
             let msg = formatPortfolioList(mergedEntries, tickers, 0, PAGE_SIZE);
-            msg += `\n<b>Total Position Value</b>: ₦${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: ₦${userData.balance.toLocaleString()}\n<b>Total Equity</b>: ₦${(totalVal + userData.balance).toLocaleString()}`;
+            msg += `\n<b>Total Position Value</b>: $${totalVal.toLocaleString()}\n<b>Wallet Balance</b>: $${userData.balance.toLocaleString()}\n<b>Total Equity</b>: $${(totalVal + userData.balance).toLocaleString()}`;
             msg += `\n\n<i>Tip: Use <code>/burn &lt;address&gt;</code> to clear dust.</i>`;
 
             const buttons = [];
@@ -626,9 +627,9 @@ export async function POST(req: NextRequest) {
             await sendTelegramMessage(chatId, msg, { inline_keyboard: buttons });
 
         } else if (command.toLowerCase() === '/balance') {
-            await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
+            await sendTelegramMessage(chatId, `💰 <b>Balance:</b> $${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;tokens&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;usd&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;tokens&gt; - Sell tokens\n/burn &lt;addr&gt; - Permanent removal\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);

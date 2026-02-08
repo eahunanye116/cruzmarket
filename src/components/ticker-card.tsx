@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -24,15 +25,15 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
 
   const formatCompact = (num: number) => {
     if (num >= 1_000_000_000) {
-      return `₦${(num / 1_000_000_000).toFixed(2)}B`;
+      return `$${(num / 1_000_000_000).toFixed(2)}B`;
     }
     if (num >= 1_000_000) {
-      return `₦${(num / 1_000_000).toFixed(2)}M`;
+      return `$${(num / 1_000_000).toFixed(2)}M`;
     }
     if (num >= 1_000) {
-      return `₦${(num / 1_000).toFixed(1)}K`;
+      return `$${(num / 1_000).toFixed(1)}K`;
     }
-    return `₦${num.toFixed(0)}`;
+    return `$${num.toFixed(0)}`;
   };
 
   return (
@@ -58,7 +59,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
                     </div>
                     <div className="flex items-end gap-2 flex-wrap">
                         <div className="text-primary font-semibold text-sm">
-                            ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                            $${(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                         </div>
                         <div className={cn(
                             "flex items-center text-xs font-semibold",

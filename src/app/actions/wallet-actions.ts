@@ -1,3 +1,4 @@
+
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -14,7 +15,7 @@ type PaystackVerificationResponse = {
     data: {
         status: 'success' | 'failed';
         amount: number; 
-        currency: 'NGN';
+        currency: 'USD';
         customer: {
             email: string;
         };
@@ -53,15 +54,16 @@ export async function verifyPaystackDepositAction(reference: string) {
             throw new Error('User ID not found in transaction metadata.');
         }
 
-        if (currency !== 'NGN') {
-            throw new Error('Only NGN transactions are supported.');
+        if (currency !== 'USD') {
+            throw new Error('Only USD transactions are supported.');
         }
         
-        const amountInNaira = amount / 100;
+        // Paystack usually sends amount in cents for USD
+        const amountInUsd = amount / 100;
 
-        await processDeposit(transactionReference, userId, amountInNaira);
+        await processDeposit(transactionReference, userId, amountInUsd);
         
-        return { success: true, message: `Deposit of ₦${amountInNaira.toLocaleString()} was successful.` };
+        return { success: true, message: `Deposit of $${amountInUsd.toLocaleString()} was successful.` };
 
     } catch (error: any) {
         console.error('Paystack verification error:', error);
@@ -76,7 +78,7 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
-    console.log(`NOWPAYMENTS: Initiating payment for user ${userId}, amount ${amount} NGN in ${payCurrency}`);
+    console.log(`NOWPAYMENTS: Initiating payment for user ${userId}, amount ${amount} USD in ${payCurrency}`);
 
     try {
         const response = await fetch('https://api.nowpayments.io/v1/payment', {
@@ -87,7 +89,7 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
             },
             body: JSON.stringify({
                 price_amount: amount,
-                price_currency: 'ngn',
+                price_currency: 'usd',
                 pay_currency: payCurrency.toLowerCase(),
                 order_id: `DEP_${Date.now()}_${userId}`,
                 order_description: `CruzMarket Crypto Deposit`,
@@ -158,7 +160,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
 
         if (totalPending + payload.amount > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
-            throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
+            throw new Error(`Insufficient available balance. You already have $${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is $${Math.max(0, availableAfterPending).toLocaleString()}.`);
         }
 
         await addDoc(requestsRef, {

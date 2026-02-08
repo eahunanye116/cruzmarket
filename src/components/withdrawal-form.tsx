@@ -14,9 +14,9 @@ import { HandCoins, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 const formSchema = z.object({
-  amount: z.coerce.number().min(10000, "Minimum withdrawal is ₦10,000."),
+  amount: z.coerce.number().min(20, "Minimum withdrawal is $20."),
   bankName: z.string().min(2, "Bank name is required."),
-  accountNumber: z.string().regex(/^\d{10}$/, "Must be a 10-digit account number."),
+  accountNumber: z.string().min(5, "Account number is required."),
   accountName: z.string().min(2, "Account name is required."),
 });
 
@@ -61,7 +61,7 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
     <Card>
       <CardHeader>
         <CardTitle>Withdraw Funds</CardTitle>
-        <CardDescription>Request a withdrawal to your bank account.</CardDescription>
+        <CardDescription>Request a withdrawal to your account.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -71,9 +71,9 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (NGN)</FormLabel>
+                  <FormLabel>Amount (USD)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 10000" {...field} value={field.value ?? ''} />
+                    <Input type="number" placeholder="e.g., 50" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -84,9 +84,9 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
               name="bankName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bank Name</FormLabel>
+                  <FormLabel>Institution/Bank Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Kuda Bank" {...field} />
+                    <Input placeholder="e.g., Chase Bank" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -97,9 +97,9 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
               name="accountNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Account Number</FormLabel>
+                  <FormLabel>Account Number / ID</FormLabel>
                   <FormControl>
-                    <Input placeholder="0123456789" {...field} />
+                    <Input placeholder="Account number" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,7 +112,7 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
                 <FormItem>
                   <FormLabel>Account Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="Full Name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
