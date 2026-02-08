@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Activity } from '@/lib/types';
-import { Sparkles, Minus, Plus, Flame } from 'lucide-react';
+import { Sparkles, Minus, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -23,8 +23,6 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
       return <Minus className="h-5 w-5 text-destructive" />;
     case 'CREATE':
       return <Sparkles className="h-5 w-5 text-primary" />;
-    case 'BURN':
-      return <Flame className="h-5 w-5 text-destructive" />;
     default:
       return null;
   }
@@ -54,10 +52,10 @@ function ActivityText({ activity }: { activity: Activity }) {
           New ticker <span className="font-bold text-primary">{activity.tickerName}</span> created!
         </p>
       );
-    case 'BURN':
+    default:
       return (
         <p>
-          <span className="font-bold text-destructive">Burned</span> {activity.tokenAmount?.toLocaleString()} <span className="font-bold text-primary">{activity.tickerName}</span>
+          <span className="font-bold uppercase">{activity.type}</span> of ₦{activity.value.toLocaleString()}
         </p>
       );
   }
@@ -79,7 +77,7 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                   {hasValidIcon ? (
                     <Image
                       src={activity.tickerIcon}
-                      alt={activity.tickerName}
+                      alt={activity.tickerName || 'Activity'}
                       width={40}
                       height={40}
                       className="rounded-none border-2 aspect-square object-cover"
@@ -91,7 +89,7 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                 <div className="flex-1 text-sm">
                    <div className="flex items-center gap-2">
                      <Badge variant={
-                       activity.type === 'BUY' ? 'default' : (activity.type === 'SELL' || activity.type === 'BURN') ? 'destructive' : 'secondary'
+                       activity.type === 'BUY' ? 'default' : activity.type === 'SELL' ? 'destructive' : 'secondary'
                      } className="text-xs">
                        <ActivityIcon type={activity.type}/>
                        <span className="ml-1">{activity.type}</span>

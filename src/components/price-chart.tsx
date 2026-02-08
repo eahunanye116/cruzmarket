@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -14,10 +15,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="rounded-lg border bg-background p-2 shadow-sm">
         <div className="grid grid-cols-1 gap-2">
           <div className="flex flex-col space-y-1">
-            <span className="text-[0.7rem] uppercase text-muted-foreground">
-              Price
-            </span>
-            <span className="font-bold text-muted-foreground">
+            <span className="text-[0.7rem] uppercase text-muted-foreground">Price</span>
+            <span className="font-bold text-foreground">
               ₦{payload[0].value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
             </span>
           </div>
@@ -50,12 +49,12 @@ export function PriceChart({ data }: { data: ChartData[] }) {
         <YAxis
           orientation="left"
           domain={['auto', 'auto']}
-          tickFormatter={(value) => `₦${Number(value).toFixed(Math.max(2, (value.toString().split('.')[1] || []).length))}`}
+          tickFormatter={(value) => `₦${Number(value).toFixed(2)}`}
           tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
           tickLine={false}
           axisLine={false}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.1)' }} />
+        <Tooltip content={<CustomTooltip />} />
         <Area
           type="monotone"
           dataKey="price"

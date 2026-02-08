@@ -15,7 +15,7 @@ type PaystackVerificationResponse = {
     data: {
         status: 'success' | 'failed';
         amount: number; 
-        currency: 'USD';
+        currency: 'NGN';
         customer: {
             email: string;
         };
@@ -54,16 +54,16 @@ export async function verifyPaystackDepositAction(reference: string) {
             throw new Error('User ID not found in transaction metadata.');
         }
 
-        if (currency !== 'USD') {
-            throw new Error('Only USD transactions are supported.');
+        if (currency !== 'NGN') {
+            throw new Error('Only NGN transactions are supported via Paystack.');
         }
         
-        // Paystack usually sends amount in cents for USD
-        const amountInUsd = amount / 100;
+        // Paystack sends amount in kobo for NGN
+        const amountInNgn = amount / 100;
 
-        await processDeposit(transactionReference, userId, amountInUsd);
+        await processDeposit(transactionReference, userId, amountInNgn);
         
-        return { success: true, message: `Deposit of $${amountInUsd.toLocaleString()} was successful.` };
+        return { success: true, message: `Deposit of ₦${amountInNgn.toLocaleString()} was successful.` };
 
     } catch (error: any) {
         console.error('Paystack verification error:', error);
@@ -73,6 +73,7 @@ export async function verifyPaystackDepositAction(reference: string) {
 
 /**
  * Creates a NowPayments direct payment for crypto deposits.
+ * Note: price_currency is explicitly 'usd' as requested.
  */
 export async function createNowPaymentsPaymentAction(amount: number, payCurrency: string, userId: string) {
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
@@ -160,7 +161,7 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
 
         if (totalPending + payload.amount > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
-            throw new Error(`Insufficient available balance. You already have $${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is $${Math.max(0, availableAfterPending).toLocaleString()}.`);
+            throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals. Maximum additional withdrawal allowed is ₦${Math.max(0, availableAfterPending).toLocaleString()}.`);
         }
 
         await addDoc(requestsRef, {

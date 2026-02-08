@@ -3,17 +3,17 @@
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import { notFound, useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import { doc, collection, query, where, orderBy } from 'firebase/firestore';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { Activity, Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Minus, Plus, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 
@@ -45,8 +45,6 @@ export default function TokenTransactionHistoryPage() {
     const tickerRef = firestore ? doc(firestore, 'tickers', tickerId) : null;
     const { data: ticker, loading: tickerLoading } = useDoc<Ticker>(tickerRef);
 
-    // To avoid requiring a composite index (userId + tickerId), we query only by userId
-    // and then filter for the specific tickerId in-memory.
     const activitiesQuery = useMemo(() => {
         if (!user || !firestore) return null;
         return query(
@@ -58,7 +56,6 @@ export default function TokenTransactionHistoryPage() {
 
     const activities = useMemo(() => {
         if (!unsortedActivities || !tickerId) return [];
-        // Filter by tickerId and sort by date descending in-memory
         return [...unsortedActivities]
             .filter(act => act.tickerId === tickerId)
             .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
@@ -67,16 +64,18 @@ export default function TokenTransactionHistoryPage() {
     const summary = useMemo(() => {
         if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, totalFees: 0, tradeCount: 0 };
         return activities.reduce((acc, act) => {
-            if (act.type === 'BUY' || act.type === 'SELL') {
-                acc.tradeCount++;
-                acc.totalFees += act.fee || (act.value * 0.002);
-            }
-            if (act.type === 'BUY') {
-                acc.totalBuy += act.value;
-            } else if (act.type === 'SELL') {
-                acc.totalSell += act.value;
-                if (typeof act.realizedPnl === 'number') {
-                    acc.realizedPnl += act.realizedPnl;
+            if (acc.tradeCount < 1000) { // Safety limit for extreme activity
+                if (act.type === 'BUY' || act.type === 'SELL') {
+                    acc.tradeCount++;
+                    acc.totalFees += act.fee || (act.value * 0.002);
+                }
+                if (act.type === 'BUY') {
+                    acc.totalBuy += act.value;
+                } else if (act.type === 'SELL') {
+                    acc.totalSell += act.value;
+                    if (typeof act.realizedPnl === 'number') {
+                        acc.realizedPnl += act.realizedPnl;
+                    }
                 }
             }
             return acc;
@@ -163,7 +162,7 @@ export default function TokenTransactionHistoryPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>All Transactions</CardTitle>
-                    <CardDescription>All buy and sell activity for this token.</CardDescription>
+                    <CardDescription>Buy and sell activity for this token.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>

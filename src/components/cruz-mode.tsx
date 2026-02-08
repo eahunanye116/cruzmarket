@@ -3,7 +3,7 @@
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from './ui/button';
-import { ArrowDownRight, ArrowUpRight, Zap, CircleCheckBig, Info } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CircleCheckBig, Info } from 'lucide-react';
 import Link from 'next/link';
 import { TickerSparkline } from './ticker-sparkline';
 import { calculateMarketCapChange, cn } from '@/lib/utils';
@@ -30,29 +30,18 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
           CRUZ MODE
            <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary">
-                <Info className="h-5 w-5" />
-              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary"><Info className="h-5 w-5" /></Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <h4 className="font-bold mb-2">What is Cruz Mode?</h4>
-              <p className="text-sm text-muted-foreground">
-                Only tokens that achieve a 5x gain from their creation price can enter Cruz Mode and become the &quot;King of the Hill&quot;. The king&apos;s reign is fleeting; they must defend their crown every minute against new challengers or being dethroned if they lose their 5x status.
-              </p>
+              <h4 className="font-bold mb-2">Cruz Mode</h4>
+              <p className="text-sm text-muted-foreground">Only the top gainers enter Cruz Mode.</p>
             </PopoverContent>
           </Popover>
         </div>
-        <p className="text-muted-foreground mb-6">The undisputed King of the Hill.</p>
         
-        <div className="flex flex-col sm:flex-row items-center gap-6">
+        <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
             {hasValidIcon ? (
-                <Image
-                    src={ticker.icon}
-                    alt={`${ticker.name} icon`}
-                    width={100}
-                    height={100}
-                    className="rounded-none border-4 border-background aspect-square object-cover bg-card"
-                />
+                <Image src={ticker.icon} alt={ticker.name} width={100} height={100} className="rounded-none border-4 border-background aspect-square object-cover" />
             ) : (
                 <div className="h-[100px] w-[100px] rounded-none border-4 border-background bg-muted"></div>
             )}
@@ -63,17 +52,14 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
                 </div>
                 <div className="flex items-end gap-3 mt-1">
                     <p className="text-primary text-2xl font-semibold leading-none">
-                        $${(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                        ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                     </p>
                     <div className={cn("flex items-center font-semibold text-sm", change24h === null ? "text-muted-foreground" : change24h >= 0 ? "text-accent" : "text-destructive")}>
-                        {change24h !== null ? (
+                        {change24h !== null && (
                             <>
                                 {change24h >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                                 <span className="ml-1">{change24h.toFixed(2)}%</span>
-                                <span className="ml-2 text-muted-foreground font-normal">(24h)</span>
                             </>
-                        ) : (
-                            <span>--%</span>
                         )}
                     </div>
                 </div>
@@ -82,19 +68,17 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
 
         <div className="my-6 flex items-center justify-center gap-8">
             <div className="text-center">
-                <p className="font-bold text-lg">24h Trend</p>
+                <p className="font-bold">24h Trend</p>
                 <TickerSparkline ticker={ticker} className="h-10 w-24 mt-1" />
             </div>
              <div className="text-center">
-                <p className="font-bold text-lg">Market Cap</p>
-                <p className="font-semibold text-muted-foreground mt-1">$${(ticker.marketCap || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="font-bold">Market Cap</p>
+                <p className="font-semibold text-muted-foreground">₦{(ticker.marketCap || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
         </div>
 
-        <Button asChild size="lg" className="bg-primary/90 hover:bg-primary text-primary-foreground">
-          <Link href={`/ticker/${ticker.id}`}>
-            Trade the King
-          </Link>
+        <Button asChild size="lg">
+          <Link href={`/ticker/${ticker.id}`}>Trade the King</Link>
         </Button>
       </div>
     </section>

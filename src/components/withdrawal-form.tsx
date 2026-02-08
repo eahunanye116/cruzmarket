@@ -14,7 +14,7 @@ import { HandCoins, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 const formSchema = z.object({
-  amount: z.coerce.number().min(20, "Minimum withdrawal is $20."),
+  amount: z.coerce.number().min(20000, "Minimum withdrawal is ₦20,000."),
   bankName: z.string().min(2, "Bank name is required."),
   accountNumber: z.string().min(5, "Account number is required."),
   accountName: z.string().min(2, "Account name is required."),
@@ -41,85 +41,40 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (values.amount > balance) {
-        form.setError("amount", { message: "Withdrawal amount cannot exceed your balance."});
+        form.setError("amount", { message: "Insufficient balance."});
         return;
     }
-
     setIsSubmitting(true);
     const result = await requestWithdrawalAction({ ...values, userId: user.uid });
     setIsSubmitting(false);
-
     if (result.success) {
-      toast({ title: 'Request Submitted', description: result.message });
+      toast({ title: 'Submitted', description: result.message });
       form.reset();
     } else {
-      toast({ variant: 'destructive', title: 'Request Failed', description: result.error });
+      toast({ variant: 'destructive', title: 'Failed', description: result.error });
     }
   };
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Withdraw Funds</CardTitle>
-        <CardDescription>Request a withdrawal to your account.</CardDescription>
-      </CardHeader>
+      <CardHeader><CardTitle>Withdraw NGN</CardTitle><CardDescription>Request a bank transfer.</CardDescription></CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount (USD)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="e.g., 50" {...field} value={field.value ?? ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bankName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Institution/Bank Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Chase Bank" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="accountNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account Number / ID</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Account number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="accountName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Full Name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="amount" render={({ field }) => (
+              <FormItem><FormLabel>Amount (NGN)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="bankName" render={({ field }) => (
+              <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={form.control} name="accountNumber" render={({ field }) => (
+              <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={form.control} name="accountName" render={({ field }) => (
+              <FormItem><FormLabel>Account Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <HandCoins className="mr-2" />}
+              {isSubmitting ? <Loader2 className="animate-spin" /> : <HandCoins className="mr-2" />}
               Request Withdrawal
             </Button>
           </form>

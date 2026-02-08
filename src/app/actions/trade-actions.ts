@@ -49,7 +49,7 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
     return cleanId;
 }
 
-export async function executeBuyAction(userId: string, tickerId: string, usdAmount: number) {
+export async function executeBuyAction(userId: string, tickerId: string, ngnAmount: number) {
     const firestore = getFirestoreInstance();
     const resolvedId = await resolveTickerId(firestore, tickerId);
     
@@ -69,19 +69,19 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
             const statsDoc = await transaction.get(statsRef);
             
             if (!userDoc.exists()) throw new Error('User not found.');
-            if (userDoc.data().balance < usdAmount) throw new Error('Insufficient balance.');
+            if (userDoc.data().balance < ngnAmount) throw new Error('Insufficient balance.');
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             
             const tickerData = tickerDoc.data();
-            const fee = usdAmount * TRANSACTION_FEE_PERCENTAGE;
-            const usdForCurve = usdAmount - fee;
+            const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
+            const ngnForCurve = ngnAmount - fee;
             
             const k = tickerData.marketCap * tickerData.supply;
-            const newMarketCap = tickerData.marketCap + usdForCurve;
+            const newMarketCap = tickerData.marketCap + ngnForCurve;
             const newSupply = k / newMarketCap;
             const tokensOut = tickerData.supply - newSupply;
             const finalPrice = newMarketCap / newSupply;
-            const avgBuyPrice = usdAmount / tokensOut;
+            const avgBuyPrice = ngnAmount / tokensOut;
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
@@ -102,7 +102,7 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
                 totalAdminFees: newAdminFees,
             }, { merge: true });
 
-            transaction.update(userRef, { balance: userDoc.data().balance - usdAmount });
+            transaction.update(userRef, { balance: userDoc.data().balance - ngnAmount });
 
             // Manage Portfolio Holding
             if (!holdingSnapshot.empty) {
@@ -110,7 +110,7 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
                 const primaryHoldingData = holdingSnapshot.docs[0].data() as PortfolioHolding;
                 
                 let totalAmount = primaryHoldingData.amount + tokensOut;
-                let totalCost = (primaryHoldingData.avgBuyPrice * primaryHoldingData.amount) + usdAmount;
+                let totalCost = (primaryHoldingData.avgBuyPrice * primaryHoldingData.amount) + ngnAmount;
 
                 for (let i = 1; i < holdingSnapshot.docs.length; i++) {
                     const extraData = holdingSnapshot.docs[i].data() as PortfolioHolding;
@@ -137,7 +137,7 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
             const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
             const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
             const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
-            const volume24h = (tickerData.volume24h || 0) + usdAmount;
+            const volume24h = (tickerData.volume24h || 0) + ngnAmount;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
             transaction.update(tickerRef, { 
@@ -150,7 +150,7 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
                 chartData: arrayUnion({
                     time: now.toISOString(),
                     price: finalPrice,
-                    volume: usdAmount,
+                    volume: ngnAmount,
                     marketCap: newMarketCap,
                 })
             });
@@ -161,7 +161,7 @@ export async function executeBuyAction(userId: string, tickerId: string, usdAmou
                 tickerId: resolvedId,
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
-                value: usdAmount,
+                value: ngnAmount,
                 fee: fee, 
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,
@@ -222,16 +222,16 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const newSupply = tickerData.supply + tokenAmountToSell;
             const newMarketCap = k / newSupply;
             
-            const usdToGetBeforeFee = tickerData.marketCap - newMarketCap;
-            const fee = usdToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
-            const usdToUser = usdToGetBeforeFee - fee;
+            const ngnToGetBeforeFee = tickerData.marketCap - newMarketCap;
+            const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+            const ngnToUser = ngnToGetBeforeFee - fee;
 
-            if (usdToUser < 0) throw new Error("Sale value too small.");
+            if (ngnToUser < 0) throw new Error("Sale value too small.");
 
             const costBasis = tokenAmountToSell * globalAvgBuyPrice;
-            const realizedPnl = usdToUser - costBasis;
+            const realizedPnl = ngnToUser - costBasis;
             const finalPrice = newMarketCap / newSupply;
-            const pricePerToken = usdToGetBeforeFee / tokenAmountToSell;
+            const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
             const currentUserFees = statsDoc.data()?.totalUserFees || 0;
@@ -246,7 +246,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 totalAdminFees: newAdminFees
             }, { merge: true });
 
-            transaction.update(userRef, { balance: userDoc.data().balance + usdToUser });
+            transaction.update(userRef, { balance: userDoc.data().balance + ngnToUser });
 
             let remainingToSell = tokenAmountToSell;
             for (const hDoc of holdingSnapshot.docs) {
@@ -271,7 +271,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
             const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
             const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
-            const volume24h = (tickerData.volume24h || 0) + usdToGetBeforeFee;
+            const volume24h = (tickerData.volume24h || 0) + ngnToGetBeforeFee;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
             transaction.update(tickerRef, { 
@@ -284,7 +284,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 chartData: arrayUnion({
                     time: now.toISOString(),
                     price: finalPrice,
-                    volume: usdToGetBeforeFee,
+                    volume: ngnToGetBeforeFee,
                     marketCap: newMarketCap,
                 })
             });
@@ -295,7 +295,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 tickerId: resolvedId,
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
-                value: usdToGetBeforeFee,
+                value: ngnToGetBeforeFee,
                 fee: fee, 
                 tokenAmount: tokenAmountToSell,
                 pricePerToken: pricePerToken,
@@ -304,7 +304,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 createdAt: serverTimestamp(),
             });
 
-            return { success: true, tickerName: tickerData.name, usdToUser, fee };
+            return { success: true, tickerName: tickerData.name, ngnToUser, fee };
         });
 
         return result;
@@ -323,17 +323,17 @@ export type CreateTickerInput = {
     videoUrl?: string;
     supply: number;
     initialMarketCap: number;
-    initialBuyUsd: number;
+    initialBuyNgn: number;
 }
 
 export async function executeCreateTickerAction(input: CreateTickerInput) {
     const firestore = getFirestoreInstance();
-    const { userId, initialMarketCap, initialBuyUsd } = input;
+    const { userId, initialMarketCap, initialBuyNgn } = input;
 
     const mCapKey = initialMarketCap.toString();
     const creationFee = marketCapOptions[mCapKey as keyof typeof marketCapOptions]?.fee || 0;
-    const initialBuyFee = initialBuyUsd * TRANSACTION_FEE_PERCENTAGE;
-    const totalCost = creationFee + initialBuyUsd;
+    const initialBuyFee = initialBuyNgn * TRANSACTION_FEE_PERCENTAGE;
+    const totalCost = creationFee + initialBuyNgn;
 
     try {
         const result = await runTransaction(firestore, async (transaction) => {
@@ -347,7 +347,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
 
             if (!userDoc.exists()) throw new Error('User profile not found.');
             if (userDoc.data().balance < totalCost) {
-                throw new Error(`Insufficient balance. You need $${totalCost.toLocaleString()}.`);
+                throw new Error(`Insufficient balance. You need ₦${totalCost.toLocaleString()}.`);
             }
 
             const currentTotalFees = statsDoc.data()?.totalFeesGenerated || 0;
@@ -372,13 +372,13 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
             transaction.update(userRef, { balance: userDoc.data().balance - totalCost });
 
             const k = initialMarketCap * input.supply;
-            const usdForCurve = initialBuyUsd - initialBuyFee;
-            const finalMarketCap = initialMarketCap + usdForCurve;
+            const ngnForCurve = initialBuyNgn - initialBuyFee;
+            const finalMarketCap = initialMarketCap + ngnForCurve;
             const finalSupply = k / finalMarketCap;
             const tokensOut = input.supply - finalSupply;
             const finalPrice = finalMarketCap / finalSupply;
             const initialPrice = initialMarketCap / input.supply;
-            const avgBuyPrice = initialBuyUsd / tokensOut;
+            const avgBuyPrice = initialBuyNgn / tokensOut;
 
             const newTickerRef = doc(tickersCollectionRef);
             const tickerAddress = `${newTickerRef.id}cruz`;
@@ -399,11 +399,11 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 createdAt: serverTimestamp(),
                 trendingScore: 0,
                 priceChange24h: 0,
-                volume24h: initialBuyUsd,
+                volume24h: initialBuyNgn,
                 isVerified: false,
                 chartData: [
                     { time: now.toISOString(), price: initialPrice, volume: 0, marketCap: initialMarketCap },
-                    { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: initialBuyUsd, marketCap: finalMarketCap }
+                    { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: initialBuyNgn, marketCap: finalMarketCap }
                 ]
             };
 
@@ -437,7 +437,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 tickerId: newTickerRef.id,
                 tickerName: input.name,
                 tickerIcon: input.icon,
-                value: initialBuyUsd,
+                value: initialBuyNgn,
                 fee: initialBuyFee, 
                 tokenAmount: tokensOut,
                 pricePerToken: avgBuyPrice,

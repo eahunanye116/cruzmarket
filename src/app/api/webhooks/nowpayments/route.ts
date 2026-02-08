@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
             const reference = payment_id.toString();
 
             if (userId) {
+                // Note: We credit the amount as NGN units in the app, 
+                // even though it was priced in USD for the payment.
                 await processDeposit(reference, userId, price_amount);
-                console.log(`NOWPAYMENTS_WEBHOOK: Successfully credited ${price_amount} NGN to user ${userId}`);
+                console.log(`NOWPAYMENTS_WEBHOOK: Successfully credited ${price_amount} units to user ${userId}`);
             } else {
                 console.error(`NOWPAYMENTS_WEBHOOK: Could not extract userId from order_id "${order_id}"`);
             }

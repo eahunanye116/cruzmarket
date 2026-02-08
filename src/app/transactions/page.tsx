@@ -10,9 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -48,7 +48,7 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 // Deposit Form Schemas
 const depositSchema = z.object({
-    amount: z.coerce.number().min(20, { message: 'Minimum deposit is $20.' }),
+    amount: z.coerce.number().min(20000, { message: 'Minimum deposit is ₦20,000.' }),
 });
 
 const cryptoDepositSchema = z.object({
@@ -56,22 +56,22 @@ const cryptoDepositSchema = z.object({
     payCurrency: z.string().min(1, { message: 'Please select a currency.' }),
 });
 
-// Deposit Component
+// Deposit Component (Paystack - NGN)
 function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
 
     const form = useForm<z.infer<typeof depositSchema>>({
         resolver: zodResolver(depositSchema),
-        defaultValues: { amount: 20 },
+        defaultValues: { amount: 20000 },
     });
     const amount = form.watch('amount');
 
     const paystackConfig = {
         reference: new Date().getTime().toString(),
         email: user.email!,
-        amount: (amount || 0) * 100, // Amount in cents
-        currency: 'USD',
+        amount: (amount || 0) * 100, // Amount in kobo
+        currency: 'NGN',
         publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
         metadata: {
             userId: user.uid,
@@ -95,16 +95,14 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
         setIsProcessing(false);
     }, [toast, form]);
 
-    const onPaymentClose = useCallback(() => {
-        // User closed the popup
-    }, []);
+    const onPaymentClose = useCallback(() => {}, []);
 
     const onSubmit = (values: z.infer<typeof depositSchema>) => {
         if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
             toast({
                 variant: 'destructive',
                 title: 'Configuration Error',
-                description: 'Paystack is not configured for this application.',
+                description: 'Paystack is not configured correctly.',
             });
             return;
         }
@@ -114,8 +112,8 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Deposit Funds</CardTitle>
-                <CardDescription>Add funds to your wallet using Paystack.</CardDescription>
+                <CardTitle>Deposit via Card</CardTitle>
+                <CardDescription>Add NGN to your wallet instantly using Paystack.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -125,9 +123,9 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                             name="amount"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Amount (USD)</FormLabel>
+                                    <FormLabel>Amount (NGN)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="e.g., 50" {...field} />
+                                        <Input type="number" placeholder="e.g., 50000" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -135,7 +133,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                         />
                         <Button type="submit" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
-                            Deposit ${amount ? amount.toLocaleString() : 0}
+                            Deposit ₦{amount ? amount.toLocaleString() : 0}
                         </Button>
                     </form>
                 </Form>
@@ -165,7 +163,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                 toast({ variant: 'destructive', title: 'Payment Error', description: result.error });
             }
         } catch (err: any) {
-            toast({ variant: 'destructive', title: 'Submission Error', description: 'A critical error occurred while starting the deposit.' });
+            toast({ variant: 'destructive', title: 'Submission Error', description: 'A critical error occurred.' });
         } finally {
             setIsProcessing(false);
         }
@@ -178,7 +176,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     <CardTitle className="text-lg flex items-center gap-2">
                         <CheckCircle2 className="h-5 w-5 text-accent" /> Send Payment
                     </CardTitle>
-                    <CardDescription>Scan the QR code or send exact amount to the address.</CardDescription>
+                    <CardDescription>Scan the QR or send exact amount to address.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 text-center">
                     <div className="bg-background p-4 rounded-lg flex justify-center border-2 border-primary/20 mx-auto w-fit">
@@ -211,10 +209,10 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 text-[10px] text-left">
                         <AlertCircle className="h-3 w-3" />
                         <AlertDescription>
-                            Your balance will update automatically after confirmation. This usually takes 5-20 minutes.
+                            Your balance will update automatically after confirmation.
                         </AlertDescription>
                     </Alert>
-                    <Button variant="outline" className="w-full h-8 text-xs" onClick={() => setPaymentDetails(null)}>Cancel / New Payment</Button>
+                    <Button variant="outline" className="w-full h-8 text-xs" onClick={() => setPaymentDetails(null)}>Cancel</Button>
                 </CardContent>
             </Card>
         );
@@ -278,7 +276,6 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     )
 }
 
-// New type for grouped data
 type GroupedTransaction = {
     tickerId: string;
     tickerName: string;
@@ -302,13 +299,11 @@ export default function WalletPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
   
-  // Hardcoded correct bot username
   const botUsername = 'cruzmarketfunbot';
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // Queries simplified to avoid manual index requirements. Sorting is handled in useMemo.
   const activitiesQuery = useMemo(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'activities'), where('userId', '==', user.uid));
@@ -325,7 +320,6 @@ export default function WalletPage() {
   const tickersQuery = firestore ? query(collection(firestore, 'tickers')) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
 
-  // Local sorting for withdrawals
   const withdrawalRequests = useMemo(() => {
     if (!unsortedWithdrawalRequests) return [];
     return [...unsortedWithdrawalRequests].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
@@ -512,14 +506,14 @@ export default function WalletPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Your Balance</CardTitle>
-                    <CardDescription>Your available USD balance.</CardDescription>
+                    <CardDescription>Available NGN for trading.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? (
                         <Skeleton className="h-10 w-48" />
                     ) : (
                         <p className="text-3xl font-bold font-headline text-primary">
-                            ${(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₦{(userProfile?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     )}
                 </CardContent>
@@ -535,7 +529,7 @@ export default function WalletPage() {
                     <Clock className="h-5 w-5 text-primary" />
                     Withdrawal Status &amp; History
                 </CardTitle>
-                <CardDescription>Monitor the status of your current and past withdrawal requests.</CardDescription>
+                <CardDescription>Monitor the status of your withdrawal requests.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                 {requestsLoading ? (
@@ -553,7 +547,7 @@ export default function WalletPage() {
                         <TableBody>
                             {withdrawalRequests.map(req => (
                                 <TableRow key={req.id}>
-                                    <TableCell className="font-bold">${req.amount.toLocaleString()}</TableCell>
+                                    <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
                                     <TableCell>
                                         <div className="text-xs">
                                             <p className="font-semibold">{req.bankName}</p>
@@ -594,7 +588,7 @@ export default function WalletPage() {
         <Card className="overflow-hidden mb-8">
             <CardHeader>
                 <CardTitle>Trade History</CardTitle>
-                <CardDescription>A summary of your trading activity, grouped by token.</CardDescription>
+                <CardDescription>Grouped summary of your trading activity.</CardDescription>
             </CardHeader>
              <div className="p-4 border-y">
                 <div className="relative flex-1">
@@ -646,7 +640,7 @@ export default function WalletPage() {
                             </TableCell>
                             <TableCell>{asset.tradeCount}</TableCell>
                             <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>
-                                {asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'USD', signDisplay: 'auto' })}
+                                {asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto' })}
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                                 {formatDistanceToNow(asset.lastActivity, { addSuffix: true })}
@@ -666,7 +660,7 @@ export default function WalletPage() {
                 <div className="text-center py-12">
                     <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No Trade History</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">You haven't traded any tokens yet, or no assets match your search.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">You haven't traded any tokens yet.</p>
                 </div>
             )}
             </CardContent>
@@ -697,7 +691,7 @@ export default function WalletPage() {
                                      <Badge variant={activity.type === 'DEPOSIT' ? 'secondary' : 'outline'}>{activity.type}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {activity.value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                    {activity.value.toLocaleString('en-US', { style: 'currency', currency: 'NGN' })}
                                 </TableCell>
                                 <TableCell>
                                     {formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}

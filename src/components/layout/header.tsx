@@ -15,7 +15,6 @@ import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { NotificationBell } from './notification-bell';
 
-// IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1'; 
 
 function UserBalance() {
@@ -32,7 +31,7 @@ function UserBalance() {
 
   return (
     <div className="font-semibold text-primary">
-      $${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      ₦{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
     </div>
   )
 }
@@ -46,9 +45,7 @@ export function Header() {
   const settingsRef = firestore ? doc(firestore, 'settings', 'privacy') : null;
   const { data: settings } = useDoc<PlatformSettings>(settingsRef);
   
-  // Default to true if not set
   const signupEnabled = settings === null || settings?.signupEnabled !== false;
-
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
@@ -61,14 +58,12 @@ export function Header() {
   const isAdmin = user?.uid === ADMIN_UID;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b-2 border-border/40 bg-background/0 backdrop-blur supports-[backdrop-filter]:bg-background/0">
+    <header className="sticky top-0 z-50 w-full border-b-2 border-border/40 bg-background/80 backdrop-blur-sm">
       <div className="container flex h-14 max-w-screen-2xl items-center">
         <div className="flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="hidden font-bold sm:inline-block font-headline text-lg">
-              CruzMarket
-            </span>
+            <span className="hidden font-bold sm:inline-block font-headline text-lg">CruzMarket</span>
           </Link>
           <nav className="hidden items-center gap-6 text-base md:flex">
             {navItems.map((item) => (
@@ -93,57 +88,21 @@ export function Header() {
             <UserBalance />
             <NotificationBell user={user} />
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.photoURL ?? ''} alt={user.displayName ?? 'User'} />
-                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="ghost" className="relative h-8 w-8 rounded-full"><Avatar className="h-8 w-8"><AvatarImage src={user.photoURL ?? ''} /><AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback></Avatar></Button></DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuLabel><p className="text-sm font-medium">{user.displayName || user.email}</p></DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <Settings className="mr-2 h-4 w-4" /> Settings
-                  </Link>
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin">
-                      <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem asChild>
-                  <Link href="/support">
-                    <History className="mr-2 h-4 w-4" /> Support Chat
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>
-                  Log out
-                </DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link></DropdownMenuItem>
+                {isAdmin && <DropdownMenuItem asChild><Link href="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin</Link></DropdownMenuItem>}
+                <DropdownMenuItem asChild><Link href="/support"><History className="mr-2 h-4 w-4" /> Support</Link></DropdownMenuItem>
+                <DropdownMenuItem onClick={signOut}>Log out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             </>
           ) : (
             <>
-              <Button variant="ghost" asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
-              {signupEnabled && (
-                <Button asChild>
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              )}
+              <Button variant="ghost" asChild><Link href="/login">Sign In</Link></Button>
+              {signupEnabled && <Button asChild><Link href="/signup">Sign Up</Link></Button>}
             </>
           )}
         </div>

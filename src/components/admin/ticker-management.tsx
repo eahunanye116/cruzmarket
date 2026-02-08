@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
@@ -40,7 +41,7 @@ function isValidUrl(url: string | undefined | null): url is string {
 export function TickerManagement() {
   const firestore = useFirestore();
   const tickersQuery = firestore ? collection(firestore, 'tickers') : null;
-  const { data: tickers, loading, error } = useCollection<Ticker>(tickersQuery);
+  const { data: tickers, loading } = useCollection<Ticker>(tickersQuery);
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,7 +62,6 @@ export function TickerManagement() {
     if (!firestore || !tickerToDelete) return;
     try {
       await deleteDoc(doc(firestore, 'tickers', tickerToDelete.id));
-      // Success toast removed for instant feedback. The list will update automatically.
     } catch (e: any) {
       toast({
         variant: 'destructive',
@@ -82,11 +82,7 @@ export function TickerManagement() {
             description: `Ticker is now ${newStatus ? 'verified' : 'unverified'}.`
         });
     } catch (e: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Update failed',
-            description: e.message
-        });
+        toast({ variant: 'destructive', title: 'Update failed', description: e.message });
     } finally {
         setUpdatingVerified(null);
     }
@@ -99,7 +95,7 @@ export function TickerManagement() {
         <div className="flex justify-between items-start">
           <div>
             <CardTitle>Tickers</CardTitle>
-            <CardDescription>Manage all tickers on the platform. Create, edit, and verify tickers.</CardDescription>
+            <CardDescription>Manage all tickers on the platform.</CardDescription>
           </div>
           <Button onClick={handleCreate}><PlusCircle className="mr-2" /> Create Ticker</Button>
         </div>
@@ -152,7 +148,6 @@ export function TickerManagement() {
                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>

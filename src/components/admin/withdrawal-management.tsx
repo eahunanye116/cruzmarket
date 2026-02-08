@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
@@ -6,7 +7,7 @@ import { WithdrawalRequest, UserProfile, Ticker, PortfolioHolding } from '@/lib/
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, Briefcase, History } from 'lucide-react';
+import { Check, MoreHorizontal, X, Loader2, Eye, Copy, Wallet, History } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -24,16 +25,13 @@ export function WithdrawalManagement() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    // State
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('pending');
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
     
-    // Details Dialog State
     const [selectedRequest, setSelectedRequest] = useState<WithdrawalRequest | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-    // Data Fetching
     const requestsQuery = firestore ? query(collection(firestore, 'withdrawalRequests'), orderBy('createdAt', 'desc')) : null;
     const { data: requests, loading: requestsLoading } = useCollection<WithdrawalRequest>(requestsQuery);
 
@@ -43,7 +41,6 @@ export function WithdrawalManagement() {
     const tickersQuery = firestore ? collection(firestore, 'tickers') : null;
     const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
 
-    // Portfolio fetching for the selected user
     const portfolioQuery = (selectedRequest && firestore) 
         ? query(collection(firestore, `users/${selectedRequest.userId}/portfolio`))
         : null;
@@ -67,7 +64,7 @@ export function WithdrawalManagement() {
             const ticker = tickers.find(t => t.id === holding.tickerId);
             if (!ticker) return acc;
             const reclaimable = calculateReclaimableValue(holding.amount, ticker);
-            return acc + (reclaimable * 0.998); // Estimating post-fee value
+            return acc + (reclaimable * 0.998);
         }, 0);
     }, [selectedUserPortfolio, tickers]);
 
@@ -101,7 +98,7 @@ export function WithdrawalManagement() {
 
     const handleCopyAccountNumber = (num: string) => {
         navigator.clipboard.writeText(num);
-        toast({ title: 'Copied!', description: 'Account number copied to clipboard.' });
+        toast({ title: 'Copied!' });
     };
     
     const getStatusBadge = (status: WithdrawalRequest['status']) => {
@@ -118,13 +115,11 @@ export function WithdrawalManagement() {
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     <div>
                         <CardTitle>Withdrawal Requests</CardTitle>
-                        <CardDescription>
-                            Review and process user withdrawal requests. Click "View Info" to see full bank details and portfolio valuation.
-                        </CardDescription>
+                        <CardDescription>Review user withdrawal requests.</CardDescription>
                     </div>
                     <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
                         <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Filter by status" />
+                            <SelectValue placeholder="Filter" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="pending">Pending</SelectItem>
@@ -137,9 +132,7 @@ export function WithdrawalManagement() {
             </CardHeader>
             <CardContent>
                 {loading ? (
-                    <div className="space-y-2">
-                        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-                    </div>
+                    <Skeleton className="h-40 w-full" />
                 ) : (
                     <div className="border rounded-lg overflow-x-auto">
                         <Table>
@@ -147,26 +140,24 @@ export function WithdrawalManagement() {
                                 <TableRow>
                                     <TableHead>User</TableHead>
                                     <TableHead>Balance</TableHead>
-                                    <TableHead>Request Amount</TableHead>
-                                    <TableHead>Bank Details</TableHead>
-                                    <TableHead className="hidden md:table-cell">Date</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Bank</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {enrichedRequests.length > 0 ? enrichedRequests.map((req) => (
+                                {enrichedRequests.map((req) => (
                                     <TableRow key={req.id}>
-                                        <TableCell className="font-medium">{req.user?.displayName || req.user?.email || 'Unknown'}</TableCell>
+                                        <TableCell>{req.user?.displayName || req.user?.email || 'Unknown'}</TableCell>
                                         <TableCell className="text-primary font-semibold">₦{req.user?.balance.toLocaleString() || '0'}</TableCell>
                                         <TableCell>₦{req.amount.toLocaleString()}</TableCell>
                                         <TableCell>
-                                            <div className="text-sm">
-                                                <p className="font-semibold line-clamp-1">{req.accountName}</p>
-                                                <p className="text-muted-foreground text-xs">{req.bankName} - {req.accountNumber}</p>
+                                            <div className="text-xs">
+                                                <p className="font-semibold">{req.accountName}</p>
+                                                <p className="text-muted-foreground">{req.bankName}</p>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="hidden md:table-cell">{format(req.createdAt.toDate(), 'PPP')}</TableCell>
                                         <TableCell>{getStatusBadge(req.status)}</TableCell>
                                         <TableCell className="text-right">
                                             {processingId === req.id ? <Loader2 className="animate-spin ml-auto" /> : (
@@ -179,14 +170,8 @@ export function WithdrawalManagement() {
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuItem onClick={() => handleViewDetails(req)}>
-                                                                <Eye className="mr-2 h-4 w-4" /> View Info
+                                                                <Eye className="mr-2 h-4 w-4" /> Info
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/admin/audit/${req.userId}`}>
-                                                                    <History className="mr-2 h-4 w-4" /> User Audit
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            
                                                             {req.status === 'pending' && (
                                                                 <>
                                                                     <DropdownMenuItem onClick={() => handleApprove(req.id)}>
@@ -204,13 +189,11 @@ export function WithdrawalManagement() {
                                                     
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
-                                                            <AlertDialogTitle>Reject Withdrawal Request?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Please provide a reason for rejecting this request of ₦{req.amount.toLocaleString()} for {req.user?.email}. This action cannot be undone.
-                                                            </AlertDialogDescription>
+                                                            <AlertDialogTitle>Reject Request?</AlertDialogTitle>
+                                                            <AlertDialogDescription>Provide a reason for rejection.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                           <Textarea
-                                                            placeholder="Reason for rejection..."
+                                                            placeholder="Reason..."
                                                             value={rejectionReason}
                                                             onChange={(e) => setRejectionReason(e.target.value)}
                                                           />
@@ -221,7 +204,7 @@ export function WithdrawalManagement() {
                                                                 disabled={!rejectionReason}
                                                                 className="bg-destructive hover:bg-destructive/90"
                                                             >
-                                                                Confirm Rejection
+                                                                Confirm
                                                             </AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
@@ -229,123 +212,36 @@ export function WithdrawalManagement() {
                                             )}
                                         </TableCell>
                                     </TableRow>
-                                )) : (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">
-                                            No requests found with status "{filterStatus}".
-                                        </TableCell>
-                                    </TableRow>
-                                )}
+                                ))}
                             </TableBody>
                         </Table>
                     </div>
                 )}
             </CardContent>
 
-            {/* View Details Dialog */}
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Withdrawal Details</DialogTitle>
-                        <DialogDescription>
-                            Review user financial standing and bank information.
-                        </DialogDescription>
                     </DialogHeader>
                     {selectedRequest && (
-                        <div className="space-y-6 py-4">
-                            <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-muted/30">
-                                <div className="space-y-1">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Request Amount</p>
-                                    <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
-                                </div>
-                                <div className="space-y-1 text-right">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Status</p>
-                                    <div>{getStatusBadge(selectedRequest.status)}</div>
-                                </div>
+                        <div className="space-y-4 py-4">
+                            <div className="border rounded-lg p-4 bg-muted/30">
+                                <p className="text-xs text-muted-foreground uppercase font-bold">Amount</p>
+                                <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
                             </div>
-
-                            {/* Financial Profile Section */}
-                            <div className="space-y-3 border rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-bold flex items-center gap-2">
-                                        <Wallet className="h-4 w-4" /> Financial Profile
-                                    </h4>
-                                    <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs">
-                                        <Link href={`/admin/audit/${selectedRequest.userId}`}>View Full Audit <History className="ml-1 h-3 w-3" /></Link>
-                                    </Button>
+                            <div className="space-y-2">
+                                <p className="text-sm font-bold">Bank Details</p>
+                                <p className="text-sm">Account: {selectedRequest.accountName}</p>
+                                <p className="text-sm">Bank: {selectedRequest.bankName}</p>
+                                <div className="flex justify-between items-center bg-muted p-2 rounded">
+                                    <p className="font-mono">{selectedRequest.accountNumber}</p>
+                                    <Button size="sm" variant="ghost" onClick={() => handleCopyAccountNumber(selectedRequest.accountNumber)}><Copy className="h-4 w-4" /></Button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                    <span className="text-muted-foreground">Current Balance</span>
-                                    <span className="text-right font-semibold">₦{selectedRequest.user?.balance.toLocaleString() || '0'}</span>
-                                    
-                                    <span className="text-muted-foreground">Position Value</span>
-                                    <span className="text-right font-semibold">
-                                        {portfolioLoading ? <Loader2 className="h-3 w-3 animate-spin inline ml-auto" /> : `₦${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                    </span>
-                                    
-                                    <div className="col-span-2 border-t pt-2 mt-1 flex justify-between font-bold text-base">
-                                        <span>Total Platform Equity</span>
-                                        <span className="text-accent">₦{((selectedRequest.user?.balance || 0) + portfolioValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                </div>
-
-                                {/* Mini Portfolio List */}
-                                {!portfolioLoading && selectedUserPortfolio && selectedUserPortfolio.length > 0 && (
-                                    <div className="mt-4 pt-4 border-t space-y-2">
-                                        <p className="text-xs font-bold text-muted-foreground uppercase">Active Holdings</p>
-                                        <ul className="space-y-1 max-h-32 overflow-y-auto pr-2">
-                                            {selectedUserPortfolio.map(holding => {
-                                                const ticker = tickers?.find(t => t.id === holding.tickerId);
-                                                const value = ticker ? calculateReclaimableValue(holding.amount, ticker) * 0.998 : 0;
-                                                return (
-                                                    <li key={holding.tickerId} className="flex justify-between items-center text-xs">
-                                                        <span className="font-medium">{ticker?.name || 'Unknown'}</span>
-                                                        <span className="text-muted-foreground">₦{value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="space-y-1 border-b pb-2">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Account Name</p>
-                                    <p className="font-semibold text-lg">{selectedRequest.accountName}</p>
-                                </div>
-                                <div className="space-y-1 border-b pb-2">
-                                    <p className="text-xs text-muted-foreground uppercase font-bold">Bank Name</p>
-                                    <p className="font-semibold">{selectedRequest.bankName}</p>
-                                </div>
-                                <div className="space-y-1 border-b pb-2 flex justify-between items-end">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground uppercase font-bold">Account Number</p>
-                                        <p className="font-mono text-xl tracking-wider">{selectedRequest.accountNumber}</p>
-                                    </div>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => handleCopyAccountNumber(selectedRequest.accountNumber)}
-                                    >
-                                        <Copy className="h-4 w-4 mr-2" /> Copy
-                                    </Button>
-                                </div>
-                                <div className="space-y-1 pt-2 text-xs text-muted-foreground">
-                                    <p>Requested On: {format(selectedRequest.createdAt.toDate(), 'PPPP p')}</p>
-                                </div>
-                                {selectedRequest.status === 'rejected' && selectedRequest.rejectionReason && (
-                                    <div className="space-y-1 pt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                                        <p className="text-xs text-destructive uppercase font-bold">Rejection Reason</p>
-                                        <p className="text-sm italic">"{selectedRequest.rejectionReason}"</p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button type="button" onClick={() => setIsDetailsOpen(false)}>Close</Button>
-                    </DialogFooter>
+                    <DialogFooter><Button onClick={() => setIsDetailsOpen(false)}>Close</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>

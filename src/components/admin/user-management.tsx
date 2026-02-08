@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
-import { collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc } from 'firebase/firestore';
 import { UserProfile, PlatformStats } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User, History, Flame } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +42,7 @@ import Link from 'next/link';
 export function UserManagement() {
   const firestore = useFirestore();
   const usersQuery = firestore ? collection(firestore, 'users') : null;
-  const { data: users, loading: usersLoading, error } = useCollection<UserProfile>(usersQuery);
+  const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
   
   const statsRef = firestore ? doc(firestore, 'stats', 'platform') : null;
   const { data: platformStats, loading: statsLoading } = useDoc<PlatformStats>(statsRef);
@@ -58,7 +58,6 @@ export function UserManagement() {
   const totalFees = platformStats?.totalFeesGenerated ?? 0;
   const userFees = platformStats?.totalUserFees ?? 0;
   const adminFees = platformStats?.totalAdminFees ?? 0;
-  const totalBurned = platformStats?.totalTokensBurned ?? 0;
   
   const loading = usersLoading || statsLoading;
 
@@ -92,7 +91,7 @@ export function UserManagement() {
       <CardHeader>
         <CardTitle>Users & Platform Stats</CardTitle>
         <CardDescription>
-          View and manage all registered users. Found {users?.length ?? 0} users.
+          View and manage all registered users.
           <br/>
           Total platform balance: ₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
           <br />
@@ -101,10 +100,6 @@ export function UserManagement() {
             (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
             {' '}
             <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-            <br />
-            <span className="flex items-center gap-1 mt-1 text-destructive font-bold">
-                <Flame className="h-4 w-4" /> Tokens Burned So Far: {totalBurned.toLocaleString()}
-            </span>
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -143,7 +138,6 @@ export function UserManagement() {
                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -186,7 +180,7 @@ export function UserManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this user?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the user profile for "{userToDelete?.email}". It does not delete their auth record or their holdings. This action cannot be undone.
+              This will permanently delete the user profile for "{userToDelete?.email}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

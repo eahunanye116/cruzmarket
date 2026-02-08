@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -266,7 +267,7 @@ export default function TickerPage({ params }: { params: { id: string } }) {
               <CardContent>
                 <TradeForm ticker={ticker} />
               </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
