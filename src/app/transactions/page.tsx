@@ -597,6 +597,7 @@ export default function WalletPage() {
                         <TabsContent value="withdraw">{user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} type="crypto" />}</TabsContent>
                     </CardContent>
                 </Tabs>
+            </Card>
         </div>
 
         <Card className="overflow-hidden mb-8">
