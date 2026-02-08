@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -55,6 +54,18 @@ const cryptoDepositSchema = z.object({
     amount: z.coerce.number().min(20, { message: 'Minimum crypto deposit is $20.' }),
     payCurrency: z.string().min(1, { message: 'Please select a currency.' }),
 });
+
+// Supported NOWPayments currencies with network labels
+const CRYPTO_ASSETS = [
+    { value: 'usdttrc20', label: 'USDT', network: 'TRON (TRC20)' },
+    { value: 'usdterc20', label: 'USDT', network: 'Ethereum (ERC20)' },
+    { value: 'usdtbsc', label: 'USDT', network: 'BNB Smart Chain (BEP20)' },
+    { value: 'btc', label: 'Bitcoin', network: 'BTC Network' },
+    { value: 'eth', label: 'Ethereum', network: 'ETH Network' },
+    { value: 'ltc', label: 'Litecoin', network: 'LTC Network' },
+    { value: 'sol', label: 'Solana', network: 'SOL Network' },
+    { value: 'trx', label: 'TRON', network: 'TRX Network' },
+];
 
 // Deposit Component (Paystack - NGN)
 function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
@@ -170,6 +181,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     };
 
     if (paymentDetails) {
+        const selectedAsset = CRYPTO_ASSETS.find(a => a.value === paymentDetails.pay_currency);
         return (
             <Card className="border-primary/50 bg-primary/5">
                 <CardHeader>
@@ -187,6 +199,13 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                         />
                     </div>
                     <div className="space-y-2 text-left">
+                        <div className="p-2 bg-muted rounded border space-y-1">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Blockchain Network</p>
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 text-accent" />
+                                <span className="font-bold text-sm text-foreground">{selectedAsset?.network || paymentDetails.pay_currency.toUpperCase()}</span>
+                            </div>
+                        </div>
                         <div className="p-2 bg-muted rounded border space-y-1">
                             <p className="text-[10px] uppercase font-bold text-muted-foreground">Amount to Send</p>
                             <div className="flex justify-between items-center">
@@ -209,7 +228,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 text-[10px] text-left">
                         <AlertCircle className="h-3 w-3" />
                         <AlertDescription>
-                            Your balance will update automatically after confirmation.
+                            Funds sent on the wrong network will be permanently lost. Ensure your wallet is using <b>{selectedAsset?.network}</b>.
                         </AlertDescription>
                     </Alert>
                     <Button variant="outline" className="w-full h-8 text-xs" onClick={() => setPaymentDetails(null)}>Cancel</Button>
@@ -224,7 +243,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                 <CardTitle className="flex items-center gap-2">
                     <Coins className="h-5 w-5 text-primary" /> Deposit Crypto
                 </CardTitle>
-                <CardDescription>Pay with BTC, USDT, ETH via NowPayments.</CardDescription>
+                <CardDescription>Select your preferred asset and blockchain network.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -247,7 +266,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                             name="payCurrency"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Select Asset</FormLabel>
+                                    <FormLabel>Select Asset & Network</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
@@ -255,10 +274,14 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="usdttrc20">USDT (TRC20)</SelectItem>
-                                            <SelectItem value="btc">Bitcoin (BTC)</SelectItem>
-                                            <SelectItem value="eth">Ethereum (ETH)</SelectItem>
-                                            <SelectItem value="ltc">Litecoin (LTC)</SelectItem>
+                                            {CRYPTO_ASSETS.map((asset) => (
+                                                <SelectItem key={asset.value} value={asset.value}>
+                                                    <div className="flex flex-col items-start">
+                                                        <span>{asset.label}</span>
+                                                        <span className="text-[10px] text-muted-foreground">{asset.network}</span>
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
