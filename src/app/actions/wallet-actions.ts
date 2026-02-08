@@ -93,7 +93,7 @@ export async function createNowPaymentsInvoiceAction(amount: number, userId: str
             },
             body: JSON.stringify({
                 price_amount: amount,
-                price_currency: 'ngn',
+                price_currency: 'ngn', // Must be lowercase for NowPayments
                 order_id: `DEP_${Date.now()}_${userId}`,
                 order_description: `CruzMarket Crypto Deposit`,
                 ipn_callback_url: `${APP_URL}/api/webhooks/nowpayments`,
