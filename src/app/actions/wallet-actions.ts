@@ -83,11 +83,36 @@ export async function verifyPaystackDepositAction(reference: string) {
     }
 }
 
+export async function getNowPaymentsMinAmountAction(payCurrency: string) {
+    const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
+    try {
+        // Fetch minimum amount from NOWPayments
+        const res = await fetch(`https://api.nowpayments.io/v1/min-amount?currency_from=${payCurrency.toLowerCase()}&fiat_equivalent=usd`, {
+            headers: { 'x-api-key': API_KEY }
+        });
+        const data = await res.json();
+        
+        if (data.fiat_equivalent) {
+            return { success: true, minAmountUsd: data.fiat_equivalent };
+        }
+        return { success: false, error: data.message || "Failed to fetch min amount" };
+    } catch (error: any) {
+        console.error("NOWPAYMENTS_MIN_ERROR:", error);
+        return { success: false, error: "Network error fetching minimum amount" };
+    }
+}
+
 export async function createNowPaymentsPaymentAction(amount: number, payCurrency: string, userId: string) {
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
     try {
+        // First check if amount is above minimum
+        const minCheck = await getNowPaymentsMinAmountAction(payCurrency);
+        if (minCheck.success && amount < minCheck.minAmountUsd) {
+            throw new Error(`Amount is below the minimum required for this coin ($${minCheck.minAmountUsd.toFixed(2)}).`);
+        }
+
         const response = await fetch('https://api.nowpayments.io/v1/payment', {
             method: 'POST',
             headers: {
@@ -120,7 +145,7 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
             return { success: false, error: result.message || 'Failed to initiate payment.' };
         }
     } catch (error: any) {
-        return { success: false, error: `Network error: ${error.message}` };
+        return { success: false, error: `Error: ${error.message}` };
     }
 }
 

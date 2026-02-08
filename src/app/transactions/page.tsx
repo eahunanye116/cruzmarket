@@ -22,12 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction, createNowPaymentsPaymentAction, getLatestUsdNgnRate } from '@/app/actions/wallet-actions';
+import { verifyPaystackDepositAction, createNowPaymentsPaymentAction, getLatestUsdNgnRate, getNowPaymentsMinAmountAction } from '@/app/actions/wallet-actions';
 import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { WithdrawalForm } from '@/components/withdrawal-form';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,7 +50,7 @@ const depositSchema = z.object({
 });
 
 const cryptoDepositSchema = z.object({
-    amount: z.coerce.number().min(20, { message: 'Minimum crypto deposit is $20.' }),
+    amount: z.coerce.number(),
     coin: z.string().min(1, { message: 'Please select a coin.' }),
     payCurrency: z.string().min(1, { message: 'Please select a network.' }),
 });
@@ -177,6 +177,8 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentDetails, setPaymentDetails] = useState<any>(null);
+    const [minAmountUsd, setMinAmountUsd] = useState<number | null>(null);
+    const [isLoadingMin, setIsLoadingMin] = useState(false);
 
     const form = useForm<z.infer<typeof cryptoDepositSchema>>({
         resolver: zodResolver(cryptoDepositSchema),
@@ -190,6 +192,23 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     const selectedCoin = COINS.find(c => c.id === selectedCoinId);
     const networks = selectedCoin?.networks || [];
 
+    // Fetch minimum amount when currency changes
+    useEffect(() => {
+        const fetchMin = async () => {
+            if (!selectedPayCurrency) return;
+            setIsLoadingMin(true);
+            const result = await getNowPaymentsMinAmountAction(selectedPayCurrency);
+            if (result.success) {
+                // Buffer by 5% to handle minor volatility during checkout
+                setMinAmountUsd(Math.ceil(result.minAmountUsd * 1.05));
+            } else {
+                setMinAmountUsd(20); // Default fallback
+            }
+            setIsLoadingMin(false);
+        };
+        fetchMin();
+    }, [selectedPayCurrency]);
+
     useEffect(() => {
         if (networks.length > 0) {
             const currentNetworkValid = networks.some(n => n.id === selectedPayCurrency);
@@ -200,6 +219,11 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     }, [selectedCoinId, networks, selectedPayCurrency, form]);
 
     const onSubmit = async (values: z.infer<typeof cryptoDepositSchema>) => {
+        if (minAmountUsd && values.amount < minAmountUsd) {
+            form.setError('amount', { message: `Minimum for this coin is $${minAmountUsd.toLocaleString()}` });
+            return;
+        }
+
         setIsProcessing(true);
         try {
             const result = await createNowPaymentsPaymentAction(values.amount, values.payCurrency, user.uid);
@@ -278,6 +302,9 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                             <FormControl>
                                 <Input type="number" placeholder="e.g., 100" {...field} />
                             </FormControl>
+                            <FormDescription className="text-[10px]">
+                                {isLoadingMin ? "Fetching minimum..." : minAmountUsd ? `Min: $${minAmountUsd.toLocaleString()}` : ""}
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -321,7 +348,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     />
                 </div>
 
-                <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing}>
+                <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing || isLoadingMin}>
                     {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Bitcoin className="mr-2" />}
                     Pay ${amount ? amount.toLocaleString() : 0} Crypto
                 </Button>
@@ -570,7 +597,6 @@ export default function WalletPage() {
                         <TabsContent value="withdraw">{user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} type="crypto" />}</TabsContent>
                     </CardContent>
                 </Tabs>
-            </Card>
         </div>
 
         <Card className="overflow-hidden mb-8">
