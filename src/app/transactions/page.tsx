@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -52,19 +52,56 @@ const depositSchema = z.object({
 
 const cryptoDepositSchema = z.object({
     amount: z.coerce.number().min(20, { message: 'Minimum crypto deposit is $20.' }),
-    payCurrency: z.string().min(1, { message: 'Please select a currency.' }),
+    coin: z.string().min(1, { message: 'Please select a coin.' }),
+    payCurrency: z.string().min(1, { message: 'Please select a network.' }),
 });
 
-// Supported NOWPayments currencies with network labels
-const CRYPTO_ASSETS = [
-    { value: 'usdttrc20', label: 'USDT', network: 'TRON (TRC20)' },
-    { value: 'usdterc20', label: 'USDT', network: 'Ethereum (ERC20)' },
-    { value: 'usdtbsc', label: 'USDT', network: 'BNB Smart Chain (BEP20)' },
-    { value: 'btc', label: 'Bitcoin', network: 'BTC Network' },
-    { value: 'eth', label: 'Ethereum', network: 'ETH Network' },
-    { value: 'ltc', label: 'Litecoin', network: 'LTC Network' },
-    { value: 'sol', label: 'Solana', network: 'SOL Network' },
-    { value: 'trx', label: 'TRON', network: 'TRX Network' },
+// Supported NOWPayments assets and their networks
+const COINS = [
+    { 
+        id: 'usdt', 
+        label: 'USDT', 
+        networks: [
+            { id: 'usdttrc20', label: 'TRON (TRC20)' },
+            { id: 'usdterc20', label: 'Ethereum (ERC20)' },
+            { id: 'usdtbsc', label: 'BNB Smart Chain (BEP20)' },
+        ]
+    },
+    { 
+        id: 'btc', 
+        label: 'Bitcoin', 
+        networks: [
+            { id: 'btc', label: 'BTC Mainnet' }
+        ]
+    },
+    { 
+        id: 'eth', 
+        label: 'Ethereum', 
+        networks: [
+            { id: 'eth', label: 'Ethereum (Mainnet)' }
+        ]
+    },
+    { 
+        id: 'sol', 
+        label: 'Solana', 
+        networks: [
+            { id: 'sol', label: 'Solana Mainnet' }
+        ]
+    },
+    { 
+        id: 'ltc', 
+        label: 'Litecoin', 
+        networks: [
+            { id: 'ltc', label: 'Litecoin Mainnet' }
+        ]
+    },
+    { 
+        id: 'trx', 
+        label: 'TRON', 
+        networks: [
+            { id: 'trx', label: 'TRX Mainnet' }
+        ]
+    },
 ];
 
 // Deposit Component (Paystack - NGN)
@@ -160,9 +197,25 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
 
     const form = useForm<z.infer<typeof cryptoDepositSchema>>({
         resolver: zodResolver(cryptoDepositSchema),
-        defaultValues: { amount: 50, payCurrency: 'usdttrc20' },
+        defaultValues: { amount: 50, coin: 'usdt', payCurrency: 'usdttrc20' },
     });
+
     const amount = form.watch('amount');
+    const selectedCoinId = form.watch('coin');
+    const selectedPayCurrency = form.watch('payCurrency');
+
+    const selectedCoin = COINS.find(c => c.id === selectedCoinId);
+    const networks = selectedCoin?.networks || [];
+
+    // Auto-select first network when coin changes
+    useEffect(() => {
+        if (networks.length > 0) {
+            const currentNetworkValid = networks.some(n => n.id === selectedPayCurrency);
+            if (!currentNetworkValid) {
+                form.setValue('payCurrency', networks[0].id);
+            }
+        }
+    }, [selectedCoinId, networks, selectedPayCurrency, form]);
 
     const onSubmit = async (values: z.infer<typeof cryptoDepositSchema>) => {
         setIsProcessing(true);
@@ -181,7 +234,9 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     };
 
     if (paymentDetails) {
-        const selectedAsset = CRYPTO_ASSETS.find(a => a.value === paymentDetails.pay_currency);
+        const selectedAssetLabel = COINS.find(c => c.networks.some(n => n.id === paymentDetails.pay_currency))?.label;
+        const selectedNetworkLabel = networks.find(n => n.id === paymentDetails.pay_currency)?.label;
+
         return (
             <Card className="border-primary/50 bg-primary/5">
                 <CardHeader>
@@ -200,16 +255,16 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     </div>
                     <div className="space-y-2 text-left">
                         <div className="p-2 bg-muted rounded border space-y-1">
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Blockchain Network</p>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Coin & Network</p>
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-accent" />
-                                <span className="font-bold text-sm text-foreground">{selectedAsset?.network || paymentDetails.pay_currency.toUpperCase()}</span>
+                                <span className="font-bold text-sm text-foreground">{selectedAssetLabel} on {selectedNetworkLabel}</span>
                             </div>
                         </div>
                         <div className="p-2 bg-muted rounded border space-y-1">
                             <p className="text-[10px] uppercase font-bold text-muted-foreground">Amount to Send</p>
                             <div className="flex justify-between items-center">
-                                <span className="font-mono font-bold text-sm">{paymentDetails.pay_amount} {paymentDetails.pay_currency.toUpperCase()}</span>
+                                <span className="font-mono font-bold text-sm">{paymentDetails.pay_amount} {paymentDetails.pay_currency.toUpperCase().replace('USDTBSC', 'USDT').replace('USDTTRC20', 'USDT').replace('USDTERC20', 'USDT')}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(paymentDetails.pay_amount.toString()); toast({ title: 'Amount Copied' }); }}>
                                     <Copy className="h-3 w-3" />
                                 </Button>
@@ -228,7 +283,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 text-[10px] text-left">
                         <AlertCircle className="h-3 w-3" />
                         <AlertDescription>
-                            Funds sent on the wrong network will be permanently lost. Ensure your wallet is using <b>{selectedAsset?.network}</b>.
+                            Funds sent on the wrong network will be permanently lost. Ensure your wallet is using <b>{selectedNetworkLabel}</b>.
                         </AlertDescription>
                     </Alert>
                     <Button variant="outline" className="w-full h-8 text-xs" onClick={() => setPaymentDetails(null)}>Cancel</Button>
@@ -243,7 +298,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                 <CardTitle className="flex items-center gap-2">
                     <Coins className="h-5 w-5 text-primary" /> Deposit Crypto
                 </CardTitle>
-                <CardDescription>Select your preferred asset and blockchain network.</CardDescription>
+                <CardDescription>Specify amount in USD and select your coin & network.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -261,36 +316,62 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="payCurrency"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Select Asset & Network</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select currency" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {CRYPTO_ASSETS.map((asset) => (
-                                                <SelectItem key={asset.value} value={asset.value}>
-                                                    <div className="flex flex-col items-start">
-                                                        <span>{asset.label}</span>
-                                                        <span className="text-[10px] text-muted-foreground">{asset.network}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="coin"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Select Coin</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Coin" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {COINS.map((coin) => (
+                                                    <SelectItem key={coin.id} value={coin.id}>
+                                                        {coin.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="payCurrency"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Select Network</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Network" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {networks.map((network) => (
+                                                    <SelectItem key={network.id} value={network.id}>
+                                                        {network.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
                         <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Bitcoin className="mr-2" />}
-                            Start ${amount ? amount.toLocaleString() : 0} Payment
+                            Pay ${amount ? amount.toLocaleString() : 0} Crypto
                         </Button>
                     </form>
                 </Form>
