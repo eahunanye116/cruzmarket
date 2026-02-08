@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { requestWithdrawalAction } from '@/app/actions/wallet-actions';
+import { requestWithdrawalAction, getLatestUsdNgnRate } from '@/app/actions/wallet-actions';
 import { HandCoins, Loader2, Landmark, Coins } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const ngnSchema = z.object({
@@ -39,12 +39,14 @@ const COINS = [
     { id: 'sol', label: 'Solana', networks: ['Mainnet'] },
 ];
 
-// Fixed rate for the prototype
-const USD_TO_NGN_RATE = 1600;
-
 export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usdNgnRate, setUsdNgnRate] = useState<number>(1600); // Default fallback
+
+  useEffect(() => {
+    getLatestUsdNgnRate().then(setUsdNgnRate);
+  }, []);
 
   const ngnForm = useForm<z.infer<typeof ngnSchema>>({
     resolver: zodResolver(ngnSchema),
@@ -84,7 +86,10 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
   };
 
   const handleCryptoSubmit = async (values: z.infer<typeof cryptoSchema>) => {
-    const amountInNgn = values.amount * USD_TO_NGN_RATE;
+    // Re-fetch rate just before submit for total accuracy
+    const freshRate = await getLatestUsdNgnRate();
+    const amountInNgn = values.amount * freshRate;
+    
     if (amountInNgn > balance) {
         cryptoForm.setError("amount", { message: `Insufficient balance. $${values.amount} is approx. ₦${amountInNgn.toLocaleString()}.`});
         return;
@@ -92,7 +97,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
     setIsSubmitting(true);
     const result = await requestWithdrawalAction({
         userId: user.uid,
-        amount: values.amount, // Send USD amount, action handles NGN conversion
+        amount: values.amount, 
         withdrawalType: 'crypto',
         cryptoCoin: values.coin,
         cryptoNetwork: values.network,
@@ -141,7 +146,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
             <FormControl><Input type="number" step="any" placeholder="e.g. 20" {...field} value={field.value ?? ''} /></FormControl>
             {cryptoAmount > 0 && (
               <FormDescription className="text-xs">
-                Approx. ₦{(cryptoAmount * USD_TO_NGN_RATE).toLocaleString()} will be deducted.
+                Approx. ₦{(cryptoAmount * usdNgnRate).toLocaleString()} will be deducted (Rate: {usdNgnRate}).
               </FormDescription>
             )}
             <FormMessage />

@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -23,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction, createNowPaymentsPaymentAction } from '@/app/actions/wallet-actions';
+import { verifyPaystackDepositAction, createNowPaymentsPaymentAction, getLatestUsdNgnRate } from '@/app/actions/wallet-actions';
 import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +35,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
-// Helper function to check for valid URLs
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
     try {
@@ -47,7 +45,6 @@ function isValidUrl(url: string | undefined | null): url is string {
     }
 }
 
-// Deposit Form Schemas
 const depositSchema = z.object({
     amount: z.coerce.number().min(100, { message: 'Minimum deposit is ₦100.' }),
 });
@@ -58,7 +55,6 @@ const cryptoDepositSchema = z.object({
     payCurrency: z.string().min(1, { message: 'Please select a network.' }),
 });
 
-// Supported NOWPayments assets and their networks
 const COINS = [
     { 
         id: 'usdt', 
@@ -106,7 +102,6 @@ const COINS = [
     },
 ];
 
-// Deposit Component (Paystack - NGN)
 function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -120,7 +115,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
     const paystackConfig = {
         reference: new Date().getTime().toString(),
         email: user.email!,
-        amount: (amount || 0) * 100, // Amount in kobo
+        amount: (amount || 0) * 100, 
         currency: 'NGN',
         publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
         metadata: {
@@ -279,7 +274,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                     name="amount"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Amount (USD Equivalent)</FormLabel>
+                            <FormLabel>Amount (USD)</FormLabel>
                             <FormControl>
                                 <Input type="number" placeholder="e.g., 100" {...field} />
                             </FormControl>
@@ -357,8 +352,21 @@ export default function WalletPage() {
   const [visibleAssets, setVisibleAssets] = useState(ITEMS_PER_PAGE);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
+  const [usdNgnRate, setUsdNgnRate] = useState<number | null>(null);
+  const [isRefreshingRate, setIsRefreshingRate] = useState(false);
   
   const botUsername = 'cruzmarketfunbot';
+
+  useEffect(() => {
+    refreshExchangeRate();
+  }, []);
+
+  const refreshExchangeRate = async () => {
+    setIsRefreshingRate(true);
+    const rate = await getLatestUsdNgnRate();
+    setUsdNgnRate(rate);
+    setIsRefreshingRate(false);
+  };
 
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading: profileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -514,7 +522,20 @@ export default function WalletPage() {
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? <Skeleton className="h-10 w-48" /> : (
-                        <p className="text-4xl font-bold font-headline text-primary">₦{(userProfile?.balance ?? 0).toLocaleString()}</p>
+                        <div className="space-y-4">
+                            <p className="text-4xl font-bold font-headline text-primary">₦{(userProfile?.balance ?? 0).toLocaleString()}</p>
+                            
+                            {/* Real-time Rate Display */}
+                            <div className="flex items-center justify-between p-2 rounded bg-accent/5 border border-accent/20">
+                                <div>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Real-time Exchange Rate</p>
+                                    <p className="text-sm font-bold text-accent">1 USD = ₦{usdNgnRate?.toLocaleString() ?? '...'}</p>
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={refreshExchangeRate} disabled={isRefreshingRate}>
+                                    <RefreshCcw className={cn("h-4 w-4", isRefreshingRate && "animate-spin")} />
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </CardContent>
             </Card>

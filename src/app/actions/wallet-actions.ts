@@ -7,7 +7,20 @@ import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const USD_TO_NGN_RATE = 1600;
+
+// Reliable Exchange Rate Fetching
+export async function getLatestUsdNgnRate(): Promise<number> {
+    try {
+        const response = await fetch('https://open.er-api.com/v6/latest/USD', { 
+            next: { revalidate: 3600 } // Cache for 1 hour
+        });
+        const data = await response.json();
+        return data.rates.NGN || 1600; // Fallback to 1600 if API fails
+    } catch (error) {
+        console.error("EXCHANGE_RATE_ERROR:", error);
+        return 1600;
+    }
+}
 
 type PaystackVerificationResponse = {
     status: boolean;
@@ -58,7 +71,6 @@ export async function verifyPaystackDepositAction(reference: string) {
             throw new Error('Only NGN transactions are supported via Paystack.');
         }
         
-        // Paystack sends amount in kobo for NGN
         const amountInNgn = amount / 100;
 
         await processDeposit(transactionReference, userId, amountInNgn);
@@ -71,9 +83,6 @@ export async function verifyPaystackDepositAction(reference: string) {
     }
 }
 
-/**
- * Creates a NowPayments direct payment for crypto deposits.
- */
 export async function createNowPaymentsPaymentAction(amount: number, payCurrency: string, userId: string) {
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
@@ -119,11 +128,9 @@ type WithdrawalRequestPayload = {
     userId: string;
     amount: number;
     withdrawalType: 'ngn' | 'crypto';
-    // NGN
     bankName?: string;
     accountNumber?: string;
     accountName?: string;
-    // Crypto
     cryptoCoin?: string;
     cryptoNetwork?: string;
     cryptoAddress?: string;
@@ -140,8 +147,9 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         }
         const userProfile = userDoc.data() as UserProfile;
 
-        // Convert crypto USD to NGN for the balance check
-        const amountInNgn = payload.withdrawalType === 'crypto' ? payload.amount * USD_TO_NGN_RATE : payload.amount;
+        // Fetch real-time rate for conversion
+        const currentRate = await getLatestUsdNgnRate();
+        const amountInNgn = payload.withdrawalType === 'crypto' ? payload.amount * currentRate : payload.amount;
 
         if (userProfile.balance < amountInNgn) {
             throw new Error('Insufficient balance.');
@@ -163,14 +171,14 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         });
 
         if (totalPending + amountInNgn > userProfile.balance) {
-            const availableAfterPending = userProfile.balance - totalPending;
             throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals.`);
         }
 
         await addDoc(requestsRef, {
             ...payload,
-            amount: amountInNgn, // Store the NGN value for easy balance deduction later
-            usdAmount: payload.withdrawalType === 'crypto' ? payload.amount : null, // Save USD for admin reference
+            amount: amountInNgn, 
+            usdAmount: payload.withdrawalType === 'crypto' ? payload.amount : (payload.amount / currentRate),
+            exchangeRateAtRequest: currentRate,
             status: 'pending',
             createdAt: serverTimestamp(),
         });
