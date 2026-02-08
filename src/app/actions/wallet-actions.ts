@@ -1,4 +1,3 @@
-
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -8,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest } from '@/lib/types';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const USD_TO_NGN_RATE = 1600;
 
 type PaystackVerificationResponse = {
     status: boolean;
@@ -140,7 +140,10 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         }
         const userProfile = userDoc.data() as UserProfile;
 
-        if (userProfile.balance < payload.amount) {
+        // Convert crypto USD to NGN for the balance check
+        const amountInNgn = payload.withdrawalType === 'crypto' ? payload.amount * USD_TO_NGN_RATE : payload.amount;
+
+        if (userProfile.balance < amountInNgn) {
             throw new Error('Insufficient balance.');
         }
 
@@ -159,13 +162,15 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
             }
         });
 
-        if (totalPending + payload.amount > userProfile.balance) {
+        if (totalPending + amountInNgn > userProfile.balance) {
             const availableAfterPending = userProfile.balance - totalPending;
             throw new Error(`Insufficient available balance. You already have ₦${totalPending.toLocaleString()} in pending withdrawals.`);
         }
 
         await addDoc(requestsRef, {
             ...payload,
+            amount: amountInNgn, // Store the NGN value for easy balance deduction later
+            usdAmount: payload.withdrawalType === 'crypto' ? payload.amount : null, // Save USD for admin reference
             status: 'pending',
             createdAt: serverTimestamp(),
         });

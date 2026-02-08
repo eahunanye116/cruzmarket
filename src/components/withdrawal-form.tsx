@@ -1,9 +1,8 @@
-
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/firebase';
@@ -21,7 +20,7 @@ const ngnSchema = z.object({
 });
 
 const cryptoSchema = z.object({
-  amount: z.coerce.number().min(10000, "Minimum withdrawal is ₦10,000 equivalent."),
+  amount: z.coerce.number().min(20, "Minimum withdrawal is $20."),
   coin: z.string().min(1, "Please select a coin."),
   network: z.string().min(1, "Please select a network."),
   address: z.string().min(10, "Valid wallet address is required."),
@@ -40,6 +39,9 @@ const COINS = [
     { id: 'sol', label: 'Solana', networks: ['Mainnet'] },
 ];
 
+// Fixed rate for the prototype
+const USD_TO_NGN_RATE = 1600;
+
 export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +57,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
   });
 
   const selectedCoinId = cryptoForm.watch('coin');
+  const cryptoAmount = cryptoForm.watch('amount');
   const networks = COINS.find(c => c.id === selectedCoinId)?.networks || [];
 
   const handleNgnSubmit = async (values: z.infer<typeof ngnSchema>) => {
@@ -81,14 +84,15 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
   };
 
   const handleCryptoSubmit = async (values: z.infer<typeof cryptoSchema>) => {
-    if (values.amount > balance) {
-        cryptoForm.setError("amount", { message: "Insufficient balance."});
+    const amountInNgn = values.amount * USD_TO_NGN_RATE;
+    if (amountInNgn > balance) {
+        cryptoForm.setError("amount", { message: `Insufficient balance. $${values.amount} is approx. ₦${amountInNgn.toLocaleString()}.`});
         return;
     }
     setIsSubmitting(true);
     const result = await requestWithdrawalAction({
         userId: user.uid,
-        amount: values.amount,
+        amount: values.amount, // Send USD amount, action handles NGN conversion
         withdrawalType: 'crypto',
         cryptoCoin: values.coin,
         cryptoNetwork: values.network,
@@ -132,7 +136,16 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
     <Form {...cryptoForm}>
       <form onSubmit={cryptoForm.handleSubmit(handleCryptoSubmit)} className="space-y-4 pt-4">
         <FormField control={cryptoForm.control} name="amount" render={({ field }) => (
-          <FormItem><FormLabel>Amount (NGN Equivalent)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel>Amount (USD)</FormLabel>
+            <FormControl><Input type="number" step="any" placeholder="e.g. 20" {...field} value={field.value ?? ''} /></FormControl>
+            {cryptoAmount > 0 && (
+              <FormDescription className="text-xs">
+                Approx. ₦{(cryptoAmount * USD_TO_NGN_RATE).toLocaleString()} will be deducted.
+              </FormDescription>
+            )}
+            <FormMessage />
+          </FormItem>
         )} />
         
         <div className="grid grid-cols-2 gap-4">

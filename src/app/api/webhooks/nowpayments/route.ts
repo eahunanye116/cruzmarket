@@ -1,9 +1,9 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { processDeposit } from '@/lib/wallet';
 
 const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET;
+const USD_TO_NGN_RATE = 1600;
 
 export async function POST(req: NextRequest) {
     const signature = req.headers.get('x-nowpayments-sig');
@@ -35,10 +35,11 @@ export async function POST(req: NextRequest) {
             const reference = payment_id.toString();
 
             if (userId) {
-                // Note: We credit the amount as NGN units in the app, 
-                // even though it was priced in USD for the payment.
-                await processDeposit(reference, userId, price_amount);
-                console.log(`NOWPAYMENTS_WEBHOOK: Successfully credited ${price_amount} units to user ${userId}`);
+                // Convert USD to NGN before crediting the internal balance
+                const amountInNgn = price_amount * USD_TO_NGN_RATE;
+                
+                await processDeposit(reference, userId, amountInNgn);
+                console.log(`NOWPAYMENTS_WEBHOOK: Successfully converted $${price_amount} to ₦${amountInNgn} and credited user ${userId}`);
             } else {
                 console.error(`NOWPAYMENTS_WEBHOOK: Could not extract userId from order_id "${order_id}"`);
             }
