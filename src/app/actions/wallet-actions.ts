@@ -1,4 +1,3 @@
-
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -71,21 +70,16 @@ export async function verifyPaystackDepositAction(reference: string) {
 }
 
 /**
- * Creates a NowPayments invoice for crypto deposits.
+ * Creates a NowPayments direct payment for crypto deposits.
  */
-export async function createNowPaymentsInvoiceAction(amount: number, userId: string) {
-    const API_KEY = process.env.NOWPAYMENTS_API_KEY;
+export async function createNowPaymentsPaymentAction(amount: number, payCurrency: string, userId: string) {
+    const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
-    console.log(`NOWPAYMENTS: Initiating invoice for user ${userId}, amount ${amount} NGN`);
-
-    if (!API_KEY) {
-        console.error("NOWPAYMENTS_ERROR: API Key is missing from environment variables.");
-        return { success: false, error: 'NowPayments API key is not configured on the server.' };
-    }
+    console.log(`NOWPAYMENTS: Initiating payment for user ${userId}, amount ${amount} NGN in ${payCurrency}`);
 
     try {
-        const response = await fetch('https://api.nowpayments.io/v1/invoice', {
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
             method: 'POST',
             headers: {
                 'x-api-key': API_KEY,
@@ -93,33 +87,34 @@ export async function createNowPaymentsInvoiceAction(amount: number, userId: str
             },
             body: JSON.stringify({
                 price_amount: amount,
-                price_currency: 'ngn', // Must be lowercase for NowPayments
+                price_currency: 'ngn',
+                pay_currency: payCurrency.toLowerCase(),
                 order_id: `DEP_${Date.now()}_${userId}`,
                 order_description: `CruzMarket Crypto Deposit`,
                 ipn_callback_url: `${APP_URL}/api/webhooks/nowpayments`,
-                success_url: `${APP_URL}/transactions?status=success`,
-                cancel_url: `${APP_URL}/transactions?status=cancel`,
             }),
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`NOWPAYMENTS_API_ERROR (${response.status}):`, errorText);
-            return { success: false, error: `NowPayments API returned an error: ${response.statusText}` };
-        }
-
         const result = await response.json();
 
-        if (result.invoice_url) {
-            console.log(`NOWPAYMENTS_SUCCESS: Invoice created: ${result.invoice_url}`);
-            return { success: true, invoiceUrl: result.invoice_url };
+        if (result.payment_id) {
+            console.log(`NOWPAYMENTS_SUCCESS: Payment created: ${result.payment_id}`);
+            return { 
+                success: true, 
+                paymentDetails: {
+                    payment_id: result.payment_id,
+                    pay_address: result.pay_address,
+                    pay_amount: result.pay_amount,
+                    pay_currency: result.pay_currency,
+                }
+            };
         } else {
             console.error('NOWPAYMENTS_INVALID_RESPONSE:', result);
-            return { success: false, error: result.message || 'Failed to create crypto invoice. Invalid response from provider.' };
+            return { success: false, error: result.message || 'Failed to initiate payment. Ensure the selected currency is supported.' };
         }
     } catch (error: any) {
         console.error('NOWPAYMENTS_FETCH_EXCEPTION:', error);
-        return { success: false, error: `Network error while contacting NowPayments: ${error.message}` };
+        return { success: false, error: `Network error: ${error.message}` };
     }
 }
 

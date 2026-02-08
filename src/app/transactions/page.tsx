@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -23,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction, createNowPaymentsInvoiceAction } from '@/app/actions/wallet-actions';
+import { verifyPaystackDepositAction, createNowPaymentsPaymentAction } from '@/app/actions/wallet-actions';
 import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,6 +30,8 @@ import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { WithdrawalForm } from '@/components/withdrawal-form';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 
 // Helper function to check for valid URLs
@@ -51,6 +52,7 @@ const depositSchema = z.object({
 
 const cryptoDepositSchema = z.object({
     amount: z.coerce.number().min(1000, { message: 'Minimum crypto deposit is ₦1,000.' }),
+    payCurrency: z.string().min(1, { message: 'Please select a currency.' }),
 });
 
 // Deposit Component
@@ -143,32 +145,78 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
 function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
+    const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
     const form = useForm<z.infer<typeof cryptoDepositSchema>>({
         resolver: zodResolver(cryptoDepositSchema),
-        defaultValues: { amount: 5000 },
+        defaultValues: { amount: 5000, payCurrency: 'usdttrc20' },
     });
     const amount = form.watch('amount');
 
     const onSubmit = async (values: z.infer<typeof cryptoDepositSchema>) => {
         setIsProcessing(true);
-        console.log("Form submitted, calling NowPayments action...");
         try {
-            const result = await createNowPaymentsInvoiceAction(values.amount, user.uid);
-            if (result.success && result.invoiceUrl) {
-                console.log("Success! Redirecting to:", result.invoiceUrl);
-                window.location.href = result.invoiceUrl;
+            const result = await createNowPaymentsPaymentAction(values.amount, values.payCurrency, user.uid);
+            if (result.success && result.paymentDetails) {
+                setPaymentDetails(result.paymentDetails);
             } else {
-                console.error("Action failed:", result.error);
-                toast({ variant: 'destructive', title: 'Crypto Deposit Error', description: result.error });
-                setIsProcessing(false);
+                toast({ variant: 'destructive', title: 'Payment Error', description: result.error });
             }
         } catch (err: any) {
-            console.error("Submission crash:", err);
             toast({ variant: 'destructive', title: 'Submission Error', description: 'A critical error occurred while starting the deposit.' });
+        } finally {
             setIsProcessing(false);
         }
     };
+
+    if (paymentDetails) {
+        return (
+            <Card className="border-primary/50 bg-primary/5">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-accent" /> Send Payment
+                    </CardTitle>
+                    <CardDescription>Scan the QR code or send exact amount to the address.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-center">
+                    <div className="bg-background p-4 rounded-lg flex justify-center border-2 border-primary/20 mx-auto w-fit">
+                        <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${paymentDetails.pay_address}`} 
+                            alt="Payment QR Code" 
+                            className="w-40 h-40"
+                        />
+                    </div>
+                    <div className="space-y-2 text-left">
+                        <div className="p-2 bg-muted rounded border space-y-1">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Amount to Send</p>
+                            <div className="flex justify-between items-center">
+                                <span className="font-mono font-bold text-sm">{paymentDetails.pay_amount} {paymentDetails.pay_currency.toUpperCase()}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(paymentDetails.pay_amount.toString()); toast({ title: 'Amount Copied' }); }}>
+                                    <Copy className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="p-2 bg-muted rounded border space-y-1">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Wallet Address</p>
+                            <div className="flex justify-between items-center">
+                                <span className="font-mono text-[10px] break-all max-w-[80%]">{paymentDetails.pay_address}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(paymentDetails.pay_address); toast({ title: 'Address Copied' }); }}>
+                                    <Copy className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                    <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 text-[10px] text-left">
+                        <AlertCircle className="h-3 w-3" />
+                        <AlertDescription>
+                            Your balance will update automatically after confirmation. This usually takes 5-20 minutes.
+                        </AlertDescription>
+                    </Alert>
+                    <Button variant="outline" className="w-full h-8 text-xs" onClick={() => setPaymentDetails(null)}>Cancel / New Payment</Button>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
@@ -194,9 +242,32 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={form.control}
+                            name="payCurrency"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Select Asset</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select currency" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="usdttrc20">USDT (TRC20)</SelectItem>
+                                            <SelectItem value="btc">Bitcoin (BTC)</SelectItem>
+                                            <SelectItem value="eth">Ethereum (ETH)</SelectItem>
+                                            <SelectItem value="ltc">Litecoin (LTC)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Bitcoin className="mr-2" />}
-                            Pay ₦{amount ? amount.toLocaleString() : 0} with Crypto
+                            Start ₦{amount ? amount.toLocaleString() : 0} Payment
                         </Button>
                     </form>
                 </Form>
