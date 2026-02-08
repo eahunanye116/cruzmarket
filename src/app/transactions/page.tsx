@@ -47,7 +47,7 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 // Deposit Form Schemas
 const depositSchema = z.object({
-    amount: z.coerce.number().min(20000, { message: 'Minimum deposit is ₦20,000.' }),
+    amount: z.coerce.number().min(100, { message: 'Minimum deposit is ₦100.' }),
 });
 
 const cryptoDepositSchema = z.object({
@@ -111,7 +111,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
 
     const form = useForm<z.infer<typeof depositSchema>>({
         resolver: zodResolver(depositSchema),
-        defaultValues: { amount: 20000 },
+        defaultValues: { amount: 100 },
     });
     const amount = form.watch('amount');
 

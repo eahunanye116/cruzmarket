@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -14,7 +13,7 @@ import { HandCoins, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 const formSchema = z.object({
-  amount: z.coerce.number().min(20000, "Minimum withdrawal is ₦20,000."),
+  amount: z.coerce.number().min(10000, "Minimum withdrawal is ₦10,000."),
   bankName: z.string().min(2, "Bank name is required."),
   accountNumber: z.string().min(5, "Account number is required."),
   accountName: z.string().min(2, "Account name is required."),
@@ -74,7 +73,7 @@ export function WithdrawalForm({ user, balance }: WithdrawalFormProps) {
               <FormItem><FormLabel>Account Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="animate-spin" /> : <HandCoins className="mr-2" />}
+              {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <HandCoins className="mr-2" />}
               Request Withdrawal
             </Button>
           </form>
