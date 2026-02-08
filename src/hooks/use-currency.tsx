@@ -61,15 +61,45 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const formatAmount = (amountInNgn: number, options: Intl.NumberFormatOptions = {}) => {
     const displayAmount = convertFromNgn(amountInNgn);
     
+    // Smart defaults for fraction digits based on amount and context
+    const isSmall = amountInNgn > 0 && amountInNgn < 100;
+    
+    let minDigits = options.minimumFractionDigits;
+    let maxDigits = options.maximumFractionDigits;
+
+    // Safe merging logic to prevent RangeError: minDigits > maxDigits
+    if (minDigits === undefined && maxDigits === undefined) {
+        // Default behavior: 2 decimals for balance, up to 8 for token prices
+        minDigits = 2;
+        maxDigits = isSmall ? 8 : 2;
+    } else if (maxDigits !== undefined && minDigits === undefined) {
+        // If user wants whole numbers (max: 0), min must also be 0
+        minDigits = Math.min(2, maxDigits);
+    } else if (minDigits !== undefined && maxDigits === undefined) {
+        // If user wants specific precision (min: 4), max must be at least that
+        maxDigits = Math.max(minDigits, isSmall ? 8 : 2);
+    }
+
+    // Final safety clamp for Intl requirements
+    const finalMin = Math.max(0, Math.min(20, minDigits ?? 2));
+    const finalMax = Math.max(finalMin, Math.min(20, maxDigits ?? finalMin));
+
     const finalOptions: Intl.NumberFormatOptions = {
         style: 'currency',
         currency: currency,
-        minimumFractionDigits: options.minimumFractionDigits ?? 2,
-        maximumFractionDigits: options.maximumFractionDigits ?? (amountInNgn < 100 ? 8 : 2),
         ...options,
+        minimumFractionDigits: finalMin,
+        maximumFractionDigits: finalMax,
     };
 
-    return new Intl.NumberFormat('en-US', finalOptions).format(displayAmount);
+    try {
+        return new Intl.NumberFormat('en-US', finalOptions).format(displayAmount);
+    } catch (e) {
+        console.error("Formatting error:", e);
+        // Fallback to basic string if Intl fails
+        const symbol = currency === 'NGN' ? '₦' : '$';
+        return `${symbol}${displayAmount.toFixed(2)}`;
+    }
   };
 
   return (

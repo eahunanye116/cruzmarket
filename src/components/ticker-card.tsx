@@ -22,14 +22,16 @@ function isValidUrl(url: string) {
 export function TickerCard({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
   const change24h = useMemo(() => calculateMarketCapChange(ticker), [ticker]);
-  const { formatAmount, currency } = useCurrency();
+  const { formatAmount, currency, convertFromNgn } = useCurrency();
 
-  const formatCompact = (num: number) => {
+  const formatCompact = (amountInNgn: number) => {
+    const val = convertFromNgn(amountInNgn);
     const sym = currency === 'NGN' ? '₦' : '$';
-    if (num >= 1_000_000_000) return `${sym}${(num / 1_000_000_000).toFixed(2)}B`;
-    if (num >= 1_000_000) return `${sym}${(num / 1_000_000).toFixed(2)}M`;
-    if (num >= 1_000) return `${sym}${(num / 1_000).toFixed(1)}K`;
-    return `${sym}${num.toFixed(0)}`;
+    
+    if (val >= 1_000_000_000) return `${sym}${(val / 1_000_000_000).toFixed(2)}B`;
+    if (val >= 1_000_000) return `${sym}${(val / 1_000_000).toFixed(2)}M`;
+    if (val >= 1_000) return `${sym}${(val / 1_000).toFixed(1)}K`;
+    return `${sym}${val.toFixed(0)}`;
   };
 
   return (
