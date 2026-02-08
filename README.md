@@ -1,3 +1,4 @@
+
 # CruzMarket
 
 **Welcome to CruzMarket: The Premier Battleground for Meme Tickers.**
@@ -15,7 +16,9 @@ Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and a
 *   `TELEGRAM_BOT_TOKEN`: Your token from @BotFather.
 *   `PAYSTACK_SECRET_KEY`: Your secret key from Paystack.
 *   `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`: Your public key from Paystack.
-*   `NEXT_PUBLIC_APP_URL`: Set to `https://cruzmarket.fun` (or your actual domain).
+*   `NOWPAYMENTS_API_KEY`: `299PEWX-X9C4349-NF28N7G-A2FFNYH`
+*   `NOWPAYMENTS_IPN_SECRET`: Your IPN Secret from NowPayments Dashboard > Settings.
+*   `NEXT_PUBLIC_APP_URL`: Set to `https://cruzmarket.fun`.
 
 ### 2. Redeploy
 You **must** trigger a new deployment on Vercel after adding variables for them to take effect.
@@ -25,7 +28,6 @@ You **must** trigger a new deployment on Vercel after adding variables for them 
 2.  Log in as Admin and go to `/admin`.
 3.  Go to the **Telegram** tab.
 4.  Ensure the URL is your live domain and click **"Set Webhook"**.
-5.  *Use the "Check Live Status" button to confirm it shows your live URL, not a `cloudworkstations.dev` URL.*
 
 ---
 
@@ -37,12 +39,10 @@ You **must** trigger a new deployment on Vercel after adding variables for them 
 *   Search for your bot: `@cruzmarketfunbot` and select it.
 *   Ensure the permission **"Post Messages"** is enabled.
 
-**2. User Linking:**
-*   Users must go to **Wallet** or **Settings** in the web app to link their account before trading in the bot.
-
 ---
 
 ## 🔗 Webhooks Reference
 
 *   **Paystack Webhook:** `https://cruzmarket.fun/api/webhooks/paystack`
+*   **NowPayments Webhook:** `https://cruzmarket.fun/api/webhooks/nowpayments`
 *   **Telegram Webhook:** `https://cruzmarket.fun/api/telegram/webhook`

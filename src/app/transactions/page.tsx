@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
+import { Ban, History, Plus, Minus, ArrowRight, Wallet, Landmark, Loader2, Search, ArrowDown, PieChart, ShoppingBag, Clock, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePaystackPayment } from 'react-paystack';
-import { verifyPaystackDepositAction } from '@/app/actions/wallet-actions';
+import { verifyPaystackDepositAction, createNowPaymentsInvoiceAction } from '@/app/actions/wallet-actions';
 import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,9 +44,13 @@ function isValidUrl(url: string | undefined | null): url is string {
     }
 }
 
-// Deposit Form Schema
+// Deposit Form Schemas
 const depositSchema = z.object({
     amount: z.coerce.number().min(100, { message: 'Minimum deposit is ₦100.' }),
+});
+
+const cryptoDepositSchema = z.object({
+    amount: z.coerce.number().min(1000, { message: 'Minimum crypto deposit is ₦1,000.' }),
 });
 
 // Deposit Component
@@ -128,6 +132,62 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                         <Button type="submit" className="w-full" disabled={isProcessing}>
                             {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
                             Deposit ₦{amount ? amount.toLocaleString() : 0}
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    )
+}
+
+function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
+    const { toast } = useToast();
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const form = useForm<z.infer<typeof cryptoDepositSchema>>({
+        resolver: zodResolver(cryptoDepositSchema),
+        defaultValues: { amount: 5000 },
+    });
+    const amount = form.watch('amount');
+
+    const onSubmit = async (values: z.infer<typeof cryptoDepositSchema>) => {
+        setIsProcessing(true);
+        const result = await createNowPaymentsInvoiceAction(values.amount, user.uid);
+        if (result.success && result.invoiceUrl) {
+            window.location.href = result.invoiceUrl;
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Coins className="h-5 w-5 text-primary" /> Deposit Crypto
+                </CardTitle>
+                <CardDescription>Pay with BTC, USDT, ETH via NowPayments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="amount"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Amount (NGN Equivalent)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="e.g., 10000" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" variant="secondary" className="w-full" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Bitcoin className="mr-2" />}
+                            Pay ₦{amount ? amount.toLocaleString() : 0} with Crypto
                         </Button>
                     </form>
                 </Form>
@@ -383,6 +443,7 @@ export default function WalletPage() {
                 </CardContent>
             </Card>
             {user && <DepositForm user={user} />}
+            {user && <CryptoDepositForm user={user} />}
             {user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} />}
         </div>
 

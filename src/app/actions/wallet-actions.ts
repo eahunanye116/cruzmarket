@@ -1,3 +1,4 @@
+
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -66,6 +67,49 @@ export async function verifyPaystackDepositAction(reference: string) {
     } catch (error: any) {
         console.error('Paystack verification error:', error);
         return { success: false, error: error.message || 'An unknown error occurred during verification.' };
+    }
+}
+
+/**
+ * Creates a NowPayments invoice for crypto deposits.
+ */
+export async function createNowPaymentsInvoiceAction(amount: number, userId: string) {
+    const API_KEY = process.env.NOWPAYMENTS_API_KEY;
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
+
+    if (!API_KEY) {
+        return { success: false, error: 'NowPayments API key is not configured.' };
+    }
+
+    try {
+        const response = await fetch('https://api.nowpayments.io/v1/invoice', {
+            method: 'POST',
+            headers: {
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                price_amount: amount,
+                price_currency: 'ngn',
+                order_id: `DEP_${Date.now()}_${userId}`,
+                order_description: `CruzMarket Crypto Deposit`,
+                ipn_callback_url: `${APP_URL}/api/webhooks/nowpayments`,
+                success_url: `${APP_URL}/transactions?status=success`,
+                cancel_url: `${APP_URL}/transactions?status=cancel`,
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.invoice_url) {
+            return { success: true, invoiceUrl: result.invoice_url };
+        } else {
+            console.error('NowPayments Error:', result);
+            return { success: false, error: result.message || 'Failed to create crypto invoice.' };
+        }
+    } catch (error: any) {
+        console.error('NowPayments Fetch Error:', error);
+        return { success: false, error: error.message };
     }
 }
 
