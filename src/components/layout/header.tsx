@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from 'next/link';
@@ -14,12 +13,14 @@ import { doc } from 'firebase/firestore';
 import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { NotificationBell } from './notification-bell';
+import { useCurrency } from '@/hooks/use-currency';
 
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1'; 
 
 function UserBalance() {
   const user = useUser();
   const firestore = useFirestore();
+  const { formatAmount } = useCurrency();
   const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
 
@@ -31,9 +32,24 @@ function UserBalance() {
 
   return (
     <div className="font-semibold text-primary">
-      ₦{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      {formatAmount(balance)}
     </div>
   )
+}
+
+function CurrencySwitcher() {
+    const { currency, setCurrency } = useCurrency();
+    
+    return (
+        <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 px-2 font-bold text-[10px] sm:text-xs"
+            onClick={() => setCurrency(currency === 'NGN' ? 'USD' : 'NGN')}
+        >
+            {currency}
+        </Button>
+    )
 }
 
 export function Header() {
@@ -83,6 +99,7 @@ export function Header() {
         </div>
         
         <div className="flex flex-1 items-center justify-end space-x-4">
+          <CurrencySwitcher />
           {user ? (
             <>
             <UserBalance />

@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -34,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCurrency } from '@/hooks/use-currency';
 
 
 function isValidUrl(url: string | undefined | null): url is string {
@@ -193,17 +193,15 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
     const selectedCoin = COINS.find(c => c.id === selectedCoinId);
     const networks = selectedCoin?.networks || [];
 
-    // Fetch minimum amount when currency changes
     useEffect(() => {
         const fetchMin = async () => {
             if (!selectedPayCurrency) return;
             setIsLoadingMin(true);
             const result = await getNowPaymentsMinAmountAction(selectedPayCurrency);
             if (result.success) {
-                // Buffer by 5% to handle minor volatility during checkout
                 setMinAmountUsd(Math.ceil(result.minAmountUsd * 1.05));
             } else {
-                setMinAmountUsd(20); // Default fallback
+                setMinAmountUsd(20);
             }
             setIsLoadingMin(false);
         };
@@ -374,6 +372,7 @@ const ITEMS_PER_PAGE = 7;
 export default function WalletPage() {
   const user = useUser();
   const firestore = useFirestore();
+  const { formatAmount } = useCurrency();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -546,14 +545,13 @@ export default function WalletPage() {
              <Card className="flex flex-col justify-center">
                 <CardHeader>
                     <CardTitle>Total Balance</CardTitle>
-                    <CardDescription>Available NGN for trading.</CardDescription>
+                    <CardDescription>Available for trading.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? <Skeleton className="h-10 w-48" /> : (
                         <div className="space-y-4">
-                            <p className="text-4xl font-bold font-headline text-primary">₦{(userProfile?.balance ?? 0).toLocaleString()}</p>
+                            <p className="text-4xl font-bold font-headline text-primary">{formatAmount(userProfile?.balance ?? 0)}</p>
                             
-                            {/* Real-time Rate Display */}
                             <div className="flex items-center justify-between p-2 rounded bg-accent/5 border border-accent/20">
                                 <div>
                                     <p className="text-[10px] uppercase font-bold text-muted-foreground">Real-time Exchange Rate</p>
@@ -616,7 +614,7 @@ export default function WalletPage() {
                                     <TableCell>{req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="font-bold">₦{req.amount.toLocaleString()}</span>
+                                            <span className="font-bold">{formatAmount(req.amount)}</span>
                                             {req.withdrawalType === 'crypto' && req.usdAmount && (
                                                 <span className="text-[10px] text-muted-foreground">(${req.usdAmount.toLocaleString()})</span>
                                             )}
@@ -652,7 +650,7 @@ export default function WalletPage() {
                         <TableRow key={asset.tickerId}>
                             <TableCell><div className="flex items-center gap-4">{isValidUrl(asset.tickerIcon) ? <Image src={asset.tickerIcon} alt={asset.tickerName} width={32} height={32} className="rounded-none border-2 aspect-square object-cover" /> : <div className="h-8 w-8 border-2 bg-muted" />}<p className="font-medium">{asset.tickerName}</p></div></TableCell>
                             <TableCell>{asset.tradeCount}</TableCell>
-                            <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>{asset.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto' })}</TableCell>
+                            <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>{formatAmount(asset.realizedPnl, { signDisplay: 'auto' })}</TableCell>
                             <TableCell className="text-muted-foreground text-xs">{formatDistanceToNow(asset.lastActivity, { addSuffix: true })}</TableCell>
                             <TableCell className="text-right"><Button asChild variant="ghost" size="icon" className="h-8 w-8"><Link href={`/transactions/token/${asset.tickerId}`}><ArrowRight className="h-4 w-4" /></Link></Button></TableCell>
                         </TableRow>
@@ -678,7 +676,7 @@ export default function WalletPage() {
                         {walletActivities.map(activity => (
                             <TableRow key={activity.id}>
                                 <TableCell><Badge variant={activity.type === 'DEPOSIT' ? 'secondary' : 'outline'}>{activity.type}</Badge></TableCell>
-                                <TableCell>₦{activity.value.toLocaleString()}</TableCell>
+                                <TableCell>{formatAmount(activity.value)}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</TableCell>
                             </TableRow>
                         ))}

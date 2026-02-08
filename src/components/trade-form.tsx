@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -25,9 +24,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { executeBuyAction, executeSellAction } from '@/app/actions/trade-actions';
+import { useCurrency } from '@/hooks/use-currency';
 
 const buySchema = z.object({
-  ngnAmount: z.coerce.number().positive().min(1),
+  amount: z.coerce.number().positive().min(0.01),
 });
 
 const sellSchema = z.object({
@@ -40,6 +40,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
   const firestore = useFirestore();
+  const { currency, formatAmount, convertToNgn, convertFromNgn } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
 
@@ -65,7 +66,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
 
   const buyForm = useForm<z.infer<typeof buySchema>>({
     resolver: zodResolver(buySchema),
-    defaultValues: { ngnAmount: '' as any },
+    defaultValues: { amount: '' as any },
   });
 
   const sellForm = useForm<z.infer<typeof sellSchema>>({
@@ -73,11 +74,13 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     defaultValues: { tokenAmount: '' as any },
   });
 
-  const ngnAmountToBuy = buyForm.watch('ngnAmount');
+  const inputAmountToBuy = buyForm.watch('amount');
+  const ngnAmountToBuy = convertToNgn(inputAmountToBuy || 0);
+  
   const tokenAmountToSell = sellForm.watch('tokenAmount');
   
-  const buyFee = (ngnAmountToBuy || 0) * TRANSACTION_FEE_PERCENTAGE;
-  const ngnForCurve = (ngnAmountToBuy || 0) - buyFee;
+  const buyFeeNgn = ngnAmountToBuy * TRANSACTION_FEE_PERCENTAGE;
+  const ngnForCurve = ngnAmountToBuy - buyFeeNgn;
 
   const tokensToReceive = useMemo(() => {
     if (!ngnForCurve || ngnForCurve <= 0) return 0;
@@ -94,17 +97,17 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     return Math.max(0, usdOut);
   }, [tokenAmountToSell, ticker]);
   
-  const sellFee = ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
-  const ngnToReceiveAfterFee = ngnToReceiveBeforeFee - sellFee;
+  const sellFeeNgn = ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
+  const ngnToReceiveAfterFee = ngnToReceiveBeforeFee - sellFeeNgn;
   
   const positionPnl = useMemo(() => {
-    if (!userHolding) return { pnl: 0, pnlPercent: 0, currentValue: 0 };
+    if (!userHolding) return { pnlNgn: 0, pnlPercent: 0, currentValueNgn: 0 };
     const reclaimable = calculateReclaimableValue(userHolding.amount, ticker);
     const fee = reclaimable * TRANSACTION_FEE_PERCENTAGE;
-    const currentValue = reclaimable - fee; 
-    const pnl = currentValue - (userHolding.amount * userHolding.avgBuyPrice);
-    const pnlPercent = (userHolding.amount * userHolding.avgBuyPrice) > 0 ? (pnl / (userHolding.amount * userHolding.avgBuyPrice)) * 100 : 0;
-    return { pnl, pnlPercent, currentValue };
+    const currentValueNgn = reclaimable - fee; 
+    const pnlNgn = currentValueNgn - (userHolding.amount * userHolding.avgBuyPrice);
+    const pnlPercent = (userHolding.amount * userHolding.avgBuyPrice) > 0 ? (pnlNgn / (userHolding.amount * userHolding.avgBuyPrice)) * 100 : 0;
+    return { pnlNgn, pnlPercent, currentValueNgn };
   }, [userHolding, ticker]);
 
   const onSellSubmit = useCallback(async (values: z.infer<typeof sellSchema>) => {
@@ -112,18 +115,20 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setIsSubmitting(true);
     const result = await executeSellAction(user.uid, ticker.id, values.tokenAmount);
     if (result.success) {
-        toast({ title: "Sale Successful!", description: `You received approx. ₦${result.ngnToUser?.toLocaleString()}.` });
+        toast({ title: "Sale Successful!", description: `You received approx. ${formatAmount(result.ngnToUser || 0)}.` });
         sellForm.reset();
     } else {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
     setIsSubmitting(false);
-  }, [user, ticker.id, toast, sellForm]);
+  }, [user, ticker.id, toast, sellForm, formatAmount]);
 
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!user) return;
     setIsSubmitting(true);
-    const result = await executeBuyAction(user.uid, ticker.id, values.ngnAmount);
+    // Always convert to NGN for the backend
+    const amountInNgn = convertToNgn(values.amount);
+    const result = await executeBuyAction(user.uid, ticker.id, amountInNgn);
     if (result.success) {
         toast({ title: "Success!", description: `Bought ${result.tokensOut?.toLocaleString()} tokens.` });
         buyForm.reset();
@@ -152,20 +157,20 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         <TabsContent value="buy">
           <Form {...buyForm}>
             <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
-              <div className="text-right text-sm text-muted-foreground">Balance: ₦{userProfile?.balance?.toLocaleString() ?? '0.00'}</div>
-              <FormField control={buyForm.control} name="ngnAmount" render={({ field }) => (
+              <div className="text-right text-sm text-muted-foreground">Balance: {formatAmount(userProfile?.balance ?? 0)}</div>
+              <FormField control={buyForm.control} name="amount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount to Spend (NGN)</FormLabel>
-                  <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
+                  <FormLabel>Amount to Spend ({currency})</FormLabel>
+                  <FormControl><Input type="number" step="any" placeholder="0.00" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
                   <div className="flex justify-between"><span>Tokens to receive</span><span>{tokensToReceive.toLocaleString()}</span></div>
-                  <div className="flex justify-between font-bold"><span>Total Cost</span><span>₦{ngnAmountToBuy || 0}</span></div>
+                  <div className="flex justify-between font-bold"><span>Total Cost</span><span>{formatAmount(ngnAmountToBuy)}</span></div>
               </div>
               <Button type="submit" disabled={isSubmitting} className="w-full">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : "Buy Ticker"}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : `Buy ${ticker.name}`}
               </Button>
             </form>
           </Form>
@@ -181,10 +186,10 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 <FormItem><FormLabel>Tokens to Sell</FormLabel><FormControl><Input type="number" step="any" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
-                  <div className="flex justify-between"><span>Net NGN received</span><span>₦{ngnToReceiveAfterFee.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>Net {currency} received</span><span>{formatAmount(ngnToReceiveAfterFee)}</span></div>
               </div>
               <Button type="submit" disabled={isSubmitting || !userHolding} className="w-full">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : "Sell Ticker"}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : `Sell ${ticker.name}`}
               </Button>
             </form>
           </Form>
@@ -193,9 +198,9 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
           <TabsContent value="position">
               <div className="rounded-lg border bg-background/50 p-4 space-y-2 text-sm">
                   <div className="flex justify-between"><span>Held</span><span>{userHolding.amount.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>Value</span><span>₦{positionPnl.currentValue.toLocaleString()}</span></div>
-                  <div className={cn("flex justify-between font-bold", positionPnl.pnl >= 0 ? "text-accent" : "text-destructive")}>
-                      <span>P/L</span><span>₦{positionPnl.pnl.toLocaleString()} ({positionPnl.pnlPercent.toFixed(2)}%)</span>
+                  <div className="flex justify-between"><span>Value</span><span>{formatAmount(positionPnl.currentValueNgn)}</span></div>
+                  <div className={cn("flex justify-between font-bold", positionPnl.pnlNgn >= 0 ? "text-accent" : "text-destructive")}>
+                      <span>P/L</span><span>{formatAmount(positionPnl.pnlNgn)} ({positionPnl.pnlPercent.toFixed(2)}%)</span>
                   </div>
               </div>
           </TabsContent>

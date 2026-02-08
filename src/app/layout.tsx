@@ -8,10 +8,9 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Analytics } from '@vercel/analytics/react';
 import { HighPriorityNotificationPopup } from '@/components/high-priority-notification-popup';
+import { CurrencyProvider } from '@/hooks/use-currency';
 
 export const metadata: Metadata = {
-  // Add a metadataBase for absolute URLs in sitemaps and social sharing.
-  // IMPORTANT: The user should replace this with their actual domain.
   metadataBase: new URL('https://cruzmarket.fun'),
   title: 'CruzMarket',
   description: 'The premier battleground for meme tickers. Create, trade, and conquer the market.',
@@ -22,7 +21,7 @@ export const metadata: Metadata = {
     siteName: 'CruzMarket',
     images: [
       {
-        url: '/cruzmarket-og.png', // This image should be placed in the `public` folder.
+        url: '/cruzmarket-og.png',
         width: 1200,
         height: 630,
         alt: 'CruzMarket Logo and Tagline',
@@ -35,8 +34,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'CruzMarket: The Meme Ticker Arena',
     description: 'Create, trade, and conquer the market on the premier battleground for meme tickers.',
-    // creator: '@cruzmarket', // Uncomment and add X handle when available
-    images: ['/cruzmarket-og.png'], // This image should be placed in the `public` folder.
+    images: ['/cruzmarket-og.png'],
   },
 };
 
@@ -57,17 +55,19 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased', comicNeue.variable)}>
         <FirebaseClientProvider>
-          <HighPriorityNotificationPopup />
-          <div className="relative flex min-h-dvh flex-col">
-            <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full animated-gradient"></div>
-                <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm"></div>
+          <CurrencyProvider>
+            <HighPriorityNotificationPopup />
+            <div className="relative flex min-h-dvh flex-col">
+              <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-full animated-gradient"></div>
+                  <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm"></div>
+              </div>
+              <Header />
+              <main className="flex-1 pb-16 md:pb-0">{children}</main>
             </div>
-            <Header />
-            <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          </div>
-          <BottomNav />
-          <Toaster />
+            <BottomNav />
+            <Toaster />
+          </CurrencyProvider>
         </FirebaseClientProvider>
         <Analytics />
       </body>

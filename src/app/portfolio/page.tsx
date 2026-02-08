@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import {
@@ -18,6 +17,7 @@ import { PortfolioHolding, Ticker } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useCurrency } from '@/hooks/use-currency';
 
 function isValidUrl(url: string | undefined | null): url is string {
     if (!url) return false;
@@ -34,6 +34,7 @@ const TRANSACTION_FEE_PERCENTAGE = 0.002;
 export default function PortfolioPage() {
   const user = useUser();
   const firestore = useFirestore();
+  const { formatAmount } = useCurrency();
 
   const portfolioPath = user ? `users/${user.uid}/portfolio` : '';
   const portfolioQuery = user ? query(collection(firestore, portfolioPath)) : null;
@@ -45,8 +46,6 @@ export default function PortfolioPage() {
   const enrichedPortfolio = useMemo(() => {
     if (!portfolio || !tickers) return [];
 
-    // Ticker holds can be split across multiple documents if the buy action creates new ones (though updated to merge now)
-    // We group them here for display robustness.
     const merged: Record<string, PortfolioHolding> = {};
     portfolio.forEach(h => {
       if (!merged[h.tickerId]) {
@@ -65,17 +64,17 @@ export default function PortfolioPage() {
 
       const reclaimableValue = calculateReclaimableValue(holding.amount, ticker);
       const fee = reclaimableValue * TRANSACTION_FEE_PERCENTAGE;
-      const currentValue = reclaimableValue - fee;
+      const currentValueNgn = reclaimableValue - fee;
       
-      const initialCost = holding.amount * holding.avgBuyPrice;
-      const profitOrLoss = currentValue - initialCost;
-      const profitOrLossPercentage = initialCost > 0 ? (profitOrLoss / initialCost) * 100 : 0;
+      const initialCostNgn = holding.amount * holding.avgBuyPrice;
+      const profitOrLossNgn = currentValueNgn - initialCostNgn;
+      const profitOrLossPercentage = initialCostNgn > 0 ? (profitOrLossNgn / initialCostNgn) * 100 : 0;
 
       return {
         ...holding,
         ticker,
-        currentValue,
-        profitOrLoss,
+        currentValueNgn,
+        profitOrLossNgn,
         profitOrLossPercentage,
       };
     }).filter(Boolean);
@@ -84,15 +83,15 @@ export default function PortfolioPage() {
   const totals = useMemo(() => {
     return enrichedPortfolio.reduce((acc, holding) => {
       if(holding) {
-        acc.currentValue += holding.currentValue;
-        acc.initialCost += holding.amount * holding.avgBuyPrice;
+        acc.currentValueNgn += holding.currentValueNgn;
+        acc.initialCostNgn += holding.amount * holding.avgBuyPrice;
       }
       return acc;
-    }, { currentValue: 0, initialCost: 0 });
+    }, { currentValueNgn: 0, initialCostNgn: 0 });
   }, [enrichedPortfolio]);
   
-  const totalProfitOrLoss = totals.currentValue - totals.initialCost;
-  const totalProfitOrLossPercentage = totals.initialCost > 0 ? (totalProfitOrLoss / totals.initialCost) * 100 : 0;
+  const totalProfitOrLossNgn = totals.currentValueNgn - totals.initialCostNgn;
+  const totalProfitOrLossPercentage = totals.initialCostNgn > 0 ? (totalProfitOrLossNgn / totals.initialCostNgn) * 100 : 0;
 
   if (!user) {
     return (
@@ -162,10 +161,10 @@ export default function PortfolioPage() {
         <div>
           <h1 className="text-4xl font-bold font-headline mb-2">My Portfolio</h1>
           <div className="flex items-baseline gap-4">
-              <p className="text-3xl font-semibold text-primary">₦{totals.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <div className={cn("flex items-center font-semibold", totalProfitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
-                {totalProfitOrLoss >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
-                <span>{totalProfitOrLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <p className="text-3xl font-semibold text-primary">{formatAmount(totals.currentValueNgn)}</p>
+              <div className={cn("flex items-center font-semibold", totalProfitOrLossNgn >= 0 ? "text-accent" : "text-destructive")}>
+                {totalProfitOrLossNgn >= 0 ? <ArrowUp className="h-5 w-5 mr-1" /> : <ArrowDown className="h-5 w-5 mr-1" />}
+                <span>{formatAmount(Math.abs(totalProfitOrLossNgn))}</span>
                 <span className="ml-2">({totalProfitOrLossPercentage.toFixed(2)}%)</span>
               </div>
           </div>
@@ -206,7 +205,7 @@ export default function PortfolioPage() {
                       <div>
                         <p className="font-medium">{holding.ticker.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Price: ₦{(holding.ticker.price || 0).toLocaleString('en-US', { maximumFractionDigits: 8 })}
+                          Price: {formatAmount(holding.ticker.price || 0)}
                         </p>
                       </div>
                     </div>
@@ -216,14 +215,14 @@ export default function PortfolioPage() {
                     <p className="text-sm text-muted-foreground">{holding.ticker.name.split('Coin')[0]}</p>
                   </TableCell>
                   <TableCell className="text-right">
-                    ₦{holding.avgBuyPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}
+                    {formatAmount(holding.avgBuyPrice)}
                   </TableCell>
                   <TableCell className="text-right">
-                    ₦{holding.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatAmount(holding.currentValueNgn)}
                   </TableCell>
-                  <TableCell className={cn("text-right font-medium", holding.profitOrLoss >= 0 ? "text-accent" : "text-destructive")}>
+                  <TableCell className={cn("text-right font-medium", holding.profitOrLossNgn >= 0 ? "text-accent" : "text-destructive")}>
                     <div className="flex flex-col items-end">
-                      <span>{holding.profitOrLoss >= 0 ? '+' : '-'}₦{Math.abs(holding.profitOrLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>{holding.profitOrLossNgn >= 0 ? '+' : '-'}{formatAmount(Math.abs(holding.profitOrLossNgn))}</span>
                       <span className="text-sm">({holding.profitOrLossPercentage.toFixed(2)}%)</span>
                     </div>
                   </TableCell>

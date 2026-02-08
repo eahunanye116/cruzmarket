@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,8 +8,10 @@ import { calculateMarketCapChange, cn } from "@/lib/utils";
 import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
+import { useCurrency } from "@/hooks/use-currency";
 
 export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[] }) {
+  const { formatAmount } = useCurrency();
   return (
     <section>
       <div className="flex items-center gap-2 mb-2">
@@ -35,7 +36,7 @@ export function TrendingSection({ trendingTickers }: { trendingTickers: Ticker[]
                       <p className="font-headline font-bold">${ticker.name}</p>
                       <div className="flex items-end gap-2">
                         <p className="text-sm text-primary font-semibold">
-                          ₦{(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                          {formatAmount(ticker.price || 0)}
                         </p>
                         {change24h !== null && (
                           <div className={cn("flex items-center text-xs font-semibold", change24h >= 0 ? "text-accent" : "text-destructive")}>
