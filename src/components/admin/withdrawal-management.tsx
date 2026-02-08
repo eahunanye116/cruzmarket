@@ -76,6 +76,7 @@ export function WithdrawalManagement() {
     };
 
     const handleCopy = (text: string) => {
+        if (!text) return;
         navigator.clipboard.writeText(text);
         toast({ title: 'Copied!' });
     };
@@ -119,7 +120,7 @@ export function WithdrawalManagement() {
                                 <TableRow>
                                     <TableHead>Type</TableHead>
                                     <TableHead>User</TableHead>
-                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Value (NGN)</TableHead>
                                     <TableHead>Details</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -129,21 +130,33 @@ export function WithdrawalManagement() {
                                 {enrichedRequests.map((req) => (
                                     <TableRow key={req.id}>
                                         <TableCell>
-                                            {req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4 text-primary" /> : <Landmark className="h-4 w-4 text-muted-foreground" />}
+                                            {req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4 text-primary" title="Crypto" /> : <Landmark className="h-4 w-4 text-muted-foreground" title="Bank" />}
                                         </TableCell>
-                                        <TableCell>{req.user?.displayName || req.user?.email || 'Unknown'}</TableCell>
-                                        <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold">{req.user?.displayName || 'Unknown'}</span>
+                                                <span className="text-[10px] text-muted-foreground line-clamp-1">{req.user?.email}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold">₦{req.amount.toLocaleString()}</span>
+                                                {req.withdrawalType === 'crypto' && req.usdAmount && (
+                                                    <span className="text-[10px] text-accent font-semibold">${req.usdAmount.toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <div className="text-xs">
                                                 {req.withdrawalType === 'crypto' ? (
                                                     <>
                                                         <p className="font-semibold">{req.cryptoCoin?.toUpperCase()} ({req.cryptoNetwork})</p>
-                                                        <p className="text-muted-foreground truncate max-w-[150px]">{req.cryptoAddress}</p>
+                                                        <p className="text-muted-foreground truncate max-w-[120px]">{req.cryptoAddress}</p>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <p className="font-semibold">{req.accountName}</p>
-                                                        <p className="text-muted-foreground">{req.bankName}</p>
+                                                        <p className="font-semibold line-clamp-1">{req.accountName}</p>
+                                                        <p className="text-muted-foreground line-clamp-1">{req.bankName}</p>
                                                     </>
                                                 )}
                                             </div>
@@ -160,12 +173,12 @@ export function WithdrawalManagement() {
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuItem onClick={() => handleViewDetails(req)}>
-                                                                <Eye className="mr-2 h-4 w-4" /> Info
+                                                                <Eye className="mr-2 h-4 w-4" /> View Info
                                                             </DropdownMenuItem>
                                                             {req.status === 'pending' && (
                                                                 <>
-                                                                    <DropdownMenuItem onClick={() => handleApprove(req.id)}>
-                                                                        <Check className="mr-2 h-4 w-4 text-accent" /> Approve
+                                                                    <DropdownMenuItem onClick={() => handleApprove(req.id)} className="text-accent">
+                                                                        <Check className="mr-2 h-4 w-4" /> Approve
                                                                     </DropdownMenuItem>
                                                                     <AlertDialogTrigger asChild>
                                                                         <DropdownMenuItem className="text-destructive">
@@ -180,10 +193,10 @@ export function WithdrawalManagement() {
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Reject Request?</AlertDialogTitle>
-                                                            <AlertDialogDescription>Provide a reason for rejection.</AlertDialogDescription>
+                                                            <AlertDialogDescription>Provide a clear reason for the rejection so the user knows why.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                           <Textarea
-                                                            placeholder="Reason..."
+                                                            placeholder="Reason for rejection (e.g., Invalid address, Insufficient funds)..."
                                                             value={rejectionReason}
                                                             onChange={(e) => setRejectionReason(e.target.value)}
                                                           />
@@ -194,7 +207,7 @@ export function WithdrawalManagement() {
                                                                 disabled={!rejectionReason}
                                                                 className="bg-destructive hover:bg-destructive/90"
                                                             >
-                                                                Confirm
+                                                                Confirm Rejection
                                                             </AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
@@ -216,35 +229,71 @@ export function WithdrawalManagement() {
                     </DialogHeader>
                     {selectedRequest && (
                         <div className="space-y-4 py-4">
-                            <div className="border rounded-lg p-4 bg-muted/30">
-                                <p className="text-xs text-muted-foreground uppercase font-bold">Amount</p>
-                                <p className="text-lg font-bold text-primary">₦{selectedRequest.amount.toLocaleString()}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="border rounded-lg p-3 bg-muted/30">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Internal NGN</p>
+                                    <p className="text-lg font-bold">₦{selectedRequest.amount.toLocaleString()}</p>
+                                </div>
+                                {selectedRequest.withdrawalType === 'crypto' && selectedRequest.usdAmount && (
+                                    <div className="border rounded-lg p-3 bg-accent/5 border-accent/20">
+                                        <p className="text-[10px] text-accent uppercase font-bold">Pay in Crypto (USD)</p>
+                                        <p className="text-lg font-bold text-accent">${selectedRequest.usdAmount.toLocaleString()}</p>
+                                    </div>
+                                )}
                             </div>
-                            <div className="space-y-2">
-                                <p className="text-sm font-bold">{selectedRequest.withdrawalType === 'crypto' ? 'Crypto Address' : 'Bank Details'}</p>
+                            
+                            <div className="space-y-2 pt-2">
+                                <p className="text-sm font-bold border-b pb-1">{selectedRequest.withdrawalType === 'crypto' ? 'Blockchain Destination' : 'Bank Destination'}</p>
                                 {selectedRequest.withdrawalType === 'crypto' ? (
-                                    <div className="space-y-2">
-                                        <p className="text-sm">Coin: {selectedRequest.cryptoCoin?.toUpperCase()}</p>
-                                        <p className="text-sm">Network: {selectedRequest.cryptoNetwork}</p>
-                                        <div className="flex justify-between items-center bg-muted p-2 rounded">
-                                            <p className="font-mono text-xs break-all">{selectedRequest.cryptoAddress}</p>
-                                            <Button size="sm" variant="ghost" onClick={() => handleCopy(selectedRequest.cryptoAddress!)}><Copy className="h-4 w-4" /></Button>
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div><p className="text-muted-foreground text-xs">Coin</p><p className="font-semibold">{selectedRequest.cryptoCoin?.toUpperCase()}</p></div>
+                                            <div><p className="text-muted-foreground text-xs">Network</p><p className="font-semibold">{selectedRequest.cryptoNetwork}</p></div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-muted-foreground text-xs">Wallet Address</p>
+                                            <div className="flex justify-between items-center bg-muted p-2 rounded group">
+                                                <p className="font-mono text-[10px] break-all max-w-[85%]">{selectedRequest.cryptoAddress}</p>
+                                                <Button size="sm" variant="ghost" className="h-8 w-8" onClick={() => handleCopy(selectedRequest.cryptoAddress!)}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
-                                        <p className="text-sm">Account: {selectedRequest.accountName}</p>
-                                        <p className="text-sm">Bank: {selectedRequest.bankName}</p>
-                                        <div className="flex justify-between items-center bg-muted p-2 rounded">
-                                            <p className="font-mono">{selectedRequest.accountNumber}</p>
-                                            <Button size="sm" variant="ghost" onClick={() => handleCopy(selectedRequest.accountNumber!)}><Copy className="h-4 w-4" /></Button>
+                                    <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <p className="text-muted-foreground text-xs">Account Name</p>
+                                            <p className="font-semibold">{selectedRequest.accountName}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div className="space-y-1">
+                                                <p className="text-muted-foreground text-xs">Bank</p>
+                                                <p className="font-semibold">{selectedRequest.bankName}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-muted-foreground text-xs">Account Number</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-mono">{selectedRequest.accountNumber}</p>
+                                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleCopy(selectedRequest.accountNumber!)}>
+                                                        <Copy className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
+                            
+                            {selectedRequest.rejectionReason && (
+                                <div className="p-3 border-2 border-destructive/20 bg-destructive/5 rounded-lg">
+                                    <p className="text-xs font-bold text-destructive uppercase">Rejection Reason</p>
+                                    <p className="text-sm italic mt-1">{selectedRequest.rejectionReason}</p>
+                                </div>
+                            )}
                         </div>
                     )}
-                    <DialogFooter><Button onClick={() => setIsDetailsOpen(false)}>Close</Button></DialogFooter>
+                    <DialogFooter><Button onClick={() => setIsDetailsOpen(false)} className="w-full">Close</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>

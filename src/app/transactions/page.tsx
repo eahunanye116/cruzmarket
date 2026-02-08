@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -613,7 +614,14 @@ export default function WalletPage() {
                             {withdrawalRequests.map(req => (
                                 <TableRow key={req.id}>
                                     <TableCell>{req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</TableCell>
-                                    <TableCell className="font-bold">₦{req.amount.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-bold">₦{req.amount.toLocaleString()}</span>
+                                            {req.withdrawalType === 'crypto' && req.usdAmount && (
+                                                <span className="text-[10px] text-muted-foreground">(${req.usdAmount.toLocaleString()})</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="text-xs text-muted-foreground">{req.withdrawalType === 'crypto' ? `${req.cryptoCoin?.toUpperCase()} (${req.cryptoNetwork})` : req.bankName}</TableCell>
                                     <TableCell className="text-right"><Badge variant={req.status === 'completed' ? 'default' : req.status === 'pending' ? 'secondary' : 'destructive'}>{req.status.toUpperCase()}</Badge></TableCell>
                                 </TableRow>

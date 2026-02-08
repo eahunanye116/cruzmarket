@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
@@ -11,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { ArrowLeft, Ban, ShieldCheck, Wallet, Download, Upload, History, Info } from 'lucide-react';
+import { ArrowLeft, Ban, ShieldCheck, Wallet, Download, Upload, History, Info, Coins, Landmark } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -148,8 +149,7 @@ export default function UserAuditPage() {
             </CardDescription>
             <CardTitle className="text-2xl text-destructive">₦{totalWithdrawn.toLocaleString()}</CardTitle>
           </CardHeader>
-        </Card>
-      </div>
+        </div>
 
       <Tabs defaultValue="deposits" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
@@ -211,7 +211,7 @@ export default function UserAuditPage() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Bank Info</TableHead>
+                      <TableHead>Details</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -221,11 +221,31 @@ export default function UserAuditPage() {
                         <TableCell className="text-sm">
                           {w.createdAt ? format(w.createdAt.toDate(), 'PP p') : 'N/A'}
                         </TableCell>
-                        <TableCell className="font-bold">₦{w.amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                            <div className="flex flex-col">
+                                <span className="font-bold text-primary">₦{w.amount.toLocaleString()}</span>
+                                {w.withdrawalType === 'crypto' && w.usdAmount && (
+                                    <span className="text-[10px] text-muted-foreground">(${w.usdAmount.toLocaleString()})</span>
+                                )}
+                            </div>
+                        </TableCell>
                         <TableCell>
                           <div className="text-xs">
-                            <p className="font-bold line-clamp-1">{w.accountName}</p>
-                            <p className="text-muted-foreground">{w.bankName} - {w.accountNumber}</p>
+                            {w.withdrawalType === 'crypto' ? (
+                                <>
+                                    <div className="flex items-center gap-1 font-bold">
+                                        <Coins className="h-3 w-3" /> {w.cryptoCoin?.toUpperCase()} ({w.cryptoNetwork})
+                                    </div>
+                                    <p className="text-muted-foreground truncate max-w-[150px]">{w.cryptoAddress}</p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-1 font-bold">
+                                        <Landmark className="h-3 w-3" /> {w.accountName}
+                                    </div>
+                                    <p className="text-muted-foreground">{w.bankName} - {w.accountNumber}</p>
+                                </>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>

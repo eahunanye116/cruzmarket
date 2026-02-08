@@ -112,7 +112,9 @@ export type Deposit = {
 export type WithdrawalRequest = {
   id: string;
   userId: string;
-  amount: number;
+  amount: number; // Equivalent NGN amount
+  usdAmount?: number; // Original USD amount for crypto
+  exchangeRateAtRequest?: number;
   withdrawalType: 'ngn' | 'crypto';
   status: 'pending' | 'completed' | 'rejected';
   // NGN Fields
