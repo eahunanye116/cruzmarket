@@ -77,8 +77,11 @@ export async function createNowPaymentsInvoiceAction(amount: number, userId: str
     const API_KEY = process.env.NOWPAYMENTS_API_KEY;
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
+    console.log(`NOWPAYMENTS: Initiating invoice for user ${userId}, amount ${amount} NGN`);
+
     if (!API_KEY) {
-        return { success: false, error: 'NowPayments API key is not configured.' };
+        console.error("NOWPAYMENTS_ERROR: API Key is missing from environment variables.");
+        return { success: false, error: 'NowPayments API key is not configured on the server.' };
     }
 
     try {
@@ -99,17 +102,24 @@ export async function createNowPaymentsInvoiceAction(amount: number, userId: str
             }),
         });
 
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`NOWPAYMENTS_API_ERROR (${response.status}):`, errorText);
+            return { success: false, error: `NowPayments API returned an error: ${response.statusText}` };
+        }
+
         const result = await response.json();
 
         if (result.invoice_url) {
+            console.log(`NOWPAYMENTS_SUCCESS: Invoice created: ${result.invoice_url}`);
             return { success: true, invoiceUrl: result.invoice_url };
         } else {
-            console.error('NowPayments Error:', result);
-            return { success: false, error: result.message || 'Failed to create crypto invoice.' };
+            console.error('NOWPAYMENTS_INVALID_RESPONSE:', result);
+            return { success: false, error: result.message || 'Failed to create crypto invoice. Invalid response from provider.' };
         }
     } catch (error: any) {
-        console.error('NowPayments Fetch Error:', error);
-        return { success: false, error: error.message };
+        console.error('NOWPAYMENTS_FETCH_EXCEPTION:', error);
+        return { success: false, error: `Network error while contacting NowPayments: ${error.message}` };
     }
 }
 

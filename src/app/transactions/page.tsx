@@ -152,11 +152,20 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
 
     const onSubmit = async (values: z.infer<typeof cryptoDepositSchema>) => {
         setIsProcessing(true);
-        const result = await createNowPaymentsInvoiceAction(values.amount, user.uid);
-        if (result.success && result.invoiceUrl) {
-            window.location.href = result.invoiceUrl;
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.error });
+        console.log("Form submitted, calling NowPayments action...");
+        try {
+            const result = await createNowPaymentsInvoiceAction(values.amount, user.uid);
+            if (result.success && result.invoiceUrl) {
+                console.log("Success! Redirecting to:", result.invoiceUrl);
+                window.location.href = result.invoiceUrl;
+            } else {
+                console.error("Action failed:", result.error);
+                toast({ variant: 'destructive', title: 'Crypto Deposit Error', description: result.error });
+                setIsProcessing(false);
+            }
+        } catch (err: any) {
+            console.error("Submission crash:", err);
+            toast({ variant: 'destructive', title: 'Submission Error', description: 'A critical error occurred while starting the deposit.' });
             setIsProcessing(false);
         }
     };
