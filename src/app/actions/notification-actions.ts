@@ -1,19 +1,23 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, query, getDocs, where, writeBatch, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, getDocs, where, writeBatch, doc, setDoc, deleteDoc, limit } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
-// Action to create a notification (Admin)
+// Consistent Admin/System UID
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
+
+// Action to create a notification (Admin or System)
 type CreateNotificationPayload = {
     title: string;
     message: string;
     isHighPriority: boolean;
     authorId: string;
 }
+
 export async function createNotificationAction(payload: CreateNotificationPayload) {
     if (!payload.authorId) {
-        return { success: false, error: "You must be logged in to send a notification."};
+        return { success: false, error: "Author ID is required."};
     }
     const firestore = getFirestoreInstance();
     try {
@@ -22,10 +26,23 @@ export async function createNotificationAction(payload: CreateNotificationPayloa
             createdAt: serverTimestamp(),
         });
         revalidatePath('/admin');
+        revalidatePath('/'); // Revalidate root to update bells
         return { success: true, message: 'Notification sent successfully.' };
     } catch (error: any) {
         return { success: false, error: error.message || 'Failed to send notification.' };
     }
+}
+
+/**
+ * Helper for system-generated notifications (e.g. Ticker launches)
+ */
+export async function createSystemNotification(title: string, message: string, isHighPriority: boolean = false) {
+    return createNotificationAction({
+        title,
+        message,
+        isHighPriority,
+        authorId: ADMIN_UID
+    });
 }
 
 // Action to mark all notifications as read for a user
@@ -36,15 +53,15 @@ export async function markAllNotificationsAsReadAction(userId: string) {
     try {
         const batch = writeBatch(firestore);
 
+        // We only mark the last 50 as read to keep the batch size manageable
         const notificationsRef = collection(firestore, 'notifications');
-        const allNotificationsSnapshot = await getDocs(notificationsRef);
+        const recentNotificationsQuery = query(notificationsRef, limit(50));
+        const snapshot = await getDocs(recentNotificationsQuery);
 
         const userNotificationsRef = collection(firestore, `users/${userId}/userNotifications`);
         
-        // This is not super efficient for thousands of notifications, but fine for now.
-        for (const notificationDoc of allNotificationsSnapshot.docs) {
+        for (const notificationDoc of snapshot.docs) {
             const userNotificationRef = doc(userNotificationsRef, notificationDoc.id);
-            // set with merge will create or update.
             batch.set(userNotificationRef, { 
                 notificationId: notificationDoc.id,
                 userId: userId,
@@ -73,7 +90,7 @@ export async function dismissHighPriorityNotificationAction(userId: string, noti
             notificationId: notificationId,
             userId: userId,
             isPopupDismissed: true,
-            isRead: true, // Dismissing the popup also counts as reading it
+            isRead: true, 
         }, { merge: true });
 
         revalidatePath('/'); // Revalidate to update popup state
@@ -90,12 +107,9 @@ export async function deleteNotificationAction(notificationId: string) {
     }
     const firestore = getFirestoreInstance();
     try {
-        // Just delete the main notification. The frontend is resilient enough to handle
-        // orphaned userNotification documents. A cleanup job could be run periodically
-        // in a real production environment.
         await deleteDoc(doc(firestore, 'notifications', notificationId));
-
         revalidatePath('/admin');
+        revalidatePath('/');
         return { success: true, message: 'Notification deleted successfully.' };
     } catch (error: any) {
         console.error('Error deleting notification:', error);

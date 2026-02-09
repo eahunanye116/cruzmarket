@@ -1,6 +1,6 @@
 'use client';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Notification, UserNotification } from '@/lib/types';
 import { useState, useMemo } from 'react';
 import type { User } from 'firebase/auth';
@@ -27,7 +27,12 @@ type EnrichedNotification = Notification & { isRead: boolean };
 export function NotificationBell({ user }: { user: User }) {
     const firestore = useFirestore();
 
-    const notificationsQuery = firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null;
+    // OPTIMIZATION: Only fetch the 20 most recent notifications to protect quota
+    const notificationsQuery = firestore ? query(
+        collection(firestore, 'notifications'), 
+        orderBy('createdAt', 'desc'),
+        limit(20)
+    ) : null;
     const { data: notifications, loading: notificationsLoading } = useCollection<Notification>(notificationsQuery);
 
     const userNotificationsQuery = firestore ? collection(firestore, `users/${user.uid}/userNotifications`) : null;

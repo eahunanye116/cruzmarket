@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -6,6 +5,7 @@ import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentR
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
+import { createSystemNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002;
@@ -451,7 +451,16 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
             return { tickerId: newTickerRef.id, tickerName: input.name, tickerAddress, fee: totalFeeForTx };
         });
 
+        // 1. Broadcast to Telegram
         broadcastNewTickerNotification(result.tickerName, result.tickerAddress, result.tickerId);
+        
+        // 2. Automated Platform-wide Notification
+        createSystemNotification(
+            '🚀 New Token Launched!',
+            `$${result.tickerName} has just been deployed to the arena. Trade it before the crowd!`,
+            false
+        );
+
         return { success: true, tickerId: result.tickerId, fee: result.fee };
     } catch (error: any) {
         console.error('Ticker creation failed:', error);
