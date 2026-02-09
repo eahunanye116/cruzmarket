@@ -38,8 +38,8 @@ const formSchema = z.object({
   }).max(20, {
     message: "Ticker name must not exceed 20 characters.",
   }),
-  icon: z.string().url({ message: "Please provide a valid icon." }),
-  coverImage: z.string().url({ message: "Please provide a valid banner image." }),
+  icon: z.string().url({ message: "Please upload an icon." }),
+  coverImage: z.string().url({ message: "Please upload a banner image." }),
   videoUrl: z.string().url({ message: "Must be a valid URL." }).optional().or(z.literal('')),
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
@@ -52,7 +52,7 @@ const formSchema = z.object({
   initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
     message: "Please select a valid market cap option.",
   }),
-  initialBuy: z.coerce.number(), // This is in user's active currency
+  initialBuy: z.coerce.number(),
 });
 
 export function CreateTickerForm() {
@@ -79,7 +79,6 @@ export function CreateTickerForm() {
   const selectedMarketCap = form.watch('initialMarketCap') as keyof typeof marketCapOptions;
   const initialBuyInput = form.watch('initialBuy') || 0;
   
-  // Convert inputs to NGN for summary and backend
   const initialBuyNgn = convertToNgn(initialBuyInput);
   const creationFeeNgn = marketCapOptions[selectedMarketCap]?.fee || 0;
   const totalCostNgn = creationFeeNgn + initialBuyNgn;
@@ -90,9 +89,11 @@ export function CreateTickerForm() {
       return;
     }
 
-    // Set a small floor for technical reasons (e.g., 5 NGN)
-    if (initialBuyNgn < 5) {
-        form.setError('initialBuy', { message: `Minimum initial buy is ${formatAmount(5)}.` });
+    const minBuyThreshold = currency === 'NGN' ? 1000 : 1;
+    if (values.initialBuy < minBuyThreshold) {
+        form.setError('initialBuy', { 
+            message: `Minimum initial buy is ${currency === 'NGN' ? '₦1,000' : '$1'}.` 
+        });
         return;
     }
 
@@ -234,7 +235,8 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Initial Buy ({currency})</FormLabel>
-              <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} /></FormControl>
+              <FormControl><Input type="number" step="any" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} /></FormControl>
+              <FormDescription>Min: {currency === 'NGN' ? '₦1,000' : '$1'}</FormDescription>
               <FormMessage />
             </FormItem>
           )}
