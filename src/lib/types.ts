@@ -62,11 +62,13 @@ export type BotSession = {
   data: Record<string, any>;
 }
 
-export type CopyTradingSettings = {
-  targetUid: string | null;
-  targetDisplayName: string | null;
+export type CopyTarget = {
+  id: string; // The target's UID
+  targetUid: string;
+  targetDisplayName: string;
   amountPerBuyNgn: number;
   isActive: boolean;
+  createdAt: Timestamp;
 };
 
 export type UserProfile = {
@@ -83,7 +85,6 @@ export type UserProfile = {
     expiresAt: Timestamp;
   };
   botSession?: BotSession | null;
-  copyTrading?: CopyTradingSettings;
 };
 
 export type PlatformSettings = {

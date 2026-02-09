@@ -2,8 +2,8 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit } from 'firebase/firestore';
-import type { Ticker, UserProfile, PortfolioHolding, PlatformStats } from '@/lib/types';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit, collectionGroup } from 'firebase/firestore';
+import type { Ticker, UserProfile, PortfolioHolding, PlatformStats, CopyTarget } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
 import { createSystemNotification } from './notification-actions';
@@ -50,31 +50,30 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
 async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
     const firestore = getFirestoreInstance();
     try {
-        // Find active followers
-        const usersRef = collection(firestore, 'users');
+        // Find all active copyTarget documents pointing to this source
         const q = query(
-            usersRef, 
-            where('copyTrading.targetUid', '==', sourceUid),
-            where('copyTrading.isActive', '==', true),
-            limit(100) // Safety limit for Server Action execution time
+            collectionGroup(firestore, 'copyTargets'),
+            where('targetUid', '==', sourceUid),
+            where('isActive', '==', true),
+            limit(200) // Fan-out limit
         );
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) return;
 
-        console.log(`CopyTrading: Triggering ${snapshot.size} copy trades for source ${sourceUid}`);
+        console.log(`CopyTrading: Triggering ${snapshot.size} fan-out trades for source ${sourceUid}`);
 
-        for (const userDoc of snapshot.docs) {
-            const followerId = userDoc.id;
-            const followerData = userDoc.data() as UserProfile;
-            const settings = followerData.copyTrading!;
+        for (const targetDoc of snapshot.docs) {
+            const settings = targetDoc.data() as CopyTarget;
+            // The follower ID is the ID of the user document that contains this sub-collection
+            const followerId = targetDoc.ref.parent.parent?.id;
+            
+            if (!followerId) continue;
 
             try {
                 if (type === 'BUY') {
-                    // For BUY, we use the follower's configured NGN amount
                     await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
                 } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
-                    // For SELL, we sell the same percentage of the follower's holding
                     const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
                     
                     const followerPortfolioRef = collection(firestore, `users/${followerId}/portfolio`);
@@ -94,7 +93,7 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
             }
         }
     } catch (error) {
-        console.error("CopyTrading: Fan-out error:", error);
+        console.error("CopyTrading: Global fan-out error:", error);
     }
 }
 
@@ -110,7 +109,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
             const tickerRef = doc(firestore, 'tickers', resolvedId);
-            const statsRef = doc(firestore, 'stats', 'platform');
             
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
