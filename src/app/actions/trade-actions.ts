@@ -45,34 +45,38 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
 
 /**
  * Trigger trades for all users copying the source user.
- * This function runs asynchronously after the main trade.
  */
 async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
     const firestore = getFirestoreInstance();
     try {
+        console.log(`CopyTrading: Starting fan-out for source ${sourceUid} on ticker ${tickerId}`);
+        
         // Find all active copyTarget documents pointing to this source
         const q = query(
             collectionGroup(firestore, 'copyTargets'),
             where('targetUid', '==', sourceUid),
             where('isActive', '==', true),
-            limit(200) // Fan-out limit
+            limit(50) // Reduced limit for reliability in a single request
         );
         const snapshot = await getDocs(q);
         
-        if (snapshot.empty) return;
+        if (snapshot.empty) {
+            console.log(`CopyTrading: No active followers found for ${sourceUid}`);
+            return;
+        }
 
-        console.log(`CopyTrading: Triggering ${snapshot.size} fan-out trades for source ${sourceUid}`);
+        console.log(`CopyTrading: Replicating trade for ${snapshot.size} followers...`);
 
-        for (const targetDoc of snapshot.docs) {
+        const tradePromises = snapshot.docs.map(async (targetDoc) => {
             const settings = targetDoc.data() as CopyTarget;
-            // The follower ID is the ID of the user document that contains this sub-collection
+            // followerId is the parent user doc ID
             const followerId = targetDoc.ref.parent.parent?.id;
             
-            if (!followerId) continue;
+            if (!followerId) return;
 
             try {
                 if (type === 'BUY') {
-                    await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
+                    return await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
                 } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
                     const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
                     
@@ -84,16 +88,19 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
                         const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
                         const amountToSell = followerHolding.amount * sellPercentage;
                         if (amountToSell > 0.000001) {
-                            await executeSellAction(followerId, tickerId, amountToSell, true);
+                            return await executeSellAction(followerId, tickerId, amountToSell, true);
                         }
                     }
                 }
             } catch (err) {
-                console.error(`CopyTrading: Failed trade for follower ${followerId}:`, err);
+                console.error(`CopyTrading: Error processing follower ${followerId}:`, err);
             }
-        }
+        });
+
+        await Promise.allSettled(tradePromises);
+        console.log(`CopyTrading: Fan-out complete for source ${sourceUid}`);
     } catch (error) {
-        console.error("CopyTrading: Global fan-out error:", error);
+        console.error("CopyTrading: Global fan-out failure:", error);
     }
 }
 
@@ -190,9 +197,9 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             return { success: true, tokensOut, tickerName: tickerData.name, fee };
         });
 
-        // Trigger Copy Trading if this wasn't already a copy trade
+        // CRITICAL: Await copy trades so the function doesn't exit early
         if (!isCopyTrade) {
-            triggerCopyTrades(userId, resolvedId, 'BUY');
+            await triggerCopyTrades(userId, resolvedId, 'BUY');
         }
 
         return result;
@@ -316,9 +323,9 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             return { success: true, tickerName: tickerData.name, ngnToUser, fee };
         });
 
-        // Trigger Copy Trading if this wasn't already a copy trade
+        // CRITICAL: Await copy trades so the function doesn't exit early
         if (!isCopyTrade) {
-            triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
+            await triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
         }
 
         return result;
