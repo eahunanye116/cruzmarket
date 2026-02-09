@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -32,12 +31,14 @@ const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
 async function resolveTickerId(firestore: any, inputId: string): Promise<string> {
     const cleanId = inputId.trim();
     
-    // 1. Try as a direct ID first
-    const directRef = doc(firestore, 'tickers', cleanId);
-    const directSnap = await getDoc(directRef);
-    if (directSnap.exists()) return cleanId;
+    // Optimization: If it looks like a standard 20-char Firestore ID, try it first
+    if (cleanId.length === 20 && !cleanId.includes(' ')) {
+        const directRef = doc(firestore, 'tickers', cleanId);
+        const directSnap = await getDoc(directRef);
+        if (directSnap.exists()) return cleanId;
+    }
 
-    // 2. Try stripping 'cruz' suffix if it's an address
+    // Try stripping 'cruz' suffix if it's an address
     if (cleanId.toLowerCase().endsWith('cruz') && cleanId.length > 5) {
         const strippedId = cleanId.slice(0, -4);
         const strippedRef = doc(firestore, 'tickers', strippedId);
@@ -45,7 +46,6 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
         if (strippedSnap.exists()) return strippedId;
     }
 
-    // 3. Fallback to original clean ID (will throw error later in transaction)
     return cleanId;
 }
 
@@ -54,7 +54,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
     const resolvedId = await resolveTickerId(firestore, tickerId);
     
     try {
-        // Find existing holdings for this user and ticker outside transaction
         const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
         const holdingQuery = query(portfolioRef, where('tickerId', '==', resolvedId));
         const holdingSnapshot = await getDocs(holdingQuery);
@@ -113,9 +112,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 let totalCost = (primaryHoldingData.avgBuyPrice * primaryHoldingData.amount) + ngnAmount;
 
                 for (let i = 1; i < holdingSnapshot.docs.length; i++) {
-                    const extraData = holdingSnapshot.docs[i].data() as PortfolioHolding;
-                    totalAmount += extraData.amount;
-                    totalCost += (extraData.avgBuyPrice * extraData.amount);
                     transaction.delete(holdingSnapshot.docs[i].ref);
                 }
 
@@ -140,6 +136,14 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const volume24h = (tickerData.volume24h || 0) + ngnAmount;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
+            // Optimization: Keep chart data array manageable (e.g., last 200 points)
+            const updatedChartData = [...chartData, {
+                time: now.toISOString(),
+                price: finalPrice,
+                volume: ngnAmount,
+                marketCap: newMarketCap,
+            }].slice(-200);
+
             transaction.update(tickerRef, { 
                 price: finalPrice,
                 marketCap: newMarketCap,
@@ -147,12 +151,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 volume24h,
                 priceChange24h,
                 trendingScore,
-                chartData: arrayUnion({
-                    time: now.toISOString(),
-                    price: finalPrice,
-                    volume: ngnAmount,
-                    marketCap: newMarketCap,
-                })
+                chartData: updatedChartData
             });
 
             const activityRef = doc(collection(firestore, 'activities'));
@@ -274,6 +273,14 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const volume24h = (tickerData.volume24h || 0) + ngnToGetBeforeFee;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
+            // Optimization: Keep chart data array manageable
+            const updatedChartData = [...chartData, {
+                time: now.toISOString(),
+                price: finalPrice,
+                volume: ngnToGetBeforeFee,
+                marketCap: newMarketCap,
+            }].slice(-200);
+
             transaction.update(tickerRef, { 
                 price: finalPrice,
                 marketCap: newMarketCap,
@@ -281,12 +288,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 volume24h,
                 priceChange24h,
                 trendingScore,
-                chartData: arrayUnion({
-                    time: now.toISOString(),
-                    price: finalPrice,
-                    volume: ngnToGetBeforeFee,
-                    marketCap: newMarketCap,
-                })
+                chartData: updatedChartData
             });
 
             const activityRef = doc(collection(firestore, 'activities'));

@@ -1,11 +1,10 @@
-
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Copy, Check, ArrowDownRight, ArrowUpRight, CircleCheckBig } from 'lucide-react';
 import { useDoc, useCollection, useFirestore } from '@/firebase';
-import { doc, collection, query, where, orderBy } from 'firebase/firestore';
+import { doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
@@ -40,18 +39,16 @@ export default function TickerPage({ params }: { params: { id: string } }) {
 
   const activitiesQuery = useMemo(() => {
     if (!firestore || !resolvedParams.id) return null;
+    // OPTIMIZATION: Limit to 50 most recent activities to save quota
     return query(
       collection(firestore, 'activities'), 
-      where('tickerId', '==', resolvedParams.id)
+      where('tickerId', '==', resolvedParams.id),
+      orderBy('createdAt', 'desc'),
+      limit(50)
     );
   }, [firestore, resolvedParams.id]);
 
-  const { data: unsortedActivities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
-
-  const activities = useMemo(() => {
-    if (!unsortedActivities) return [];
-    return [...unsortedActivities].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-  }, [unsortedActivities]);
+  const { data: activities, loading: activitiesLoading } = useCollection<Activity>(activitiesQuery);
 
   const handleCopy = () => {
     if (ticker?.tickerAddress) {

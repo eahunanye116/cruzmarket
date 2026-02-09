@@ -1,4 +1,3 @@
-
 'use client';
 
 import { TickerList } from '@/components/ticker-list';
@@ -27,7 +26,12 @@ export default function Home() {
   // Walkthrough State
   const [showWalkthrough, setShowWalkthrough] = useState(false);
 
-  const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('createdAt', 'desc')) : null;
+  // OPTIMIZATION: Limit ticker fetch to top 100 most recent to save read quota
+  const tickersQuery = firestore ? query(
+    collection(firestore, 'tickers'), 
+    orderBy('createdAt', 'desc'),
+    limit(100) 
+  ) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
   
   const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
@@ -106,23 +110,13 @@ export default function Home() {
 
 
   useEffect(() => {
-    // This effect runs on the client after the initial render and when dependencies change.
-    if (tickersLoading || activityLoading) {
-      // Don't do anything until the main page data is loaded.
-      // This helps ensure the `user` object from Firebase Auth has also had time to populate.
-      return;
-    }
+    if (tickersLoading || activityLoading) return;
   
     const hasCompletedWalkthrough = localStorage.getItem('walkthrough_completed') === 'true';
-    if (hasCompletedWalkthrough) {
-      return;
-    }
+    if (hasCompletedWalkthrough) return;
   
-    // At this point, initial data is loaded and we can check the auth state.
-    // `user` will be null for guests, or a user object for logged-in users.
     setShowWalkthrough(true);
-
-  }, [tickersLoading, activityLoading]); // Depends on loading states
+  }, [tickersLoading, activityLoading]);
 
   const handleFinishWalkthrough = () => {
     localStorage.setItem('walkthrough_completed', 'true');
@@ -133,65 +127,49 @@ export default function Home() {
   useEffect(() => {
     if (!tickers) return;
 
-    // 1. Identify all contenders (5x gain since creation)
     const newContenders = tickers.filter(t => {
       if (!t.chartData || t.chartData.length === 0) return false;
       const creationPrice = t.chartData[0].price;
       if (creationPrice === 0) return false;
       return t.price >= creationPrice * 5;
-    }).sort((a,b) => (b.trendingScore || 0) - (a.trendingScore || 0)); // Sort by trend score
+    }).sort((a,b) => (b.trendingScore || 0) - (a.trendingScore || 0));
 
     setContendersQueue(newContenders);
     if (newContenders.length === 0) {
-      setKingTicker(null); // No one is worthy
+      setKingTicker(null);
       return;
     }
 
     const now = new Date();
     
-    // 2. Check if there's a king
     if (!kingTicker) {
-      // Crown the first king from the queue
       setKingTicker(newContenders[0]);
       setKingCoronationTime(now);
       setCurrentContenderIndex(0);
       return;
     }
 
-    // 3. If there is a king, check their status
     const reignIsOver = kingCoronationTime ? (now.getTime() - kingCoronationTime.getTime()) > 1 * 60 * 1000 : false;
-    
-    // Check if current king is still a contender
     const kingIsStillContender = newContenders.some(c => c.id === kingTicker.id);
 
     if (!kingIsStillContender) {
-      // Dethrone immediately if king loses 5x status
       const nextIndex = currentContenderIndex % newContenders.length;
       setKingTicker(newContenders[nextIndex]);
       setKingCoronationTime(now);
       setCurrentContenderIndex(nextIndex);
     } else if (reignIsOver) {
-      // Reign is over, cycle to the next contender in the queue
       const nextIndex = (currentContenderIndex + 1) % newContenders.length;
       setKingTicker(newContenders[nextIndex]);
       setKingCoronationTime(now);
       setCurrentContenderIndex(nextIndex);
     }
-
-    // If reign is not over and king is still a contender, do nothing.
-
   }, [tickers, kingTicker, kingCoronationTime, currentContenderIndex]);
 
 
   const trendingTickers = useMemo(() => {
     if (!tickers) return [];
-    
-    // Sort by trendingScore, but handle cases where it might be undefined or null
     const sortedByTrend = [...tickers].sort((a, b) => (b.trendingScore || 0) - (a.trendingScore || 0));
-
-    // Filter out the king and take the next 3 trending
     return sortedByTrend.filter(t => t.id !== kingTicker?.id).slice(0, 3);
-
   }, [tickers, kingTicker]);
 
   const isLoading = tickersLoading || activityLoading;
