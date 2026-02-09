@@ -60,8 +60,8 @@ export function PaymentManagement() {
         if (!user) return;
         setIsGeneratingMock(true);
         setMockResult(null);
-        // Use a test amount of $10
-        const result = await createNowPaymentsPaymentAction(10, mockCoin, user.uid);
+        // Use a test amount of $30
+        const result = await createNowPaymentsPaymentAction(30, mockCoin, user.uid);
         if (result.success) {
             setMockResult(result.paymentDetails);
             toast({ title: "Mock Payment Created" });
@@ -108,7 +108,7 @@ export function PaymentManagement() {
                         <CardTitle className="flex items-center gap-2">
                             <Bitcoin className="h-5 w-5 text-primary" /> diagnostic: Address Generation
                         </CardTitle>
-                        <CardDescription>Attempt to create a $10 invoice to verify wallet address creation.</CardDescription>
+                        <CardDescription>Attempt to create a $30 invoice to verify wallet address creation.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex gap-2">
