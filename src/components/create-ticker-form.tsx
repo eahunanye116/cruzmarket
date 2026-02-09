@@ -23,13 +23,14 @@ import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { executeCreateTickerAction } from "@/app/actions/trade-actions";
 import { ImageUpload } from "./image-upload";
+import { useCurrency } from "@/hooks/use-currency";
 
 
 const marketCapOptions = {
-  '100': { fee: 1, label: '₦100' },
-  '1000': { fee: 4, label: '₦1,000' },
-  '5000': { fee: 7, label: '₦5,000' },
-  '10000': { fee: 10, label: '₦10,000' },
+  '100000': { fee: 1000, label: '100,000' },
+  '1000000': { fee: 4000, label: '1,000,000' },
+  '5000000': { fee: 7000, label: '5,000,000' },
+  '10000000': { fee: 10000, label: '10,000,000' },
 };
 
 const formSchema = z.object({
@@ -52,7 +53,7 @@ const formSchema = z.object({
   initialMarketCap: z.string().refine(value => Object.keys(marketCapOptions).includes(value), {
     message: "Please select a valid market cap option.",
   }),
-  initialBuyNgn: z.coerce.number().min(5, { message: "Minimum initial buy is ₦5."}),
+  initialBuy: z.coerce.number(), // This is in user's active currency
 });
 
 export function CreateTickerForm() {
@@ -60,6 +61,7 @@ export function CreateTickerForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const user = useUser();
   const router = useRouter();
+  const { currency, formatAmount, convertToNgn } = useCurrency();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -70,21 +72,28 @@ export function CreateTickerForm() {
       videoUrl: "",
       description: "",
       supply: 1000000000,
-      initialMarketCap: '100',
-      initialBuyNgn: 5,
+      initialMarketCap: '100000',
+      initialBuy: 0,
     },
   });
   
   const selectedMarketCap = form.watch('initialMarketCap') as keyof typeof marketCapOptions;
-  const initialBuyValue = form.watch('initialBuyNgn') || 0;
+  const initialBuyInput = form.watch('initialBuy') || 0;
   
-  const creationFee = marketCapOptions[selectedMarketCap]?.fee || 0;
-  const totalCost = creationFee + initialBuyValue;
+  // Convert inputs to NGN for summary and backend
+  const initialBuyNgn = convertToNgn(initialBuyInput);
+  const creationFeeNgn = marketCapOptions[selectedMarketCap]?.fee || 0;
+  const totalCostNgn = creationFeeNgn + initialBuyNgn;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
       toast({ variant: "destructive", title: "Error", description: "Sign in required." });
       return;
+    }
+
+    if (initialBuyNgn < 1000) {
+        form.setError('initialBuy', { message: `Minimum initial buy is ${formatAmount(1000)}.` });
+        return;
     }
 
     setIsSubmitting(true);
@@ -98,7 +107,7 @@ export function CreateTickerForm() {
         videoUrl: values.videoUrl,
         supply: values.supply,
         initialMarketCap: Number(values.initialMarketCap),
-        initialBuyNgn: values.initialBuyNgn,
+        initialBuyNgn: initialBuyNgn,
     });
 
     if (result.success && result.tickerId) {
@@ -171,7 +180,7 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Video URL (Optional)</FormLabel>
-              <FormControl><Input placeholder="Paste YouTube/TikTok URL..." {...field} /></FormControl>
+              <FormControl><Input placeholder="Paste YouTube/TikTok URL..." {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -192,13 +201,13 @@ export function CreateTickerForm() {
           name="initialMarketCap"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Starting Market Cap</FormLabel>
+              <FormLabel>Starting Market Cap ({currency})</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Select MCAP" /></SelectTrigger></FormControl>
                 <SelectContent>
-                  {Object.entries(marketCapOptions).map(([value, { label, fee }]) => (
+                  {Object.entries(marketCapOptions).map(([value, { fee }]) => (
                     <SelectItem key={value} value={value}>
-                      {label} (Fee: ₦{fee})
+                      {formatAmount(Number(value), { maximumFractionDigits: 0 })} (Fee: {formatAmount(fee)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -221,11 +230,11 @@ export function CreateTickerForm() {
         />
         <FormField
           control={form.control}
-          name="initialBuyNgn"
+          name="initialBuy"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Initial Buy (NGN)</FormLabel>
-              <FormControl><Input type="number" placeholder="5" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}/></FormControl>
+              <FormLabel>Initial Buy ({currency})</FormLabel>
+              <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -233,8 +242,9 @@ export function CreateTickerForm() {
         <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center">
             <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest">Creation Summary</p>
             <div className="flex justify-center gap-8 mt-2">
-                <div><p className="text-[10px] text-muted-foreground uppercase">Fee</p><p className="font-bold">₦{creationFee.toLocaleString()}</p></div>
-                <div><p className="text-[10px] text-muted-foreground uppercase">Total</p><p className="text-xl font-bold text-primary">₦{totalCost.toLocaleString()}</p></div>
+                <div><p className="text-[10px] text-muted-foreground uppercase">Creation Fee</p><p className="font-bold">{formatAmount(creationFeeNgn)}</p></div>
+                <div><p className="text-[10px] text-muted-foreground uppercase">Initial Buy</p><p className="font-bold">{formatAmount(initialBuyNgn)}</p></div>
+                <div><p className="text-[10px] text-muted-foreground uppercase">Total Cost</p><p className="text-xl font-bold text-primary">{formatAmount(totalCostNgn)}</p></div>
             </div>
         </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">

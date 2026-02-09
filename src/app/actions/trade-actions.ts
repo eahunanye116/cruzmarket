@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -11,10 +12,10 @@ const TRANSACTION_FEE_PERCENTAGE = 0.002;
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 const marketCapOptions = {
-  '100': { fee: 1 },
-  '1000': { fee: 4 },
-  '5000': { fee: 7 },
-  '10000': { fee: 10 },
+  '100000': { fee: 1000 },
+  '1000000': { fee: 4000 },
+  '5000000': { fee: 7000 },
+  '10000000': { fee: 10000 },
 };
 
 const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
@@ -136,7 +137,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const volume24h = (tickerData.volume24h || 0) + ngnAmount;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
-            // Optimization: Keep chart data array manageable (e.g., last 200 points)
+            // Optimization: Keep chart data array manageable (e.g., last 200 data points)
             const updatedChartData = [...chartData, {
                 time: now.toISOString(),
                 price: finalPrice,
@@ -252,7 +253,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 const hData = hDoc.data() as PortfolioHolding;
                 if (remainingToSell <= 0) break;
 
-                const amountInThisDoc = hData.amount;
+                const amountIn ThisDoc = hData.amount;
                 const sellFromThisDoc = Math.min(amountInThisDoc, remainingToSell);
                 const newAmount = amountInThisDoc - sellFromThisDoc;
 
