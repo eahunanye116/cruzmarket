@@ -12,13 +12,6 @@ import { revalidatePath } from 'next/cache';
 const TRANSACTION_FEE_PERCENTAGE = 0.002;
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
-const marketCapOptions = {
-  '100000': { fee: 1000 },
-  '1000000': { fee: 4000 },
-  '5000000': { fee: 7000 },
-  '10000000': { fee: 10000 },
-};
-
 const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {
     const volumeWeight = 0.7;
     const priceChangeWeight = 0.3;
@@ -56,7 +49,7 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
             collectionGroup(firestore, 'copyTargets'),
             where('targetUid', '==', sourceUid),
             where('isActive', '==', true),
-            limit(50) // Reduced limit for reliability in a single request
+            limit(50) // Limit per batch for reliability
         );
         const snapshot = await getDocs(q);
         
@@ -69,13 +62,20 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
 
         const tradePromises = snapshot.docs.map(async (targetDoc) => {
             const settings = targetDoc.data() as CopyTarget;
-            // followerId is the parent user doc ID
+            // followerId is the parent user doc ID in the path users/{followerId}/copyTargets/{targetUid}
             const followerId = targetDoc.ref.parent.parent?.id;
             
-            if (!followerId) return;
+            if (!followerId) {
+                console.warn(`CopyTrading: Could not resolve follower ID from path ${targetDoc.ref.path}`);
+                return;
+            }
+
+            // Safety: Don't allow self-copying recursion
+            if (followerId === sourceUid) return;
 
             try {
                 if (type === 'BUY') {
+                    console.log(`CopyTrading: Executing BUY for follower ${followerId} (Amount: ${settings.amountPerBuyNgn})`);
                     return await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
                 } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
                     const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
@@ -88,17 +88,19 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
                         const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
                         const amountToSell = followerHolding.amount * sellPercentage;
                         if (amountToSell > 0.000001) {
+                            console.log(`CopyTrading: Executing SELL for follower ${followerId} (Percentage: ${(sellPercentage * 100).toFixed(1)}%)`);
                             return await executeSellAction(followerId, tickerId, amountToSell, true);
                         }
                     }
                 }
             } catch (err) {
-                console.error(`CopyTrading: Error processing follower ${followerId}:`, err);
+                console.error(`CopyTrading: Individual error processing follower ${followerId}:`, err);
             }
         });
 
-        await Promise.allSettled(tradePromises);
-        console.log(`CopyTrading: Fan-out complete for source ${sourceUid}`);
+        const results = await Promise.allSettled(tradePromises);
+        const successes = results.filter(r => r.status === 'fulfilled').length;
+        console.log(`CopyTrading: Fan-out complete for ${sourceUid}. Successes: ${successes}/${results.length}`);
     } catch (error) {
         console.error("CopyTrading: Global fan-out failure:", error);
     }
@@ -197,8 +199,9 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             return { success: true, tokensOut, tickerName: tickerData.name, fee };
         });
 
-        // CRITICAL: Await copy trades so the function doesn't exit early
+        // ONLY trigger fan-out if this is a manual trade (to avoid infinite loops)
         if (!isCopyTrade) {
+            // We AWAIT this to ensure the server action doesn't finish before children finish
             await triggerCopyTrades(userId, resolvedId, 'BUY');
         }
 
@@ -323,8 +326,9 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             return { success: true, tickerName: tickerData.name, ngnToUser, fee };
         });
 
-        // CRITICAL: Await copy trades so the function doesn't exit early
+        // ONLY trigger fan-out if this is a manual trade
         if (!isCopyTrade) {
+            // Await the fan-out
             await triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
         }
 
@@ -350,6 +354,13 @@ export type CreateTickerInput = {
 export async function executeCreateTickerAction(input: CreateTickerInput) {
     const firestore = getFirestoreInstance();
     const { userId, initialMarketCap, initialBuyNgn } = input;
+
+    const marketCapOptions = {
+      '100000': { fee: 1000 },
+      '1000000': { fee: 4000 },
+      '5000000': { fee: 7000 },
+      '10000000': { fee: 10000 },
+    };
 
     const mCapKey = initialMarketCap.toString();
     const creationFee = marketCapOptions[mCapKey as keyof typeof marketCapOptions]?.fee || 0;
