@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser } from '@/firebase';
 import { Ban } from 'lucide-react';
@@ -12,6 +13,7 @@ import { WithdrawalManagement } from '@/components/admin/withdrawal-management';
 import { NotificationManagement } from '@/components/admin/notification-management';
 import { SupportManagement } from '@/components/admin/support-management';
 import { TelegramManagement } from '@/components/admin/telegram-management';
+import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
 import { useState } from 'react';
 import {
   Select,
@@ -73,9 +75,10 @@ export default function AdminPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
         <div className="hidden sm:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-9">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-10">
             <TabsTrigger value="tickers">Tickers</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="copy-audit">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -95,6 +98,7 @@ export default function AdminPage() {
             <SelectContent>
               <SelectItem value="tickers">Tickers</SelectItem>
               <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
               <SelectItem value="support">Support</SelectItem>
               <SelectItem value="notifications">Notifications</SelectItem>
@@ -111,6 +115,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="copy-audit" className="mt-6">
+          <CopyAuditManagement />
         </TabsContent>
          <TabsContent value="withdrawals" className="mt-6">
           <WithdrawalManagement />

@@ -71,6 +71,23 @@ export type CopyTarget = {
   createdAt: Timestamp;
 };
 
+export type CopyTradeAudit = {
+    id: string;
+    sourceUid: string;
+    tickerId: string;
+    type: 'BUY' | 'SELL';
+    timestamp: Timestamp;
+    followerCount: number;
+    status?: 'critical_failure' | 'complete';
+    error?: string;
+    results?: {
+        followerId: string;
+        status: 'success' | 'failed' | 'skipped' | 'error';
+        reason?: string;
+        message?: string;
+    }[];
+};
+
 export type UserProfile = {
   id?: string;
   email: string;
