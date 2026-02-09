@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -91,8 +90,9 @@ export function CreateTickerForm() {
       return;
     }
 
-    if (initialBuyNgn < 1000) {
-        form.setError('initialBuy', { message: `Minimum initial buy is ${formatAmount(1000)}.` });
+    // Set a small floor for technical reasons (e.g., 5 NGN)
+    if (initialBuyNgn < 5) {
+        form.setError('initialBuy', { message: `Minimum initial buy is ${formatAmount(5)}.` });
         return;
     }
 
