@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import type { Activity } from '@/lib/types';
@@ -12,8 +11,12 @@ import { Button } from './ui/button';
 
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
-    case 'BUY': return <Plus className="h-4 w-4 text-accent-foreground" />;
-    case 'SELL': return <Minus className="h-4 w-4 text-destructive" />;
+    case 'BUY':
+    case 'COPY_BUY':
+      return <Plus className="h-4 w-4 text-accent-foreground" />;
+    case 'SELL':
+    case 'COPY_SELL':
+      return <Minus className="h-4 w-4 text-destructive-foreground" />;
     default: return null;
   }
 }
@@ -28,7 +31,9 @@ export function TickerTransactions({ activities }: { activities: Activity[] }) {
   const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
       if (activity.type === 'CREATE') return false;
-      const typeMatch = filterType === 'all' || activity.type.toLowerCase() === filterType;
+      const isBuy = activity.type.includes('BUY');
+      const isSell = activity.type.includes('SELL');
+      const typeMatch = filterType === 'all' || (filterType === 'buy' && isBuy) || (filterType === 'sell' && isSell);
       const amountMatch = minAmount === '' || activity.value >= minAmount;
       return typeMatch && amountMatch;
     });
@@ -79,20 +84,23 @@ export function TickerTransactions({ activities }: { activities: Activity[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentActivities.length > 0 ? currentActivities.map((activity) => (
-              <TableRow key={activity.id}>
-                <TableCell>
-                  <Badge variant={activity.type === 'BUY' ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0">
-                    <ActivityIcon type={activity.type} />
-                    <span className="ml-1">{activity.type}</span>
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right font-medium">₦{activity.value.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">
-                  {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
-                </TableCell>
-              </TableRow>
-            )) : (
+            {currentActivities.length > 0 ? currentActivities.map((activity) => {
+              const isBuy = activity.type.includes('BUY');
+              return (
+                <TableRow key={activity.id}>
+                  <TableCell>
+                    <Badge variant={isBuy ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0">
+                      <ActivityIcon type={activity.type} />
+                      <span className="ml-1">{activity.type.replace('_', ' ')}</span>
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">₦{activity.value.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">
+                    {activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}
+                  </TableCell>
+                </TableRow>
+              );
+            }) : (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No trades found matching criteria.</TableCell>
               </TableRow>

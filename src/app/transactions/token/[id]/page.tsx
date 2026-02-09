@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import { notFound, useParams } from 'next/navigation';
@@ -29,8 +28,12 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
-    case 'BUY': return <Plus className="h-4 w-4 text-accent-foreground" />;
-    case 'SELL': return <Minus className="h-4 w-4 text-destructive-foreground" />;
+    case 'BUY':
+    case 'COPY_BUY':
+      return <Plus className="h-4 w-4 text-accent-foreground" />;
+    case 'SELL':
+    case 'COPY_SELL':
+      return <Minus className="h-4 w-4 text-destructive-foreground" />;
     default: return null;
   }
 }
@@ -65,13 +68,16 @@ export default function TokenTransactionHistoryPage() {
         if (!activities) return { totalBuy: 0, totalSell: 0, realizedPnl: 0, totalFees: 0, tradeCount: 0 };
         return activities.reduce((acc, act) => {
             if (acc.tradeCount < 1000) { // Safety limit for extreme activity
-                if (act.type === 'BUY' || act.type === 'SELL') {
+                const isBuy = act.type.includes('BUY');
+                const isSell = act.type.includes('SELL');
+                
+                if (isBuy || isSell) {
                     acc.tradeCount++;
                     acc.totalFees += act.fee || (act.value * 0.002);
                 }
-                if (act.type === 'BUY') {
+                if (isBuy) {
                     acc.totalBuy += act.value;
-                } else if (act.type === 'SELL') {
+                } else if (isSell) {
                     acc.totalSell += act.value;
                     if (typeof act.realizedPnl === 'number') {
                         acc.realizedPnl += act.realizedPnl;
@@ -177,38 +183,41 @@ export default function TokenTransactionHistoryPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {activities?.map(act => (
-                                <TableRow key={act.id}>
-                                    <TableCell className="pl-6">
-                                        <Badge variant={act.type === 'BUY' ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0">
-                                            <ActivityIcon type={act.type} />
-                                            <span className="ml-1">{act.type}</span>
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col text-xs">
-                                            <span>{format(act.createdAt.toDate(), 'PP')}</span>
-                                            <span className="text-muted-foreground">{format(act.createdAt.toDate(), 'p')}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-xs font-medium">
-                                        ₦{act.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                                    </TableCell>
-                                    <TableCell className="text-xs text-destructive/70">
-                                        ₦{(act.fee ?? (act.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    </TableCell>
-                                    <TableCell className="text-xs">
-                                        {act.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' })}
-                                    </TableCell>
-                                    <TableCell className="text-right pr-6">
-                                        <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-                                            <Link href={`/trade/${act.id}`}>
-                                                <ArrowRight className="h-4 w-4" />
-                                            </Link>
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {activities?.map(act => {
+                                const isBuy = act.type.includes('BUY');
+                                return (
+                                    <TableRow key={act.id}>
+                                        <TableCell className="pl-6">
+                                            <Badge variant={isBuy ? 'default' : 'destructive'} className="text-[10px] px-1.5 py-0">
+                                                <ActivityIcon type={act.type} />
+                                                <span className="ml-1">{act.type.replace('_', ' ')}</span>
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col text-xs">
+                                                <span>{format(act.createdAt.toDate(), 'PP')}</span>
+                                                <span className="text-muted-foreground">{format(act.createdAt.toDate(), 'p')}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs font-medium">
+                                            ₦{act.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-destructive/70">
+                                            ₦{(act.fee ?? (act.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {act.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' })}
+                                        </TableCell>
+                                        <TableCell className="text-right pr-6">
+                                            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                                                <Link href={`/trade/${act.id}`}>
+                                                    <ArrowRight className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </CardContent>

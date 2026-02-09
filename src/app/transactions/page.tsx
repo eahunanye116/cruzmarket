@@ -430,7 +430,7 @@ export default function WalletPage() {
     }));
 
     const walletActs = enriched.filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL' || act.type === 'TRANSFER_SENT' || act.type === 'TRANSFER_RECEIVED');
-    const trades = enriched.filter(act => act.type === 'BUY' || act.type === 'SELL' || act.type === 'COPY_BUY' || act.type === 'COPY_SELL');
+    const trades = enriched.filter(act => act.type.includes('BUY') || act.type.includes('SELL'));
 
     const groups: { [key: string]: GroupedTransaction } = {};
 
@@ -451,7 +451,7 @@ export default function WalletPage() {
         const group = groups[trade.tickerId];
         group.tradeCount++;
         group.totalVolume += trade.value;
-        if (trade.type === 'SELL' || trade.type === 'COPY_SELL' && typeof trade.realizedPnl === 'number') {
+        if (trade.type.includes('SELL') && typeof trade.realizedPnl === 'number') {
             group.realizedPnl += trade.realizedPnl!;
         }
         if (trade.createdAt.toDate() > group.lastActivity) {

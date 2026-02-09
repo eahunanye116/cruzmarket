@@ -1,4 +1,3 @@
-
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Activity } from '@/lib/types';
@@ -18,9 +17,11 @@ function isValidUrl(url: string) {
 function ActivityIcon({ type }: { type: Activity['type'] }) {
   switch (type) {
     case 'BUY':
+    case 'COPY_BUY':
       return <Plus className="h-5 w-5 text-accent-foreground" />;
     case 'SELL':
-      return <Minus className="h-5 w-5 text-destructive" />;
+    case 'COPY_SELL':
+      return <Minus className="h-5 w-5 text-destructive-foreground" />;
     case 'CREATE':
       return <Sparkles className="h-5 w-5 text-primary" />;
     default:
@@ -31,17 +32,21 @@ function ActivityIcon({ type }: { type: Activity['type'] }) {
 function ActivityText({ activity }: { activity: Activity }) {
   switch (activity.type) {
     case 'BUY':
+    case 'COPY_BUY':
       return (
         <p>
-          <span className="font-bold">Buy</span> of{' '}
+          <span className="font-bold">{activity.type === 'COPY_BUY' ? 'Copy Buy' : 'Buy'}</span>
+          {' '}of{' '}
           <span className="font-bold text-primary">{activity.tickerName}</span> for{' '}
           <span className="font-bold">₦{activity.value.toLocaleString()}</span>
         </p>
       );
     case 'SELL':
+    case 'COPY_SELL':
       return (
         <p>
-          <span className="font-bold">Sell</span> of{' '}
+          <span className="font-bold">{activity.type === 'COPY_SELL' ? 'Copy Sell' : 'Sell'}</span>
+          {' '}of{' '}
           <span className="font-bold text-primary">{activity.tickerName}</span> for{' '}
           <span className="font-bold">₦{activity.value.toLocaleString()}</span>
         </p>
@@ -55,7 +60,7 @@ function ActivityText({ activity }: { activity: Activity }) {
     default:
       return (
         <p>
-          <span className="font-bold uppercase">{activity.type}</span> of ₦{activity.value.toLocaleString()}
+          <span className="font-bold uppercase">{activity.type.replace('_', ' ')}</span> of ₦{activity.value.toLocaleString()}
         </p>
       );
   }
@@ -71,12 +76,15 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
         <ul className="space-y-4">
           {activities.map((activity) => {
             const hasValidIcon = activity.tickerIcon && isValidUrl(activity.tickerIcon);
+            const isBuyType = activity.type === 'BUY' || activity.type === 'COPY_BUY';
+            const isSellType = activity.type === 'SELL' || activity.type === 'COPY_SELL';
+            
             return (
               <li key={activity.id} className="flex items-center gap-4">
                 <div className="flex-shrink-0">
                   {hasValidIcon ? (
                     <Image
-                      src={activity.tickerIcon}
+                      src={activity.tickerIcon!}
                       alt={activity.tickerName || 'Activity'}
                       width={40}
                       height={40}
@@ -89,10 +97,10 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                 <div className="flex-1 text-sm">
                    <div className="flex items-center gap-2">
                      <Badge variant={
-                       activity.type === 'BUY' ? 'default' : activity.type === 'SELL' ? 'destructive' : 'secondary'
+                       isBuyType ? 'default' : isSellType ? 'destructive' : 'secondary'
                      } className="text-xs">
                        <ActivityIcon type={activity.type}/>
-                       <span className="ml-1">{activity.type}</span>
+                       <span className="ml-1">{activity.type.replace('_', ' ')}</span>
                      </Badge>
                      <p className="text-xs text-muted-foreground">{activity.createdAt ? formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true }) : ''}</p>
                    </div>
