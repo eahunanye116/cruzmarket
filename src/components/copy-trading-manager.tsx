@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +14,7 @@ import { useCurrency } from '@/hooks/use-currency';
 import { Loader2, Copy, X, User, ShieldCheck, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { startCopyingAction, stopCopyingAction, updateCopySettingsAction } from '@/app/actions/copy-actions';
 import { getUserProfileByUid } from '@/app/actions/wallet-actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function CopyTradingManager() {
     const user = useUser();
