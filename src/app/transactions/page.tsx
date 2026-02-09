@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCurrency } from '@/hooks/use-currency';
+import { CopyTradingManager } from '@/components/copy-trading-manager';
 
 
 function isValidUrl(url: string | undefined | null): url is string {
@@ -431,7 +432,7 @@ export default function WalletPage() {
     }));
 
     const walletActs = enriched.filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL' || act.type === 'TRANSFER_SENT' || act.type === 'TRANSFER_RECEIVED');
-    const trades = enriched.filter(act => act.type === 'BUY' || act.type === 'SELL');
+    const trades = enriched.filter(act => act.type === 'BUY' || act.type === 'SELL' || act.type === 'COPY_BUY' || act.type === 'COPY_SELL');
 
     const groups: { [key: string]: GroupedTransaction } = {};
 
@@ -452,8 +453,8 @@ export default function WalletPage() {
         const group = groups[trade.tickerId];
         group.tradeCount++;
         group.totalVolume += trade.value;
-        if (trade.type === 'SELL' && typeof trade.realizedPnl === 'number') {
-            group.realizedPnl += trade.realizedPnl;
+        if (trade.type === 'SELL' || trade.type === 'COPY_SELL' && typeof trade.realizedPnl === 'number') {
+            group.realizedPnl += trade.realizedPnl!;
         }
         if (trade.createdAt.toDate() > group.lastActivity) {
             group.lastActivity = trade.createdAt.toDate();
@@ -612,36 +613,72 @@ export default function WalletPage() {
             </Card>
         </div>
 
-        <Card className="overflow-hidden mb-8">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Withdrawal Requests</CardTitle>
-                <CardDescription>Monitor status of your requests.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-                {requestsLoading ? <div className="p-4"><Skeleton className="h-32 w-full" /></div> : withdrawalRequests.length > 0 ? (
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Details</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {withdrawalRequests.map(req => (
-                                <TableRow key={req.id}>
-                                    <TableCell>{req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-bold">{formatAmount(req.amount)}</span>
-                                            {req.withdrawalType === 'crypto' && req.usdAmount && (
-                                                <span className="text-[10px] text-muted-foreground">(${req.usdAmount.toLocaleString()})</span>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-xs text-muted-foreground">{req.withdrawalType === 'crypto' ? `${req.cryptoCoin?.toUpperCase()} (${req.cryptoNetwork})` : req.bankName}</TableCell>
-                                    <TableCell className="text-right"><Badge variant={req.status === 'completed' ? 'default' : req.status === 'pending' ? 'secondary' : 'destructive'}>{req.status.toUpperCase()}</Badge></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                ) : <div className="text-center py-12 text-muted-foreground"><p className="text-sm">No history found.</p></div>}
-            </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <Card>
+                <Tabs defaultValue="requests">
+                    <CardHeader className="pb-0">
+                        <CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Activity Logs</CardTitle>
+                        <TabsList className="grid w-full grid-cols-2 mt-4">
+                            <TabsTrigger value="requests">Withdrawals</TabsTrigger>
+                            <TabsTrigger value="wallet">Wallet</TabsTrigger>
+                        </TabsList>
+                    </CardHeader>
+                    <CardContent>
+                        <TabsContent value="requests">
+                            {requestsLoading ? <div className="p-4"><Skeleton className="h-32 w-full" /></div> : withdrawalRequests.length > 0 ? (
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Details</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {withdrawalRequests.map(req => (
+                                            <TableRow key={req.id}>
+                                                <TableCell>{req.withdrawalType === 'crypto' ? <Coins className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold">{formatAmount(req.amount)}</span>
+                                                        {req.withdrawalType === 'crypto' && req.usdAmount && (
+                                                            <span className="text-[10px] text-muted-foreground">(${req.usdAmount.toLocaleString()})</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{req.withdrawalType === 'crypto' ? `${req.cryptoCoin?.toUpperCase()} (${req.cryptoNetwork})` : req.bankName}</TableCell>
+                                                <TableCell className="text-right"><Badge variant={req.status === 'completed' ? 'default' : req.status === 'pending' ? 'secondary' : 'destructive'}>{req.status.toUpperCase()}</Badge></TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : <div className="text-center py-12 text-muted-foreground"><p className="text-sm">No requests found.</p></div>}
+                        </TabsContent>
+                        <TabsContent value="wallet">
+                            {isLoading ? <div className="p-4"><Skeleton className="h-24 w-full" /></div> : walletActivities.length > 0 ? (
+                                <Table>
+                                <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {walletActivities.map(activity => (
+                                        <TableRow key={activity.id}>
+                                            <TableCell>
+                                                <Badge variant={
+                                                    activity.type === 'DEPOSIT' ? 'secondary' : 
+                                                    activity.type === 'WITHDRAWAL' ? 'outline' : 
+                                                    activity.type === 'TRANSFER_SENT' ? 'destructive' : 
+                                                    'default'
+                                                }>
+                                                    {activity.type.replace('_', ' ')}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{formatAmount(activity.value)}</TableCell>
+                                            <TableCell className="text-[10px] text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                </Table>
+                            ) : <div className="text-center py-12"><History className="mx-auto h-12 w-12 text-muted-foreground" /><p className="mt-4">No wallet history.</p></div>}
+                        </TabsContent>
+                    </CardContent>
+                </Tabs>
+            </Card>
+
+            <CopyTradingManager />
+        </div>
       
         <Card className="overflow-hidden mb-8">
             <CardHeader>
@@ -677,41 +714,6 @@ export default function WalletPage() {
                     <Button onClick={() => setVisibleAssets(prev => prev + ITEMS_PER_PAGE)} variant="outline">Load More Assets</Button>
                 </CardFooter>
             )}
-        </Card>
-
-         <Card className="overflow-hidden">
-            <CardHeader><CardTitle>Wallet History</CardTitle><CardDescription>Record of deposits, withdrawals, and transfers.</CardDescription></CardHeader>
-            <CardContent className="p-0">
-             {isLoading ? <div className="p-4"><Skeleton className="h-24 w-full" /></div> : walletActivities.length > 0 ? (
-                 <Table>
-                    <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Details</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                        {walletActivities.map(activity => (
-                            <TableRow key={activity.id}>
-                                <TableCell>
-                                    <Badge variant={
-                                        activity.type === 'DEPOSIT' ? 'secondary' : 
-                                        activity.type === 'WITHDRAWAL' ? 'outline' : 
-                                        activity.type === 'TRANSFER_SENT' ? 'destructive' : 
-                                        'default'
-                                    }>
-                                        {activity.type.replace('_', ' ')}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>{formatAmount(activity.value)}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                    {activity.type === 'TRANSFER_SENT' && `To: ${activity.recipientName}`}
-                                    {activity.type === 'TRANSFER_RECEIVED' && `From: ${activity.senderName}`}
-                                    {activity.type === 'DEPOSIT' && 'Paystack/NowPayments'}
-                                    {activity.type === 'WITHDRAWAL' && 'Bank/Crypto'}
-                                </TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                 </Table>
-             ) : <div className="text-center py-12"><History className="mx-auto h-12 w-12 text-muted-foreground" /><p className="mt-4">No wallet history.</p></div>}
-            </CardContent>
         </Card>
     </div>
   );

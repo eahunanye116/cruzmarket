@@ -1,22 +1,30 @@
+
 'use client';
 
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { UserProfile } from '@/lib/types';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Medal, User, Loader2, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { Trophy, Medal, User, Loader2, ArrowUpRight, TrendingUp, Copy, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { startCopyingAction } from '@/app/actions/copy-actions';
+import { useToast } from '@/hooks/use-toast';
+import { useCurrency } from '@/hooks/use-currency';
 
 const PAGE_SIZE = 10;
 
 export default function LeaderboardPage() {
   const firestore = useFirestore();
+  const user = useUser();
+  const { toast } = useToast();
+  const { convertToNgn } = useCurrency();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
 
   // We query users by their total realized profit
   const usersQuery = firestore ? query(
@@ -36,13 +44,33 @@ export default function LeaderboardPage() {
     }
   };
 
-  const calculateProfitPercent = (user: UserProfile) => {
-    const pnl = user.totalRealizedPnl || 0;
-    const volume = user.totalTradingVolume || 1; // Prevent division by zero
-    // This is a rough estimation of performance: (Total Realized Profit / Total Trading Volume) * 100
-    // In a real environment, you'd track total capital deployed vs profit.
+  const calculateProfitPercent = (player: UserProfile) => {
+    const pnl = player.totalRealizedPnl || 0;
+    const volume = player.totalTradingVolume || 1; 
     const percent = (pnl / volume) * 100;
     return percent > 0 ? percent : 0;
+  };
+
+  const handleCopy = async (target: UserProfile) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Sign in Required', description: 'Log in to copy legends.' });
+        return;
+    }
+    if (user.uid === target.id) {
+        toast({ variant: 'destructive', title: 'Narcissist Alert!', description: 'You cannot copy yourself.' });
+        return;
+    }
+
+    setCopyingId(target.id!);
+    // Default amount for a new copy: 1000 NGN
+    const result = await startCopyingAction(user.uid, target.id!, 1000);
+    
+    if (result.success) {
+        toast({ title: 'Copying Active', description: `You are now replicating ${target.displayName || 'this legend'}'s trades.` });
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+    setCopyingId(null);
   };
 
   return (
@@ -81,6 +109,8 @@ export default function LeaderboardPage() {
             <div className="divide-y-2">
               {users.map((player, index) => {
                 const profitPercent = calculateProfitPercent(player);
+                const isMe = user?.uid === player.id;
+                
                 return (
                   <div key={player.id} className={cn(
                     "flex items-center gap-4 p-4 transition-colors hover:bg-muted/20",
@@ -95,14 +125,32 @@ export default function LeaderboardPage() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold truncate">{player.displayName || 'Anonymous Legend'}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">{player.id?.substring(0, 12)}...</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center justify-end text-accent font-bold text-lg">
-                        <ArrowUpRight className="h-4 w-4 mr-1" />
-                        {profitPercent.toFixed(1)}%
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono truncate">{player.id?.substring(0, 8)}...</span>
+                        {isMe && <Badge variant="outline" className="text-[8px] h-4">YOU</Badge>}
                       </div>
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Efficiency</p>
+                    </div>
+                    <div className="text-right shrink-0 flex items-center gap-4">
+                      <div>
+                        <div className="flex items-center justify-end text-accent font-bold text-lg">
+                            <ArrowUpRight className="h-4 w-4 mr-1" />
+                            {profitPercent.toFixed(1)}%
+                        </div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Efficiency</p>
+                      </div>
+                      
+                      {!isMe && (
+                        <Button 
+                            size="sm" 
+                            className="h-8 px-2" 
+                            variant="outline"
+                            onClick={() => handleCopy(player)}
+                            disabled={copyingId === player.id}
+                        >
+                            {copyingId === player.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3 mr-1" />}
+                            Copy
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -134,9 +182,9 @@ export default function LeaderboardPage() {
           <TrendingUp className="h-5 w-5 text-accent" />
         </div>
         <div className="space-y-1">
-          <h4 className="font-bold text-sm">How is rank determined?</h4>
+          <h4 className="font-bold text-sm">Copy the Legends</h4>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Players are ranked by total realized profit. The percentage shown represents their trading efficiency (Profit relative to Total Volume). Launching successful tokens and trading effectively on the bonding curve will boost your standing.
+            Want to trade like a pro? Click <b>"Copy"</b> on any legend to automatically mirror their market moves. You can manage your copy trading settings, including your budget per trade, in your <b>Wallet</b>.
           </p>
         </div>
       </div>

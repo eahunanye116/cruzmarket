@@ -2,7 +2,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit } from 'firebase/firestore';
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
@@ -43,7 +43,62 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
     return cleanId;
 }
 
-export async function executeBuyAction(userId: string, tickerId: string, ngnAmount: number) {
+/**
+ * Trigger trades for all users copying the source user.
+ * This function runs asynchronously after the main trade.
+ */
+async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
+    const firestore = getFirestoreInstance();
+    try {
+        // Find active followers
+        const usersRef = collection(firestore, 'users');
+        const q = query(
+            usersRef, 
+            where('copyTrading.targetUid', '==', sourceUid),
+            where('copyTrading.isActive', '==', true),
+            limit(100) // Safety limit for Server Action execution time
+        );
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) return;
+
+        console.log(`CopyTrading: Triggering ${snapshot.size} copy trades for source ${sourceUid}`);
+
+        for (const userDoc of snapshot.docs) {
+            const followerId = userDoc.id;
+            const followerData = userDoc.data() as UserProfile;
+            const settings = followerData.copyTrading!;
+
+            try {
+                if (type === 'BUY') {
+                    // For BUY, we use the follower's configured NGN amount
+                    await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
+                } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
+                    // For SELL, we sell the same percentage of the follower's holding
+                    const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
+                    
+                    const followerPortfolioRef = collection(firestore, `users/${followerId}/portfolio`);
+                    const holdingQ = query(followerPortfolioRef, where('tickerId', '==', tickerId));
+                    const holdingSnap = await getDocs(holdingQ);
+                    
+                    if (!holdingSnap.empty) {
+                        const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
+                        const amountToSell = followerHolding.amount * sellPercentage;
+                        if (amountToSell > 0.000001) {
+                            await executeSellAction(followerId, tickerId, amountToSell, true);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`CopyTrading: Failed trade for follower ${followerId}:`, err);
+            }
+        }
+    } catch (error) {
+        console.error("CopyTrading: Fan-out error:", error);
+    }
+}
+
+export async function executeBuyAction(userId: string, tickerId: string, ngnAmount: number, isCopyTrade: boolean = false) {
     const firestore = getFirestoreInstance();
     const resolvedId = await resolveTickerId(firestore, tickerId);
     
@@ -59,7 +114,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
-            const statsDoc = await transaction.get(statsRef);
             
             if (!userDoc.exists()) throw new Error('User not found.');
             if (userDoc.data().balance < ngnAmount) throw new Error('Insufficient balance.');
@@ -123,7 +177,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
-                type: 'BUY',
+                type: isCopyTrade ? 'COPY_BUY' : 'BUY',
                 tickerId: resolvedId,
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
@@ -138,6 +192,11 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             return { success: true, tokensOut, tickerName: tickerData.name, fee };
         });
 
+        // Trigger Copy Trading if this wasn't already a copy trade
+        if (!isCopyTrade) {
+            triggerCopyTrades(userId, resolvedId, 'BUY');
+        }
+
         return result;
     } catch (error: any) {
         console.error('Trade execution failed:', error);
@@ -145,7 +204,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
     }
 }
 
-export async function executeSellAction(userId: string, tickerId: string, tokenAmountToSell: number) {
+export async function executeSellAction(userId: string, tickerId: string, tokenAmountToSell: number, isCopyTrade: boolean = false) {
     const firestore = getFirestoreInstance();
     const resolvedId = await resolveTickerId(firestore, tickerId);
 
@@ -158,6 +217,11 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             return { success: false, error: 'You do not own this ticker.' };
         }
 
+        let totalHeldAmountBefore = 0;
+        holdingSnapshot.docs.forEach(doc => {
+            totalHeldAmountBefore += (doc.data() as PortfolioHolding).amount;
+        });
+
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
             const tickerRef = doc(firestore, 'tickers', resolvedId);
@@ -168,18 +232,16 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             if (!userDoc.exists()) throw new Error('User not found.');
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
 
-            let totalHeldAmount = 0;
             let totalWeightedCost = 0;
             holdingSnapshot.docs.forEach(doc => {
                 const data = doc.data() as PortfolioHolding;
-                totalHeldAmount += data.amount;
                 totalWeightedCost += (data.avgBuyPrice * data.amount);
             });
 
-            const globalAvgBuyPrice = totalHeldAmount > 0 ? totalWeightedCost / totalHeldAmount : 0;
+            const globalAvgBuyPrice = totalHeldAmountBefore > 0 ? totalWeightedCost / totalHeldAmountBefore : 0;
 
             if (tokenAmountToSell <= 0) throw new Error("Invalid sell amount.");
-            if (tokenAmountToSell > totalHeldAmount + 0.000001) throw new Error("Insufficient tokens in portfolio.");
+            if (tokenAmountToSell > totalHeldAmountBefore + 0.000001) throw new Error("Insufficient tokens in portfolio.");
 
             const tickerData = tickerDoc.data();
             const k = tickerData.marketCap * tickerData.supply;
@@ -240,7 +302,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
 
             const activityRef = doc(collection(firestore, 'activities'));
             transaction.set(activityRef, {
-                type: 'SELL',
+                type: isCopyTrade ? 'COPY_SELL' : 'SELL',
                 tickerId: resolvedId,
                 tickerName: tickerData.name,
                 tickerIcon: tickerData.icon,
@@ -255,6 +317,11 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
 
             return { success: true, tickerName: tickerData.name, ngnToUser, fee };
         });
+
+        // Trigger Copy Trading if this wasn't already a copy trade
+        if (!isCopyTrade) {
+            triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
+        }
 
         return result;
     } catch (error: any) {

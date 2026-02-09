@@ -39,7 +39,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'COPY_BUY' | 'COPY_SELL';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
@@ -62,6 +62,13 @@ export type BotSession = {
   data: Record<string, any>;
 }
 
+export type CopyTradingSettings = {
+  targetUid: string | null;
+  targetDisplayName: string | null;
+  amountPerBuyNgn: number;
+  isActive: boolean;
+};
+
 export type UserProfile = {
   id?: string;
   email: string;
@@ -76,6 +83,7 @@ export type UserProfile = {
     expiresAt: Timestamp;
   };
   botSession?: BotSession | null;
+  copyTrading?: CopyTradingSettings;
 };
 
 export type PlatformSettings = {
