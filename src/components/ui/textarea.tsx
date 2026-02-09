@@ -5,7 +5,8 @@ import {cn} from '@/lib/utils';
 const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'textarea'>>(
   ({className, ...props}, ref) => {
     // Ensure value is never undefined if it's passed in, to prevent uncontrolled to controlled warnings.
-    const controlledValue = props.value !== undefined ? (props.value ?? "") : undefined;
+    const isControlled = 'value' in props;
+    const controlledValue = isControlled ? (props.value ?? "") : undefined;
 
     return (
       <textarea

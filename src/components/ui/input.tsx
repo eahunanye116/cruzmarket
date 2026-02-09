@@ -4,9 +4,11 @@ import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
-    // Ensure value is never undefined if it's passed in, to prevent uncontrolled to controlled warnings.
+    // If a value prop is present (even if undefined/null), we ensure it's at least an empty string
+    // to prevent React from seeing it as a switch from uncontrolled to controlled.
     // File inputs must remain uncontrolled.
-    const controlledValue = props.value !== undefined ? (props.value ?? "") : undefined;
+    const isControlled = 'value' in props;
+    const controlledValue = isControlled ? (props.value ?? "") : undefined;
     const valueProps = type === 'file' ? {} : { value: controlledValue };
 
     return (

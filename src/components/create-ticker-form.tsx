@@ -143,7 +143,7 @@ export function CreateTickerForm() {
                     <FormLabel>Token Icon (Square)</FormLabel>
                     <FormControl>
                         <ImageUpload 
-                            value={field.value} 
+                            value={field.value ?? ''} 
                             onChange={field.onChange} 
                             folder="tickers/icons" 
                             label="Icon" 
@@ -161,7 +161,7 @@ export function CreateTickerForm() {
                     <FormLabel>Cover Banner (16:9)</FormLabel>
                     <FormControl>
                         <ImageUpload 
-                            value={field.value} 
+                            value={field.value ?? ''} 
                             onChange={field.onChange} 
                             folder="tickers/covers" 
                             label="Cover" 
