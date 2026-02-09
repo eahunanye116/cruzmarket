@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,15 +11,17 @@ import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getUserProfileByUid, transferFundsAction } from '@/app/actions/wallet-actions';
 import { Loader2, Send, User, AlertCircle } from 'lucide-react';
+import { useCurrency } from '@/hooks/use-currency';
 
 const transferSchema = z.object({
   recipientId: z.string().min(5, "Invalid User ID format."),
-  amount: z.coerce.number().min(1, "Minimum transfer is ₦1."),
+  amount: z.coerce.number().positive("Amount must be greater than zero."),
 });
 
 export function TransferFundsForm({ balance }: { balance: number }) {
   const user = useUser();
   const { toast } = useToast();
+  const { currency, formatAmount, convertToNgn } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [recipientName, setRecipientName] = useState<string | null>(null);
@@ -62,7 +63,11 @@ export function TransferFundsForm({ balance }: { balance: number }) {
 
   const onSubmit = async (values: z.infer<typeof transferSchema>) => {
     if (!user) return;
-    if (values.amount > balance) {
+    
+    // Always convert the input amount to NGN for the internal balance logic
+    const amountInNgn = convertToNgn(values.amount);
+    
+    if (amountInNgn > balance) {
       form.setError('amount', { message: "Insufficient balance." });
       return;
     }
@@ -74,11 +79,14 @@ export function TransferFundsForm({ balance }: { balance: number }) {
     }
 
     setIsSubmitting(true);
-    const result = await transferFundsAction(user.uid, cleanId, values.amount);
+    const result = await transferFundsAction(user.uid, cleanId, amountInNgn);
     setIsSubmitting(false);
 
     if (result.success) {
-      toast({ title: 'Transfer Successful', description: `₦${values.amount.toLocaleString()} sent to ${recipientName || 'user'}.` });
+      toast({ 
+        title: 'Transfer Successful', 
+        description: `${formatAmount(amountInNgn)} sent to ${recipientName || 'user'}.` 
+      });
       form.reset({ recipientId: '', amount: undefined });
       setRecipientName(null);
       setLookupError(null);
@@ -139,9 +147,9 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Amount (NGN)</FormLabel>
+              <FormLabel>Amount ({currency})</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
+                <Input type="number" step="any" placeholder="0.00" {...field} value={field.value ?? ''} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -156,7 +164,7 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           {isSubmitting ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
           ) : (
-            <><Send className="mr-2 h-4 w-4" /> Transfer NGN</>
+            <><Send className="mr-2 h-4 w-4" /> Transfer {currency}</>
           )}
         </Button>
       </form>
