@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -239,11 +240,20 @@ export function CreateTickerForm() {
           )}
         />
         <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest">Creation Summary</p>
-            <div className="flex justify-center gap-8 mt-2">
-                <div><p className="text-[10px] text-muted-foreground uppercase">Creation Fee</p><p className="font-bold">{formatAmount(creationFeeNgn)}</p></div>
-                <div><p className="text-[10px] text-muted-foreground uppercase">Initial Buy</p><p className="font-bold">{formatAmount(initialBuyNgn)}</p></div>
-                <div><p className="text-[10px] text-muted-foreground uppercase">Total Cost</p><p className="text-xl font-bold text-primary">{formatAmount(totalCostNgn)}</p></div>
+            <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest mb-4">Creation Summary</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                <div className="flex flex-col items-center">
+                    <p className="text-[10px] text-muted-foreground uppercase">Creation Fee</p>
+                    <p className="font-bold">{formatAmount(creationFeeNgn)}</p>
+                </div>
+                <div className="flex flex-col items-center">
+                    <p className="text-[10px] text-muted-foreground uppercase">Initial Buy</p>
+                    <p className="font-bold">{formatAmount(initialBuyNgn)}</p>
+                </div>
+                <div className="flex flex-col items-center sm:border-l sm:pl-4 border-primary/10">
+                    <p className="text-[10px] text-muted-foreground uppercase">Total Cost</p>
+                    <p className="text-2xl font-bold text-primary">{formatAmount(totalCostNgn)}</p>
+                </div>
             </div>
         </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
