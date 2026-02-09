@@ -253,7 +253,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 const hData = hDoc.data() as PortfolioHolding;
                 if (remainingToSell <= 0) break;
 
-                const amountIn ThisDoc = hData.amount;
+                const amountInThisDoc = hData.amount;
                 const sellFromThisDoc = Math.min(amountInThisDoc, remainingToSell);
                 const newAmount = amountInThisDoc - sellFromThisDoc;
 
