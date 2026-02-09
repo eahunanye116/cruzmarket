@@ -129,7 +129,7 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Ticker Name</FormLabel>
-              <FormControl><Input placeholder="e.g., DogeCoin" {...field} /></FormControl>
+              <FormControl><Input placeholder="e.g., DogeCoin" {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -191,7 +191,7 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Description</FormLabel>
-              <FormControl><Textarea placeholder="What is this meme about?" {...field} /></FormControl>
+              <FormControl><Textarea placeholder="What is this meme about?" {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -223,7 +223,7 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Total Supply</FormLabel>
-              <FormControl><Input type="number" placeholder="1000000000" {...field} /></FormControl>
+              <FormControl><Input type="number" placeholder="1000000000" {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { Upload, X, Loader2, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
 
 interface ImageUploadProps {
-  value?: string;
+  value?: string | null;
   onChange: (url: string) => void;
   folder: string;
   label?: string;
@@ -21,8 +21,11 @@ export function ImageUpload({ value, onChange, folder, label }: ImageUploadProps
   const user = useUser();
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  
   // Default to URL mode if value exists and doesn't look like a Firebase Storage URL, else default to upload
-  const [mode, setMode] = useState<'upload' | 'url'>(value && !value.includes('firebasestorage') ? 'url' : 'upload');
+  const [mode, setMode] = useState<'upload' | 'url'>(
+    (value && typeof value === 'string' && !value.includes('firebasestorage')) ? 'url' : 'upload'
+  );
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
