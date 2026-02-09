@@ -3,19 +3,16 @@
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { UserProfile } from '@/lib/types';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Medal, User, Loader2, ArrowUpRight, TrendingUp, Copy, Search, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Trophy, Medal, User, Loader2, ArrowUpRight, TrendingUp, Copy } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { startCopyingAction } from '@/app/actions/copy-actions';
 import { useToast } from '@/hooks/use-toast';
-import { useCurrency } from '@/hooks/use-currency';
-import { getUserProfileByUid } from '@/app/actions/wallet-actions';
 import { CopyTradingManager } from '@/components/copy-trading-manager';
 
 const PAGE_SIZE = 10;
@@ -27,11 +24,6 @@ export default function LeaderboardPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [copyingId, setCopyingId] = useState<string | null>(null);
 
-  // UID Lookup State
-  const [searchUid, setSearchUid] = useState('');
-  const [isLookingUp, setIsLookingUp] = useState(false);
-  const [foundUser, setFoundUser] = useState<UserProfile | null>(null);
-
   // We query users by their total realized profit
   const usersQuery = firestore ? query(
     collection(firestore, 'users'),
@@ -40,21 +32,6 @@ export default function LeaderboardPage() {
   ) : null;
 
   const { data: users, loading } = useCollection<UserProfile>(usersQuery);
-
-  const handleLookup = async () => {
-    const cleanId = searchUid.trim();
-    if (cleanId.length < 10) return;
-    
-    setIsLookingUp(true);
-    const result = await getUserProfileByUid(cleanId);
-    if (result.success) {
-        setFoundUser({ id: cleanId, ...result.profile } as UserProfile);
-    } else {
-        setFoundUser(null);
-        toast({ variant: 'destructive', title: 'User not found', description: 'Check the UID and try again.' });
-    }
-    setIsLookingUp(false);
-  };
 
   const renderRankIcon = (index: number) => {
     switch (index) {
@@ -83,15 +60,10 @@ export default function LeaderboardPage() {
     }
 
     setCopyingId(target.id!);
-    // Default amount for a new copy: 1000 NGN
     const result = await startCopyingAction(user.uid, target.id!, 1000);
     
     if (result.success) {
         toast({ title: 'Copying Active', description: `You are now replicating ${target.displayName || 'this trader'}'s trades.` });
-        if (foundUser && foundUser.id === target.id) {
-            setSearchUid('');
-            setFoundUser(null);
-        }
     } else {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
@@ -99,73 +71,16 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="flex flex-col items-center text-center mb-10">
         <h1 className="text-4xl font-bold font-headline">Arena Legends</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Mirror the elites or search for a specific trader using their UID.
+          Mirror the elite or manage your custom copy portfolio.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        <div className="space-y-8">
-            {/* UID Search Section */}
-            <Card className="border-2 border-primary/20 bg-primary/5">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-sm uppercase tracking-widest font-bold flex items-center gap-2">
-                        <Search className="h-4 w-4" /> Find a Trader
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="relative">
-                        <Input 
-                            placeholder="Paste User UID (e.g. xhYlmn...)" 
-                            value={searchUid}
-                            onChange={(e) => setSearchUid(e.target.value)}
-                            className="pr-12 h-12 text-lg font-mono"
-                        />
-                        <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10"
-                            onClick={handleLookup}
-                            disabled={isLookingUp || searchUid.trim().length < 10}
-                        >
-                            {isLookingUp ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUpRight className="h-5 w-5" />}
-                        </Button>
-                    </div>
-
-                    {foundUser && (
-                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="flex items-center justify-between p-4 rounded-lg bg-background border-2">
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-10 w-10 border-2">
-                                        <AvatarFallback>{foundUser.displayName?.charAt(0) || foundUser.email?.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <p className="font-bold">{foundUser.displayName || foundUser.email.split('@')[0]}</p>
-                                        <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[150px]">{foundUser.id}</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button 
-                                        size="sm" 
-                                        onClick={() => handleCopy(foundUser)}
-                                        disabled={copyingId === foundUser.id}
-                                    >
-                                        {copyingId === foundUser.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
-                                        Copy Trader
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => { setFoundUser(null); setSearchUid(''); }}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <div className="lg:col-span-2 space-y-8">
             <Card className="overflow-hidden border-2">
                 <CardHeader className="bg-muted/30 border-b-2">
                 <div className="flex justify-between items-center">
@@ -262,7 +177,7 @@ export default function LeaderboardPage() {
             </Card>
         </div>
 
-        <div className="space-y-8">
+        <div className="lg:col-span-1 space-y-8">
             <CopyTradingManager />
             
             <div className="p-4 rounded-lg bg-accent/5 border-2 border-accent/20 flex gap-4 items-start">
@@ -272,7 +187,7 @@ export default function LeaderboardPage() {
                 <div className="space-y-1">
                 <h4 className="font-bold text-sm">Strategic Mirroring</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                    Copy trading is real-time. When your targets trade, the platform executes for you using your specified budget. <b>Budget per Buy</b> is the fixed amount you spend on every entry. Sells are proportional (e.g. if the expert sells 50%, you exit 50% of your position).
+                    Copy trading is real-time. When your targets trade, the platform executes for you using your specified budget. <b>Budget per Buy</b> is the fixed amount you spend on every entry. Sells are proportional.
                 </p>
                 </div>
             </div>
