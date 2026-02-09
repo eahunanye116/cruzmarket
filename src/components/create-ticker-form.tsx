@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -202,7 +201,7 @@ export function CreateTickerForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Starting Market Cap ({currency})</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value ?? '100000'}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Select MCAP" /></SelectTrigger></FormControl>
                 <SelectContent>
                   {Object.entries(marketCapOptions).map(([value, { fee }]) => (
