@@ -1,14 +1,15 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, TrendingUp } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, Trophy } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
-  { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-6 w-6" /> },
+  { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-6 w-6" /> },
   { href: '/transactions', label: 'Wallet', icon: <History className="h-6 w-6" /> },
@@ -24,7 +25,6 @@ export function BottomNav() {
           const isActive = pathname === item.href;
           const isCenterButton = item.href === '/create';
 
-          // Special rendering for the glorified center button
           if (isCenterButton) {
             return (
               <div key={item.href} className="relative flex justify-center">
@@ -42,7 +42,6 @@ export function BottomNav() {
             );
           }
 
-          // Standard rendering for other buttons
           return (
             <Link
               key={item.href}

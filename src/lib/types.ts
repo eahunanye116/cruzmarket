@@ -68,6 +68,8 @@ export type UserProfile = {
   displayName: string;
   photoURL?: string;
   balance: number;
+  totalRealizedPnl?: number;
+  totalTradingVolume?: number;
   telegramChatId?: string;
   telegramLinkingCode?: {
     code: string;
