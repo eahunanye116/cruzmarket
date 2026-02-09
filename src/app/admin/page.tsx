@@ -14,6 +14,7 @@ import { NotificationManagement } from '@/components/admin/notification-manageme
 import { SupportManagement } from '@/components/admin/support-management';
 import { TelegramManagement } from '@/components/admin/telegram-management';
 import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
+import { PaymentManagement } from '@/components/admin/payment-management';
 import { useState } from 'react';
 import {
   Select,
@@ -75,11 +76,12 @@ export default function AdminPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
         <div className="hidden sm:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-10">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-11">
             <TabsTrigger value="tickers">Tickers</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="copy-audit">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="blog">Blog</TabsTrigger>
@@ -100,6 +102,7 @@ export default function AdminPage() {
               <SelectItem value="users">Users</SelectItem>
               <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
+              <SelectItem value="payments">Payments</SelectItem>
               <SelectItem value="support">Support</SelectItem>
               <SelectItem value="notifications">Notifications</SelectItem>
               <SelectItem value="blog">Blog</SelectItem>
@@ -121,6 +124,9 @@ export default function AdminPage() {
         </TabsContent>
          <TabsContent value="withdrawals" className="mt-6">
           <WithdrawalManagement />
+        </TabsContent>
+        <TabsContent value="payments" className="mt-6">
+          <PaymentManagement />
         </TabsContent>
          <TabsContent value="support" className="mt-6">
           <SupportManagement />

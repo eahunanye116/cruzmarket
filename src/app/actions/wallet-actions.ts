@@ -148,6 +148,48 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
     }
 }
 
+/**
+ * ADMIN ONLY: Test NowPayments Connectivity
+ */
+export async function testNowPaymentsConnectivityAction() {
+    const API_KEY = process.env.NOWPAYMENTS_API_KEY;
+    if (!API_KEY) return { success: false, error: "API Key not configured in environment variables." };
+
+    try {
+        const res = await fetch('https://api.nowpayments.io/v1/status', {
+            headers: { 'x-api-key': API_KEY }
+        });
+        const data = await res.json();
+        if (data.message === 'OK') {
+            return { success: true, message: "Connection Successful! NowPayments is reachable and API Key is valid." };
+        }
+        return { success: false, error: data.message || "Failed to reach NowPayments." };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * ADMIN ONLY: Fetch Full Currency/Network List from NowPayments
+ */
+export async function getNowPaymentsCurrenciesAction() {
+    const API_KEY = process.env.NOWPAYMENTS_API_KEY;
+    if (!API_KEY) return { success: false, error: "API Key missing." };
+
+    try {
+        const res = await fetch('https://api.nowpayments.io/v1/currencies?fixed_rate=true', {
+            headers: { 'x-api-key': API_KEY }
+        });
+        const data = await res.json();
+        if (data.currencies) {
+            return { success: true, currencies: data.currencies };
+        }
+        return { success: false, error: "Failed to fetch currency list." };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
 type WithdrawalRequestPayload = {
     userId: string;
     amount: number;
