@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -36,7 +35,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCurrency } from '@/hooks/use-currency';
-import { CopyTradingManager } from '@/components/copy-trading-manager';
 
 
 function isValidUrl(url: string | undefined | null): url is string {
@@ -613,7 +611,7 @@ export default function WalletPage() {
             </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 gap-8 mb-8">
             <Card>
                 <Tabs defaultValue="requests">
                     <CardHeader className="pb-0">
@@ -676,8 +674,6 @@ export default function WalletPage() {
                     </CardContent>
                 </Tabs>
             </Card>
-
-            <CopyTradingManager />
         </div>
       
         <Card className="overflow-hidden mb-8">
