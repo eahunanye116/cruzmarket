@@ -2,7 +2,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit, collectionGroup } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit, collectionGroup, addDoc } from 'firebase/firestore';
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats, CopyTarget } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
@@ -38,45 +38,47 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
 
 /**
  * Trigger trades for all users copying the source user.
+ * This is the high-reliability fan-out engine.
  */
 async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
     const firestore = getFirestoreInstance();
+    const auditLogs: any[] = [];
+    
     try {
-        console.log(`CopyTrading: Starting fan-out for source ${sourceUid} on ticker ${tickerId}`);
+        console.log(`[CopyTrading] Initiating fan-out for source ${sourceUid} on ${tickerId}...`);
         
-        // Find all active copyTarget documents pointing to this source
+        // FIND FOLLOWERS
+        // NOTE: This query requires a Collection Group index on 'copyTargets' for fields 'targetUid' and 'isActive'.
         const q = query(
             collectionGroup(firestore, 'copyTargets'),
             where('targetUid', '==', sourceUid),
             where('isActive', '==', true),
-            limit(50) // Limit per batch for reliability
+            limit(100) 
         );
+        
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) {
-            console.log(`CopyTrading: No active followers found for ${sourceUid}`);
+            console.log(`[CopyTrading] No active followers found for source ${sourceUid}.`);
             return;
         }
 
-        console.log(`CopyTrading: Replicating trade for ${snapshot.size} followers...`);
+        console.log(`[CopyTrading] Found ${snapshot.size} active followers. Executing trade replication...`);
 
         const tradePromises = snapshot.docs.map(async (targetDoc) => {
             const settings = targetDoc.data() as CopyTarget;
-            // followerId is the parent user doc ID in the path users/{followerId}/copyTargets/{targetUid}
             const followerId = targetDoc.ref.parent.parent?.id;
             
-            if (!followerId) {
-                console.warn(`CopyTrading: Could not resolve follower ID from path ${targetDoc.ref.path}`);
-                return;
-            }
-
-            // Safety: Don't allow self-copying recursion
-            if (followerId === sourceUid) return;
+            if (!followerId || followerId === sourceUid) return { followerId, status: 'skipped', reason: 'self-copy' };
 
             try {
                 if (type === 'BUY') {
-                    console.log(`CopyTrading: Executing BUY for follower ${followerId} (Amount: ${settings.amountPerBuyNgn})`);
-                    return await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
+                    const buyRes = await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
+                    if (buyRes.success) {
+                        return { followerId, status: 'success', type: 'BUY' };
+                    } else {
+                        return { followerId, status: 'failed', reason: buyRes.error };
+                    }
                 } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
                     const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
                     
@@ -87,22 +89,52 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
                     if (!holdingSnap.empty) {
                         const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
                         const amountToSell = followerHolding.amount * sellPercentage;
+                        
                         if (amountToSell > 0.000001) {
-                            console.log(`CopyTrading: Executing SELL for follower ${followerId} (Percentage: ${(sellPercentage * 100).toFixed(1)}%)`);
-                            return await executeSellAction(followerId, tickerId, amountToSell, true);
+                            const sellRes = await executeSellAction(followerId, tickerId, amountToSell, true);
+                            if (sellRes.success) {
+                                return { followerId, status: 'success', type: 'SELL' };
+                            } else {
+                                return { followerId, status: 'failed', reason: sellRes.error };
+                            }
+                        } else {
+                            return { followerId, status: 'skipped', reason: 'dust-amount' };
                         }
+                    } else {
+                        return { followerId, status: 'skipped', reason: 'no-holding' };
                     }
                 }
-            } catch (err) {
-                console.error(`CopyTrading: Individual error processing follower ${followerId}:`, err);
+                return { followerId, status: 'unknown' };
+            } catch (err: any) {
+                console.error(`[CopyTrading] Critical error for follower ${followerId}:`, err);
+                return { followerId, status: 'error', message: err.message };
             }
         });
 
         const results = await Promise.allSettled(tradePromises);
-        const successes = results.filter(r => r.status === 'fulfilled').length;
-        console.log(`CopyTrading: Fan-out complete for ${sourceUid}. Successes: ${successes}/${results.length}`);
-    } catch (error) {
-        console.error("CopyTrading: Global fan-out failure:", error);
+        
+        // Log the final audit summary to Firestore for visibility
+        await addDoc(collection(firestore, 'copyTradeAudit'), {
+            sourceUid,
+            tickerId,
+            type,
+            timestamp: serverTimestamp(),
+            followerCount: snapshot.size,
+            results: results.map((r: any) => r.status === 'fulfilled' ? r.value : { status: 'rejected', error: r.reason })
+        });
+
+        console.log(`[CopyTrading] Fan-out complete for ${sourceUid}. Audit log recorded.`);
+    } catch (error: any) {
+        console.error("[CopyTrading] GLOBAL FAN-OUT FAILURE:", error);
+        // Record global failure
+        await addDoc(collection(firestore, 'copyTradeAudit'), {
+            sourceUid,
+            tickerId,
+            type,
+            timestamp: serverTimestamp(),
+            status: 'critical_failure',
+            error: error.message
+        }).catch(() => {});
     }
 }
 
@@ -201,7 +233,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
         // ONLY trigger fan-out if this is a manual trade (to avoid infinite loops)
         if (!isCopyTrade) {
-            // We AWAIT this to ensure the server action doesn't finish before children finish
+            // In production, we MUST wait for the fan-out to ensure reliability in NextJS server environment
             await triggerCopyTrades(userId, resolvedId, 'BUY');
         }
 
@@ -328,7 +360,6 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
 
         // ONLY trigger fan-out if this is a manual trade
         if (!isCopyTrade) {
-            // Await the fan-out
             await triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
         }
 
