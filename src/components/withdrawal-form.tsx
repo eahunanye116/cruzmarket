@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -118,7 +117,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
         <Form {...ngnForm}>
           <form onSubmit={ngnForm.handleSubmit(handleNgnSubmit)} className="space-y-4 pt-4">
             <FormField control={ngnForm.control} name="amount" render={({ field }) => (
-              <FormItem><FormLabel>Amount (NGN)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Amount (₦)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={ngnForm.control} name="bankName" render={({ field }) => (
               <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input placeholder="e.g., Kuda Bank" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
@@ -131,7 +130,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
             )} />
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
-              Request NGN Withdrawal
+              Request ₦ Withdrawal
             </Button>
           </form>
         </Form>

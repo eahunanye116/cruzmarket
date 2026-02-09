@@ -21,7 +21,7 @@ const transferSchema = z.object({
 export function TransferFundsForm({ balance }: { balance: number }) {
   const user = useUser();
   const { toast } = useToast();
-  const { currency, formatAmount, convertToNgn } = useCurrency();
+  const { symbol, formatAmount, convertToNgn } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [recipientName, setRecipientName] = useState<string | null>(null);
@@ -147,7 +147,7 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Amount ({currency})</FormLabel>
+              <FormLabel>Amount ({symbol})</FormLabel>
               <FormControl>
                 <Input type="number" step="any" placeholder="0.00" {...field} value={field.value ?? ''} />
               </FormControl>
@@ -164,7 +164,7 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           {isSubmitting ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
           ) : (
-            <><Send className="mr-2 h-4 w-4" /> Transfer {currency}</>
+            <><Send className="mr-2 h-4 w-4" /> Transfer {symbol}</>
           )}
         </Button>
       </form>

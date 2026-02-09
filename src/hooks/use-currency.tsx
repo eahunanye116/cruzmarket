@@ -9,6 +9,7 @@ type Currency = 'NGN' | 'USD';
 
 interface CurrencyContextType {
   currency: Currency;
+  symbol: string;
   setCurrency: (c: Currency) => void;
   exchangeRate: number;
   formatAmount: (amountInNgn: number, options?: Intl.NumberFormatOptions) => string;
@@ -58,6 +59,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return amount * exchangeRate;
   }
 
+  const symbol = currency === 'NGN' ? '₦' : '$';
+
   const formatAmount = (amountInNgn: number, options: Intl.NumberFormatOptions = {}) => {
     const displayAmount = convertFromNgn(amountInNgn);
     
@@ -97,7 +100,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
         console.error("Formatting error:", e);
         // Fallback to basic string if Intl fails
-        const symbol = currency === 'NGN' ? '₦' : '$';
         return `${symbol}${displayAmount.toFixed(2)}`;
     }
   };
@@ -105,6 +107,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   return (
     <CurrencyContext.Provider value={{ 
         currency, 
+        symbol,
         setCurrency: handleSetCurrency, 
         exchangeRate, 
         formatAmount, 

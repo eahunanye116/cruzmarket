@@ -61,7 +61,7 @@ export function CreateTickerForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const user = useUser();
   const router = useRouter();
-  const { currency, formatAmount, convertToNgn } = useCurrency();
+  const { symbol, formatAmount, convertToNgn } = useCurrency();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -90,10 +90,10 @@ export function CreateTickerForm() {
       return;
     }
 
-    const minBuyThreshold = currency === 'NGN' ? 1000 : 1;
+    const minBuyThreshold = symbol === '₦' ? 1000 : 1;
     if (values.initialBuy < minBuyThreshold) {
         form.setError('initialBuy', { 
-            message: `Minimum initial buy is ${currency === 'NGN' ? '₦1,000' : '$1'}.` 
+            message: `Minimum initial buy is ${symbol === '₦' ? '₦1,000' : '$1'}.` 
         });
         return;
     }
@@ -203,7 +203,7 @@ export function CreateTickerForm() {
           name="initialMarketCap"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Starting Market Cap ({currency})</FormLabel>
+              <FormLabel>Starting Market Cap ({symbol})</FormLabel>
               <Select onValueChange={field.onChange} value={field.value ?? '100000'}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Select MCAP" /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -235,9 +235,9 @@ export function CreateTickerForm() {
           name="initialBuy"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Initial Buy ({currency})</FormLabel>
+              <FormLabel>Initial Buy ({symbol})</FormLabel>
               <FormControl><Input type="number" step="any" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} /></FormControl>
-              <FormDescription>Min: {currency === 'NGN' ? '₦1,000' : '$1'}</FormDescription>
+              <FormDescription>Min: {symbol === '₦' ? '₦1,000' : '$1'}</FormDescription>
               <FormMessage />
             </FormItem>
           )}

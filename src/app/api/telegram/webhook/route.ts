@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, query, where, getDocs, limit, updateDoc, doc, orderBy } from 'firebase/firestore';
@@ -122,7 +121,7 @@ export async function POST(req: NextRequest) {
             const tickerId = parts[2];
 
             if (amountStr === 'custom') {
-                await sendTelegramMessage(chatId, `💸 <b>Custom Buy</b>\n\nBuying Token: <code>${tickerId}cruz</code>\n\nHow much NGN would you like to spend?\n\n(Reply with just the number)`, {
+                await sendTelegramMessage(chatId, `💸 <b>Custom Buy</b>\n\nBuying Token: <code>${tickerId}cruz</code>\n\nHow much ₦ would you like to spend?\n\n(Reply with just the number)`, {
                     force_reply: true,
                     selective: true
                 });
@@ -214,7 +213,7 @@ export async function POST(req: NextRequest) {
                 'botSession.step': 'CREATE_BUY',
                 'botSession.data.mcap': Number(mcap)
             });
-            await sendTelegramMessage(chatId, `💰 <b>Final Step: Initial Buy</b>\n\nHow much NGN do you want to automatically buy when the token launches?\n\n<b>Minimum:</b> 5\n<b>Fee:</b> 0.2%\n\n<i>Note: This helps establish an initial price.</i>`);
+            await sendTelegramMessage(chatId, `💰 <b>Final Step: Initial Buy</b>\n\nHow much ₦ do you want to automatically buy when the token launches?\n\n<b>Minimum:</b> 5\n<b>Fee:</b> 0.2%\n\n<i>Note: This helps establish an initial price.</i>`);
         }
         return NextResponse.json({ ok: true });
     }
@@ -468,7 +467,7 @@ export async function POST(req: NextRequest) {
 
         if (command.toLowerCase() === '/buy') {
             if (args.length < 2) {
-                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;address&gt; &lt;amount_ngn&gt;</code>");
+                await sendTelegramMessage(chatId, "Usage: <code>/buy &lt;address&gt; &lt;amount_naira&gt;</code>");
                 return NextResponse.json({ ok: true });
             }
             const result = await executeBuyAction(userId, args[0], parseFloat(args[1]));
@@ -528,7 +527,7 @@ export async function POST(req: NextRequest) {
                     data: {}
                 }
             });
-            await sendTelegramMessage(chatId, `💸 <b>Withdraw Funds</b>\n\nHow much NGN would you like to withdraw?\n\n<b>Min:</b> 20\n<b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
+            await sendTelegramMessage(chatId, `💸 <b>Withdraw Funds</b>\n\nHow much ₦ would you like to withdraw?\n\n<b>Min:</b> 20\n<b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
 
         } else if (command.toLowerCase() === '/withdrawals') {
             const requestsRef = collection(firestore, 'withdrawalRequests');
@@ -603,7 +602,7 @@ export async function POST(req: NextRequest) {
         } else if (command.toLowerCase() === '/balance') {
             await sendTelegramMessage(chatId, `💰 <b>Balance:</b> ₦${userData.balance.toLocaleString()}`);
         } else if (command.toLowerCase() === '/help') {
-            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;ngn&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;tokens&gt; - Sell tokens\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
+            await sendTelegramMessage(chatId, "🤖 <b>Commands</b>\n\n/buy &lt;addr&gt; &lt;₦&gt; - Purchase tokens\n/sell &lt;addr&gt; &lt;tokens&gt; - Sell tokens\n/create - Launch token step-by-step\n/withdraw - Request funds\n/withdrawals - Check request status\n/top - Trending by volume\n/portfolio - View holdings & equity\n/balance - Wallet balance\n/cancel - Abort current process");
         }
     } catch (error: any) {
         console.error("WEBHOOK_ERROR:", error);

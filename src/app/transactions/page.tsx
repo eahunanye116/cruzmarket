@@ -158,7 +158,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                     name="amount"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Amount (NGN)</FormLabel>
+                            <FormLabel>Amount (₦)</FormLabel>
                             <FormControl>
                                 <Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} />
                             </FormControl>
@@ -373,7 +373,7 @@ const ITEMS_PER_PAGE = 7;
 export default function WalletPage() {
   const user = useUser();
   const firestore = useFirestore();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, symbol } = useCurrency();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -579,7 +579,7 @@ export default function WalletPage() {
             <Card className="lg:col-span-1">
                 <Tabs defaultValue="deposit">
                     <CardHeader className="pb-0">
-                        <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5" /> NGN Transactions</CardTitle>
+                        <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5" /> ₦ Transactions</CardTitle>
                         <TabsList className="grid w-full grid-cols-3 mt-4">
                             <TabsTrigger value="deposit">Deposit</TabsTrigger>
                             <TabsTrigger value="withdraw">Withdraw</TabsTrigger>

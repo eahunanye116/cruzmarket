@@ -40,7 +40,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const { toast } = useToast();
   const user = useUser();
   const firestore = useFirestore();
-  const { currency, formatAmount, convertToNgn, convertFromNgn } = useCurrency();
+  const { symbol, formatAmount, convertToNgn } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('buy');
 
@@ -160,7 +160,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
               <div className="text-right text-sm text-muted-foreground">Balance: {formatAmount(userProfile?.balance ?? 0)}</div>
               <FormField control={buyForm.control} name="amount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount to Spend ({currency})</FormLabel>
+                  <FormLabel>Amount to Spend ({symbol})</FormLabel>
                   <FormControl><Input type="number" step="any" placeholder="0.00" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -186,7 +186,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
                 <FormItem><FormLabel>Tokens to Sell</FormLabel><FormControl><Input type="number" step="any" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-1">
-                  <div className="flex justify-between"><span>Net {currency} received</span><span>{formatAmount(ngnToReceiveAfterFee)}</span></div>
+                  <div className="flex justify-between"><span>Net {symbol} received</span><span>{formatAmount(ngnToReceiveAfterFee)}</span></div>
               </div>
               <Button type="submit" disabled={isSubmitting || !userHolding} className="w-full">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : `Sell ${ticker.name}`}
