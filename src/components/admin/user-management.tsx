@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { collection, deleteDoc, doc } from 'firebase/firestore';
 import { UserProfile, PlatformStats } from '@/lib/types';
@@ -15,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User, History } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { EditUserDialog } from './edit-user-dialog';
+import { Input } from '../ui/input';
 import Link from 'next/link';
 
 
@@ -49,6 +49,7 @@ export function UserManagement() {
 
   const { toast } = useToast();
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
@@ -60,6 +61,17 @@ export function UserManagement() {
   const adminFees = platformStats?.totalAdminFees ?? 0;
   
   const loading = usersLoading || statsLoading;
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    if (!searchTerm) return users;
+    
+    const lowerSearch = searchTerm.toLowerCase();
+    return users.filter(user => 
+      (user.email?.toLowerCase().includes(lowerSearch)) || 
+      (user.displayName?.toLowerCase().includes(lowerSearch))
+    );
+  }, [users, searchTerm]);
 
   const handleEdit = (user: UserProfile) => {
     setSelectedUser(user);
@@ -90,19 +102,38 @@ export function UserManagement() {
     <Card>
       <CardHeader>
         <CardTitle>Users & Platform Stats</CardTitle>
-        <CardDescription>
-          View and manage all registered users.
-          <br/>
-          Total platform balance: ₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
-          <br />
-            <span className="font-semibold">Total Fees:</span> ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            {' '}
-            (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
-            {' '}
-            <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+        <CardDescription className="space-y-1">
+          <p>View and manage all registered users.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t">
+            <div>
+                <p className="text-foreground font-semibold">Platform Financials</p>
+                <p>Total platform balance: <span className="text-primary font-bold">₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+                <p>
+                    <span className="font-semibold">Total Fees:</span> ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {' '}
+                    (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
+                    {' '}
+                    <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </p>
+            </div>
+            <div>
+                <p className="text-foreground font-semibold">User Statistics</p>
+                <p>Total Registered Users: <span className="text-accent font-bold">{users?.length ?? 0}</span></p>
+            </div>
+          </div>
         </CardDescription>
       </CardHeader>
       <CardContent>
+         <div className="mb-6 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+                placeholder="Search users by email or username..." 
+                className="pl-10" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+         </div>
+
          {loading ? (
            <div className="space-y-2">
              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
@@ -119,7 +150,7 @@ export function UserManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users?.map((user) => (
+                {filteredUsers.length > 0 ? filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -162,7 +193,13 @@ export function UserManagement() {
                         </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
+                )) : (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            No users found matching "{searchTerm}"
+                        </TableCell>
+                    </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
