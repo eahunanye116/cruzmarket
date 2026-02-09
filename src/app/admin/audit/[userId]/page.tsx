@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
@@ -149,7 +148,8 @@ export default function UserAuditPage() {
             </CardDescription>
             <CardTitle className="text-2xl text-destructive">₦{totalWithdrawn.toLocaleString()}</CardTitle>
           </CardHeader>
-        </div>
+        </Card>
+      </div>
 
       <Tabs defaultValue="deposits" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">

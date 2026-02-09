@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 
 function TargetCard({ target, userId }: { target: CopyTarget, userId: string }) {
     const { toast } = useToast();
-    const { currency, convertToNgn, convertFromNgn } = useCurrency();
+    const { symbol, convertToNgn, convertFromNgn } = useCurrency();
     const [isUpdating, setIsUpdating] = useState(false);
     const [localAmount, setLocalAmount] = useState(convertFromNgn(target.amountPerBuyNgn));
 
@@ -63,7 +63,7 @@ function TargetCard({ target, userId }: { target: CopyTarget, userId: string }) 
 
             <div className="space-y-3">
                 <div className="flex flex-col gap-1.5">
-                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Budget per Buy ({currency})</Label>
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Budget per Buy ({symbol})</Label>
                     <div className="flex gap-2">
                         <Input 
                             type="number" 
@@ -95,7 +95,7 @@ export function CopyTradingManager() {
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { currency, convertToNgn } = useCurrency();
+    const { symbol, convertToNgn } = useCurrency();
 
     const targetsQuery = user ? query(collection(firestore, `users/${user.uid}/copyTargets`), orderBy('createdAt', 'desc')) : null;
     const { data: targets, loading } = useCollection<CopyTarget>(targetsQuery);
@@ -211,7 +211,7 @@ export function CopyTradingManager() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label className="text-xs">Budget per Buy ({currency})</Label>
+                                <Label className="text-xs">Budget per Buy ({symbol})</Label>
                                 <Input 
                                     type="number" 
                                     value={buyAmountInput} 
