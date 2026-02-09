@@ -1,7 +1,8 @@
+
 'use client';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { collection, query, orderBy, limit, doc, where } from 'firebase/firestore';
-import { Notification, UserNotification } from '@/lib/types';
+import { AppNotification, UserNotification } from '@/lib/types';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from './ui/button';
@@ -20,7 +21,7 @@ export function HighPriorityNotificationPopup() {
         orderBy('createdAt', 'desc'), 
         limit(1)
     ) : null;
-    const { data: highPriorityNotifications, loading: highPriorityLoading } = useCollection<Notification>(highPriorityQuery);
+    const { data: highPriorityNotifications, loading: highPriorityLoading } = useCollection<AppNotification>(highPriorityQuery);
     const latestHighPriority = highPriorityNotifications?.[0];
 
     // Get the user's dismissal status for that specific notification

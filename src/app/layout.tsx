@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { Analytics } from '@vercel/analytics/react';
 import { HighPriorityNotificationPopup } from '@/components/high-priority-notification-popup';
 import { CurrencyProvider } from '@/hooks/use-currency';
+import { NotificationPermissionPrompt } from '@/components/notification-permission-prompt';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://cruzmarket.fun'),
@@ -56,6 +57,7 @@ export default function RootLayout({
       <body className={cn('min-h-screen bg-background font-body antialiased', comicNeue.variable)}>
         <FirebaseClientProvider>
           <CurrencyProvider>
+            <NotificationPermissionPrompt />
             <HighPriorityNotificationPopup />
             <div className="relative flex min-h-dvh flex-col">
               <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">

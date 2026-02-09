@@ -1,8 +1,9 @@
+
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Notification } from '@/lib/types';
+import { AppNotification } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
@@ -40,12 +41,12 @@ export function NotificationManagement() {
     const [isSending, setIsSending] = useState(false);
     
     // View Message Dialog State
-    const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+    const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
     const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
 
     // Data Fetching
     const notificationsQuery = firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null;
-    const { data: notifications, loading } = useCollection<Notification>(notificationsQuery);
+    const { data: notifications, loading } = useCollection<AppNotification>(notificationsQuery);
 
     const handleSendNotification = async () => {
         if (!title || !message) {
@@ -73,7 +74,7 @@ export function NotificationManagement() {
         }
     };
     
-    const handleDelete = async (notificationToDelete: Notification) => {
+    const handleDelete = async (notificationToDelete: AppNotification) => {
         if (!notificationToDelete) return;
         
         const result = await deleteNotificationAction(notificationToDelete.id);
@@ -85,7 +86,7 @@ export function NotificationManagement() {
         }
     };
 
-    const handleViewMessage = (notification: Notification) => {
+    const handleViewMessage = (notification: AppNotification) => {
         setSelectedNotification(notification);
         setIsMessageDialogOpen(true);
     };

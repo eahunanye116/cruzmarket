@@ -1,8 +1,9 @@
+
 'use client';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { Notification, UserNotification } from '@/lib/types';
-import { useState, useMemo } from 'react';
+import { AppNotification, UserNotification } from '@/lib/types';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { User } from 'firebase/auth';
 import { Bell, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,10 +23,11 @@ import {
 } from '@/components/ui/alert-dialog';
 
 
-type EnrichedNotification = Notification & { isRead: boolean };
+type EnrichedNotification = AppNotification & { isRead: boolean };
 
 export function NotificationBell({ user }: { user: User }) {
     const firestore = useFirestore();
+    const lastNotificationIdRef = useRef<string | null>(null);
 
     // OPTIMIZATION: Only fetch the 20 most recent notifications to protect quota
     const notificationsQuery = firestore ? query(
@@ -33,7 +35,7 @@ export function NotificationBell({ user }: { user: User }) {
         orderBy('createdAt', 'desc'),
         limit(20)
     ) : null;
-    const { data: notifications, loading: notificationsLoading } = useCollection<Notification>(notificationsQuery);
+    const { data: notifications, loading: notificationsLoading } = useCollection<AppNotification>(notificationsQuery);
 
     const userNotificationsQuery = firestore ? collection(firestore, `users/${user.uid}/userNotifications`) : null;
     const { data: userNotifications, loading: userNotificationsLoading } = useCollection<UserNotification>(userNotificationsQuery);
@@ -59,6 +61,32 @@ export function NotificationBell({ user }: { user: User }) {
     const unreadCount = useMemo(() => {
         return enrichedNotifications.filter(n => !n.isRead).length;
     }, [enrichedNotifications]);
+
+    // Native Browser Notification Logic
+    useEffect(() => {
+        if (notificationsLoading || !notifications || notifications.length === 0) return;
+
+        const latest = notifications[0];
+        
+        // If this is the first time we've loaded notifications, just store the ID
+        if (!lastNotificationIdRef.current) {
+            lastNotificationIdRef.current = latest.id;
+            return;
+        }
+
+        // If the ID has changed, it's a new notification
+        if (latest.id !== lastNotificationIdRef.current) {
+            lastNotificationIdRef.current = latest.id;
+
+            // Trigger browser notification if allowed
+            if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
+                new window.Notification(latest.title, {
+                    body: latest.message,
+                    icon: '/favicon.ico'
+                });
+            }
+        }
+    }, [notifications, notificationsLoading]);
 
     const handleSheetOpen = async (open: boolean) => {
         setIsSheetOpen(open);
