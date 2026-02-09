@@ -71,7 +71,10 @@ export function PaymentManagement() {
         setIsGeneratingMock(false);
     };
 
-    const filteredCurrencies = currencies?.filter(c => c.toLowerCase().includes(curSearch.toLowerCase())) || [];
+    const filteredCurrencies = currencies?.filter(c => {
+        const currencyString = String(c || '');
+        return currencyString.toLowerCase().includes(curSearch.toLowerCase());
+    }) || [];
 
     return (
         <div className="space-y-6">
@@ -133,7 +136,7 @@ export function PaymentManagement() {
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
                                             <Label className="text-[10px] text-muted-foreground uppercase">Amount</Label>
-                                            <p className="text-xs font-bold">{mockResult.pay_amount} {mockResult.pay_currency.toUpperCase()}</p>
+                                            <p className="text-xs font-bold">{mockResult.pay_amount} {String(mockResult.pay_currency || '').toUpperCase()}</p>
                                         </div>
                                         <div>
                                             <Label className="text-[10px] text-muted-foreground uppercase">Payment ID</Label>
@@ -174,9 +177,9 @@ export function PaymentManagement() {
                             </div>
                             <ScrollArea className="h-[300px] rounded-md border p-4">
                                 <div className="flex flex-wrap gap-2">
-                                    {filteredCurrencies.map(c => (
-                                        <Badge key={c} variant="secondary" className="font-mono text-[10px]">
-                                            {c}
+                                    {filteredCurrencies.map((c, index) => (
+                                        <Badge key={`${String(c)}-${index}`} variant="secondary" className="font-mono text-[10px]">
+                                            {String(c)}
                                         </Badge>
                                     ))}
                                     {filteredCurrencies.length === 0 && (
