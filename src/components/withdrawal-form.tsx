@@ -121,13 +121,13 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
               <FormItem><FormLabel>Amount (NGN)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={ngnForm.control} name="bankName" render={({ field }) => (
-              <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input placeholder="e.g., Kuda Bank" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input placeholder="e.g., Kuda Bank" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
              <FormField control={ngnForm.control} name="accountNumber" render={({ field }) => (
-              <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="10 digits" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="10 digits" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
              <FormField control={ngnForm.control} name="accountName" render={({ field }) => (
-              <FormItem><FormLabel>Account Name</FormLabel><FormControl><Input placeholder="Full name on account" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Account Name</FormLabel><FormControl><Input placeholder="Full name on account" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
@@ -180,7 +180,7 @@ export function WithdrawalForm({ user, balance, type }: WithdrawalFormProps) {
         </div>
 
         <FormField control={cryptoForm.control} name="address" render={({ field }) => (
-          <FormItem><FormLabel>Wallet Address</FormLabel><FormControl><Input placeholder="Paste your destination address here" {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Wallet Address</FormLabel><FormControl><Input placeholder="Paste your destination address here" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
         )} />
 
         <Button type="submit" variant="secondary" className="w-full" disabled={isSubmitting}>

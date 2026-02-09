@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore, useCollection } from '@/firebase';
-import { collectionGroup, query, where } from 'firebase/firestore';
+import { collectionGroup, query, where, limit } from 'firebase/firestore';
 import { useMemo } from 'react';
 import type { Ticker, PortfolioHolding } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
@@ -15,7 +15,8 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
     if (!firestore || !ticker) return null;
     return query(
       collectionGroup(firestore, 'portfolio'),
-      where('tickerId', '==', ticker.id)
+      where('tickerId', '==', ticker.id),
+      limit(50) // OPTIMIZATION: Limit reads to protect quota
     );
   }, [firestore, ticker]);
 
@@ -82,7 +83,7 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
   }
 
   const stats = [
-    { label: 'Total Holders', value: analysis.totalHolders.toLocaleString() },
+    { label: 'Total Holders (Analyzed)', value: analysis.totalHolders.toLocaleString() },
     { label: 'Total Supply', value: analysis.totalSupply.toLocaleString('en-US', { maximumFractionDigits: 0 }) },
     { label: 'Circulating Supply', value: `${analysis.circulatingSupply.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: 'Creator Holdings', value: `${analysis.devHoldings.toLocaleString('en-US', { maximumFractionDigits: 2 })} (${analysis.devHoldingsPercentage.toFixed(2)}%)` },
@@ -100,7 +101,7 @@ export function TokenAnalysis({ ticker }: { ticker: Ticker }) {
       </ul>
       <div>
         <div className="flex justify-between items-center mb-2 text-sm">
-            <span className="text-muted-foreground">Top 10 Holders</span>
+            <span className="text-muted-foreground">Top Holders Analysis</span>
             <span className="font-semibold">{analysis.topHoldersPercentage.toFixed(2)}% of Supply</span>
         </div>
         <Progress value={analysis.topHoldersPercentage} className="h-2" />
