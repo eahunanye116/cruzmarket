@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useCollection, useFirestore } from '@/firebase';
 import { UserProfile } from '@/lib/types';
-import { collection, query, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Medal, User, Loader2, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -49,9 +48,6 @@ export default function LeaderboardPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-2xl">
       <div className="flex flex-col items-center text-center mb-10">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-          <Trophy className="h-8 w-8 text-primary" />
-        </div>
         <h1 className="text-4xl font-bold font-headline">Arena Legends</h1>
         <p className="mt-2 text-lg text-muted-foreground">
           The most elite traders in the arena, ranked by their profit performance.

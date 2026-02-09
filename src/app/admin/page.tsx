@@ -1,6 +1,6 @@
 'use client';
 import { useUser } from '@/firebase';
-import { Ban, ShieldCheck } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TickerManagement } from '@/components/admin/ticker-management';
 import { UserManagement } from '@/components/admin/user-management';
@@ -64,9 +64,6 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-          <ShieldCheck className="h-8 w-8 text-primary" />
-        </div>
         <h1 className="text-4xl font-bold font-headline">Admin Control Panel</h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Manage tickers, users, and platform settings.

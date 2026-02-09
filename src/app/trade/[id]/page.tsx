@@ -1,4 +1,3 @@
-
 'use client';
 import { useDoc, useFirestore, useUser } from '@/firebase';
 import { Activity, Ticker } from '@/lib/types';
@@ -130,9 +129,6 @@ export default function TradeDetailsPage({ params }: { params: { id: string } })
   // Common UI elements
   const pageHeader = (
     <div className="flex flex-col items-center text-center mb-8">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 border-2">
-        <Briefcase className="h-8 w-8 text-primary" />
-      </div>
       <h1 className="text-4xl font-bold font-headline">Trade Details</h1>
       <p className="mt-2 text-lg text-muted-foreground">
         An in-depth look at your activity for ${ticker.name}.
