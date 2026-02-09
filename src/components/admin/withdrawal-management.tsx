@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
@@ -120,7 +119,7 @@ export function WithdrawalManagement() {
                                 <TableRow>
                                     <TableHead>Type</TableHead>
                                     <TableHead>User</TableHead>
-                                    <TableHead>Value (NGN)</TableHead>
+                                    <TableHead>Value (₦)</TableHead>
                                     <TableHead>Details</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -231,7 +230,7 @@ export function WithdrawalManagement() {
                         <div className="space-y-4 py-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="border rounded-lg p-3 bg-muted/30">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Internal NGN</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Internal ₦</p>
                                     <p className="text-lg font-bold">₦{selectedRequest.amount.toLocaleString()}</p>
                                 </div>
                                 {selectedRequest.withdrawalType === 'crypto' && selectedRequest.usdAmount && (

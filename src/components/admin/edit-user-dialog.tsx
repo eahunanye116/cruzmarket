@@ -1,4 +1,3 @@
-
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -68,7 +67,7 @@ export function EditUserDialog({ isOpen, setIsOpen, user }: EditUserDialogProps)
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
              <FormField control={form.control} name="balance" render={({ field }) => (
               <FormItem>
-                <FormLabel>Balance (NGN)</FormLabel>
+                <FormLabel>Balance (₦)</FormLabel>
                 <FormControl><Input type="number" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>

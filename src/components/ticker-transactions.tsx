@@ -58,7 +58,7 @@ export function TickerTransactions({ activities }: { activities: Activity[] }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             type="number" 
-            placeholder="Min amount (NGN)..." 
+            placeholder="Min amount (₦)..." 
             value={minAmount} 
             onChange={(e) => setMinAmount(e.target.value === '' ? '' : Number(e.target.value))} 
             className="pl-10 w-full" 
@@ -79,7 +79,7 @@ export function TickerTransactions({ activities }: { activities: Activity[] }) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[100px]">Type</TableHead>
-              <TableHead className="text-right">Value (NGN)</TableHead>
+              <TableHead className="text-right">Value (₦)</TableHead>
               <TableHead className="text-right">Time</TableHead>
             </TableRow>
           </TableHeader>
