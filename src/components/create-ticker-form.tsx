@@ -16,13 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Info } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { executeCreateTickerAction } from "@/app/actions/trade-actions";
+import { ImageUpload } from "./image-upload";
 
 
 const marketCapOptions = {
@@ -38,8 +38,8 @@ const formSchema = z.object({
   }).max(20, {
     message: "Ticker name must not exceed 20 characters.",
   }),
-  icon: z.string().url({ message: "Please enter a valid icon image URL." }),
-  coverImage: z.string().url({ message: "Please enter a valid cover image URL." }),
+  icon: z.string().url({ message: "Please provide a valid icon." }),
+  coverImage: z.string().url({ message: "Please provide a valid banner image." }),
   videoUrl: z.string().url({ message: "Must be a valid URL." }).optional().or(z.literal('')),
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
@@ -125,35 +125,53 @@ export function CreateTickerForm() {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="icon"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Icon URL (Square)</FormLabel>
-              <FormControl><Input placeholder="https://..." {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="coverImage"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cover Image URL (16:9)</FormLabel>
-              <FormControl><Input placeholder="https://..." {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+                control={form.control}
+                name="icon"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Token Icon (Square)</FormLabel>
+                    <FormControl>
+                        <ImageUpload 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            folder="tickers/icons" 
+                            label="Icon" 
+                        />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="coverImage"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Cover Banner (16:9)</FormLabel>
+                    <FormControl>
+                        <ImageUpload 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            folder="tickers/covers" 
+                            label="Cover" 
+                        />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+        </div>
+
         <FormField
           control={form.control}
           name="videoUrl"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Video URL (Optional)</FormLabel>
-              <FormControl><Input placeholder="https://..." {...field} /></FormControl>
+              <FormControl><Input placeholder="Paste YouTube/TikTok URL..." {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -212,9 +230,12 @@ export function CreateTickerForm() {
             </FormItem>
           )}
         />
-        <div className="rounded-lg border bg-muted/50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">Creation Fee: ₦{creationFee.toLocaleString()}</p>
-            <p className="font-bold text-lg mt-1">Total Cost: ₦{totalCost.toLocaleString()}</p>
+        <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center">
+            <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest">Creation Summary</p>
+            <div className="flex justify-center gap-8 mt-2">
+                <div><p className="text-[10px] text-muted-foreground uppercase">Fee</p><p className="font-bold">₦{creationFee.toLocaleString()}</p></div>
+                <div><p className="text-[10px] text-muted-foreground uppercase">Total</p><p className="text-xl font-bold text-primary">₦{totalCost.toLocaleString()}</p></div>
+            </div>
         </div>
         <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
           {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <Send className="mr-2" />}

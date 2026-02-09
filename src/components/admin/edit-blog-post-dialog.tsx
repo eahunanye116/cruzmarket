@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -13,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { saveBlogPostAction } from '@/app/actions/blog-actions';
+import { ImageUpload } from '../image-upload';
 
 const formSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
@@ -88,7 +90,7 @@ export function EditBlogPostDialog({ isOpen, setIsOpen, post }: EditBlogPostDial
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[75vh] overflow-y-auto pr-6">
             <FormField control={form.control} name="title" render={({ field }) => (
               <FormItem>
                 <FormLabel>Title</FormLabel>
@@ -105,8 +107,15 @@ export function EditBlogPostDialog({ isOpen, setIsOpen, post }: EditBlogPostDial
             )} />
              <FormField control={form.control} name="coverImage" render={({ field }) => (
               <FormItem>
-                <FormLabel>Cover Image URL</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
+                <FormLabel>Cover Image</FormLabel>
+                <FormControl>
+                    <ImageUpload 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                        folder="blog/covers" 
+                        label="Cover Image" 
+                    />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -124,7 +133,7 @@ export function EditBlogPostDialog({ isOpen, setIsOpen, post }: EditBlogPostDial
                 <FormMessage />
               </FormItem>
             )} />
-            <DialogFooter className="sticky bottom-0 bg-background py-4">
+            <DialogFooter className="sticky bottom-0 bg-background py-4 border-t mt-4">
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

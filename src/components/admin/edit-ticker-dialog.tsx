@@ -1,3 +1,4 @@
+
 'use client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -11,8 +12,9 @@ import { Ticker } from '@/lib/types';
 import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
-import { doc, serverTimestamp, setDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, collection, updateDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { ImageUpload } from '../image-upload';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -34,7 +36,7 @@ type EditTickerDialogProps = {
 export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const user = useUser(); // For creatorId on new tickers
+  const user = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,7 +73,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
       } else { // Creating new ticker
         const tickersCollection = collection(firestore, 'tickers');
         const newTickerRef = doc(tickersCollection);
-        const slug = values.name.toLowerCase().replace(/\s+/g, '-');
+        const slug = values.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         
         const now = new Date();
         const chartData = [
@@ -103,7 +105,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{ticker ? 'Edit Ticker' : 'Create Ticker'}</DialogTitle>
           <DialogDescription>
@@ -111,7 +113,7 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
              <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Name</FormLabel>
@@ -126,20 +128,28 @@ export function EditTickerDialog({ isOpen, setIsOpen, ticker }: EditTickerDialog
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="icon" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Icon URL</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="coverImage" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cover Image URL</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="icon" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Icon</FormLabel>
+                    <FormControl>
+                        <ImageUpload value={field.value} onChange={field.onChange} folder="tickers/icons" label="Icon" />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )} />
+                <FormField control={form.control} name="coverImage" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Cover Image</FormLabel>
+                    <FormControl>
+                        <ImageUpload value={field.value} onChange={field.onChange} folder="tickers/covers" label="Cover" />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )} />
+            </div>
+
             <FormField control={form.control} name="videoUrl" render={({ field }) => (
               <FormItem>
                 <FormLabel>Video URL (Optional)</FormLabel>
