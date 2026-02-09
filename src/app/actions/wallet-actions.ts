@@ -1,3 +1,4 @@
+
 'use server';
 
 import { processDeposit } from '@/lib/wallet';
@@ -282,6 +283,77 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
         revalidatePath('/transactions');
         return { success: true, message: 'Withdrawal request has been rejected.' };
     } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getUserProfileByUid(uid: string) {
+    const firestore = getFirestoreInstance();
+    try {
+        const userDoc = await getDoc(doc(firestore, 'users', uid));
+        if (userDoc.exists()) {
+            const data = userDoc.data() as UserProfile;
+            return { success: true, profile: { displayName: data.displayName, email: data.email } };
+        }
+        return { success: false, error: 'User not found.' };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function transferFundsAction(senderId: string, recipientId: string, amount: number) {
+    if (senderId === recipientId) return { success: false, error: "You cannot transfer to yourself." };
+    if (amount <= 0) return { success: false, error: "Invalid amount." };
+
+    const firestore = getFirestoreInstance();
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const senderRef = doc(firestore, 'users', senderId);
+            const recipientRef = doc(firestore, 'users', recipientId);
+
+            const [senderDoc, recipientDoc] = await Promise.all([
+                transaction.get(senderRef),
+                transaction.get(recipientRef)
+            ]);
+
+            if (!senderDoc.exists()) throw new Error("Sender account not found.");
+            if (!recipientDoc.exists()) throw new Error("Recipient account not found.");
+
+            const senderData = senderDoc.data() as UserProfile;
+            const recipientData = recipientDoc.data() as UserProfile;
+
+            if (senderData.balance < amount) throw new Error("Insufficient balance.");
+
+            transaction.update(senderRef, { balance: senderData.balance - amount });
+            transaction.update(recipientRef, { balance: recipientData.balance + amount });
+
+            // Log activity for sender
+            const senderActivityRef = doc(collection(firestore, 'activities'));
+            transaction.set(senderActivityRef, {
+                type: 'TRANSFER_SENT',
+                value: amount,
+                userId: senderId,
+                recipientId: recipientId,
+                recipientName: recipientData.displayName,
+                createdAt: serverTimestamp(),
+            });
+
+            // Log activity for recipient
+            const recipientActivityRef = doc(collection(firestore, 'activities'));
+            transaction.set(recipientActivityRef, {
+                type: 'TRANSFER_RECEIVED',
+                value: amount,
+                userId: recipientId,
+                senderId: senderId,
+                senderName: senderData.displayName,
+                createdAt: serverTimestamp(),
+            });
+        });
+
+        revalidatePath('/transactions');
+        return { success: true, message: 'Transfer successful.' };
+    } catch (error: any) {
+        console.error('Transfer failed:', error);
         return { success: false, error: error.message };
     }
 }

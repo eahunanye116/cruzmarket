@@ -41,7 +41,7 @@
       "description": "Represents a single trading or creation event in the activity feed.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL", "CREATE", "DEPOSIT", "WITHDRAWAL", "TRANSFER_SENT", "TRANSFER_RECEIVED"] },
         "tickerId": { "type": "string" },
         "tickerName": { "type": "string" },
         "tickerIcon": { "type": "string" },
@@ -50,6 +50,10 @@
         "pricePerToken": { "type": "number" },
         "realizedPnl": { "type": "number" },
         "userId": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["type", "value", "createdAt", "userId"]
@@ -219,4 +223,3 @@
     }
   }
 }
-    

@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -29,6 +30,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { WithdrawalForm } from '@/components/withdrawal-form';
+import { TransferFundsForm } from '@/components/transfer-funds-form';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -159,7 +161,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                         <FormItem>
                             <FormLabel>Amount (NGN)</FormLabel>
                             <FormControl>
-                                <Input type="number" placeholder="e.g., 50000" {...field} />
+                                <Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -299,7 +301,7 @@ function CryptoDepositForm({ user }: { user: NonNullable<ReturnType<typeof useUs
                         <FormItem>
                             <FormLabel>Amount (USD)</FormLabel>
                             <FormControl>
-                                <Input type="number" placeholder="e.g., 100" {...field} />
+                                <Input type="number" placeholder="e.g., 100" {...field} value={field.value ?? ''} />
                             </FormControl>
                             <FormDescription className="text-[10px]">
                                 {isLoadingMin ? "Fetching minimum..." : minAmountUsd ? `Min: $${minAmountUsd.toLocaleString()}` : ""}
@@ -428,7 +430,7 @@ export default function WalletPage() {
         ticker: tickers.find(t => t.id === act.tickerId)
     }));
 
-    const walletActs = enriched.filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL');
+    const walletActs = enriched.filter(act => act.type === 'DEPOSIT' || act.type === 'WITHDRAWAL' || act.type === 'TRANSFER_SENT' || act.type === 'TRANSFER_RECEIVED');
     const trades = enriched.filter(act => act.type === 'BUY' || act.type === 'SELL');
 
     const groups: { [key: string]: GroupedTransaction } = {};
@@ -561,6 +563,15 @@ export default function WalletPage() {
                                     <RefreshCcw className={cn("h-4 w-4", isRefreshingRate && "animate-spin")} />
                                 </Button>
                             </div>
+                            <div className="pt-2">
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground">My User ID (UID)</p>
+                                <div className="flex items-center justify-between bg-muted p-2 rounded mt-1">
+                                    <code className="text-xs font-mono truncate max-w-[180px]">{user?.uid}</code>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(user?.uid || ''); toast({ title: 'UID Copied' }); }}>
+                                        <Copy className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -570,14 +581,16 @@ export default function WalletPage() {
                 <Tabs defaultValue="deposit">
                     <CardHeader className="pb-0">
                         <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5" /> NGN Transactions</CardTitle>
-                        <TabsList className="grid w-full grid-cols-2 mt-4">
+                        <TabsList className="grid w-full grid-cols-3 mt-4">
                             <TabsTrigger value="deposit">Deposit</TabsTrigger>
                             <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+                            <TabsTrigger value="transfer">Transfer</TabsTrigger>
                         </TabsList>
                     </CardHeader>
                     <CardContent>
                         <TabsContent value="deposit">{user && <DepositForm user={user} />}</TabsContent>
                         <TabsContent value="withdraw">{user && <WithdrawalForm user={user} balance={userProfile?.balance ?? 0} type="ngn" />}</TabsContent>
+                        <TabsContent value="transfer">{user && <TransferFundsForm balance={userProfile?.balance ?? 0} />}</TabsContent>
                     </CardContent>
                 </Tabs>
             </Card>
@@ -667,16 +680,31 @@ export default function WalletPage() {
         </Card>
 
          <Card className="overflow-hidden">
-            <CardHeader><CardTitle>Wallet History</CardTitle><CardDescription>Record of deposits and withdrawals.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Wallet History</CardTitle><CardDescription>Record of deposits, withdrawals, and transfers.</CardDescription></CardHeader>
             <CardContent className="p-0">
              {isLoading ? <div className="p-4"><Skeleton className="h-24 w-full" /></div> : walletActivities.length > 0 ? (
                  <Table>
-                    <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Details</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
                     <TableBody>
                         {walletActivities.map(activity => (
                             <TableRow key={activity.id}>
-                                <TableCell><Badge variant={activity.type === 'DEPOSIT' ? 'secondary' : 'outline'}>{activity.type}</Badge></TableCell>
+                                <TableCell>
+                                    <Badge variant={
+                                        activity.type === 'DEPOSIT' ? 'secondary' : 
+                                        activity.type === 'WITHDRAWAL' ? 'outline' : 
+                                        activity.type === 'TRANSFER_SENT' ? 'destructive' : 
+                                        'default'
+                                    }>
+                                        {activity.type.replace('_', ' ')}
+                                    </Badge>
+                                </TableCell>
                                 <TableCell>{formatAmount(activity.value)}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                    {activity.type === 'TRANSFER_SENT' && `To: ${activity.recipientName}`}
+                                    {activity.type === 'TRANSFER_RECEIVED' && `From: ${activity.senderName}`}
+                                    {activity.type === 'DEPOSIT' && 'Paystack/NowPayments'}
+                                    {activity.type === 'WITHDRAWAL' && 'Bank/Crypto'}
+                                </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(activity.createdAt.toDate(), { addSuffix: true })}</TableCell>
                             </TableRow>
                         ))}
