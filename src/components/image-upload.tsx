@@ -131,7 +131,7 @@ export function ImageUpload({ value, onChange, folder, label }: ImageUploadProps
         <div className="space-y-1">
             <Input 
                 placeholder={`Paste ${label?.toLowerCase() || 'image'} URL here...`} 
-                value={value} 
+                value={value ?? ''} 
                 onChange={(e) => onChange(e.target.value)} 
             />
             <p className="text-[10px] text-muted-foreground italic pl-1">Link to an external image directly.</p>
