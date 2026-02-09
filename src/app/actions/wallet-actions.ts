@@ -87,7 +87,6 @@ export async function verifyPaystackDepositAction(reference: string) {
 export async function getNowPaymentsMinAmountAction(payCurrency: string) {
     const API_KEY = process.env.NOWPAYMENTS_API_KEY || '299PEWX-X9C4349-NF28N7G-A2FFNYH';
     try {
-        // Fetch minimum amount from NOWPayments
         const res = await fetch(`https://api.nowpayments.io/v1/min-amount?currency_from=${payCurrency.toLowerCase()}&fiat_equivalent=usd`, {
             headers: { 'x-api-key': API_KEY }
         });
@@ -108,7 +107,6 @@ export async function createNowPaymentsPaymentAction(amount: number, payCurrency
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cruzmarket.fun';
 
     try {
-        // First check if amount is above minimum
         const minCheck = await getNowPaymentsMinAmountAction(payCurrency);
         if (minCheck.success && amount < minCheck.minAmountUsd) {
             throw new Error(`Amount is below the minimum required for this coin ($${minCheck.minAmountUsd.toFixed(2)}).`);
@@ -173,7 +171,6 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         }
         const userProfile = userDoc.data() as UserProfile;
 
-        // Fetch real-time rate for conversion
         const currentRate = await getLatestUsdNgnRate();
         const amountInNgn = payload.withdrawalType === 'crypto' ? payload.amount * currentRate : payload.amount;
 
@@ -288,12 +285,20 @@ export async function rejectWithdrawalAction(requestId: string, reason: string) 
 }
 
 export async function getUserProfileByUid(uid: string) {
+    if (!uid || uid.trim().length < 10) return { success: false, error: 'Invalid UID.' };
+    
     const firestore = getFirestoreInstance();
     try {
-        const userDoc = await getDoc(doc(firestore, 'users', uid));
+        const userDoc = await getDoc(doc(firestore, 'users', uid.trim()));
         if (userDoc.exists()) {
             const data = userDoc.data() as UserProfile;
-            return { success: true, profile: { displayName: data.displayName, email: data.email } };
+            return { 
+                success: true, 
+                profile: { 
+                    displayName: data.displayName || data.email?.split('@')[0] || 'Trader', 
+                    email: data.email 
+                } 
+            };
         }
         return { success: false, error: 'User not found.' };
     } catch (error: any) {
@@ -302,6 +307,7 @@ export async function getUserProfileByUid(uid: string) {
 }
 
 export async function transferFundsAction(senderId: string, recipientId: string, amount: number) {
+    if (!senderId || !recipientId) return { success: false, error: "Authentication or Recipient ID missing." };
     if (senderId === recipientId) return { success: false, error: "You cannot transfer to yourself." };
     if (amount <= 0) return { success: false, error: "Invalid amount." };
 
@@ -309,7 +315,7 @@ export async function transferFundsAction(senderId: string, recipientId: string,
     try {
         await runTransaction(firestore, async (transaction) => {
             const senderRef = doc(firestore, 'users', senderId);
-            const recipientRef = doc(firestore, 'users', recipientId);
+            const recipientRef = doc(firestore, 'users', recipientId.trim());
 
             const [senderDoc, recipientDoc] = await Promise.all([
                 transaction.get(senderRef),
@@ -333,8 +339,8 @@ export async function transferFundsAction(senderId: string, recipientId: string,
                 type: 'TRANSFER_SENT',
                 value: amount,
                 userId: senderId,
-                recipientId: recipientId,
-                recipientName: recipientData.displayName,
+                recipientId: recipientId.trim(),
+                recipientName: recipientData.displayName || recipientData.email,
                 createdAt: serverTimestamp(),
             });
 
@@ -343,9 +349,9 @@ export async function transferFundsAction(senderId: string, recipientId: string,
             transaction.set(recipientActivityRef, {
                 type: 'TRANSFER_RECEIVED',
                 value: amount,
-                userId: recipientId,
+                userId: recipientId.trim(),
                 senderId: senderId,
-                senderName: senderData.displayName,
+                senderName: senderData.displayName || senderData.email,
                 createdAt: serverTimestamp(),
             });
         });

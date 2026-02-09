@@ -11,11 +11,10 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getUserProfileByUid, transferFundsAction } from '@/app/actions/wallet-actions';
-import { Loader2, Send, User } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Loader2, Send, User, AlertCircle } from 'lucide-react';
 
 const transferSchema = z.object({
-  recipientId: z.string().min(10, "Invalid User ID format."),
+  recipientId: z.string().min(5, "Invalid User ID format."),
   amount: z.coerce.number().min(1, "Minimum transfer is ₦1."),
 });
 
@@ -25,6 +24,7 @@ export function TransferFundsForm({ balance }: { balance: number }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [recipientName, setRecipientName] = useState<string | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof transferSchema>>({
     resolver: zodResolver(transferSchema),
@@ -35,21 +35,28 @@ export function TransferFundsForm({ balance }: { balance: number }) {
 
   useEffect(() => {
     const lookup = async () => {
-      if (recipientId.length >= 20) {
+      const cleanId = (recipientId || '').trim();
+      
+      if (cleanId.length >= 10) {
+        setLookupError(null);
         setIsLookingUp(true);
-        const result = await getUserProfileByUid(recipientId);
+        const result = await getUserProfileByUid(cleanId);
+        
         if (result.success && result.profile) {
           setRecipientName(result.profile.displayName);
+          setLookupError(null);
         } else {
           setRecipientName(null);
+          setLookupError(result.error || 'User not found.');
         }
         setIsLookingUp(false);
       } else {
         setRecipientName(null);
+        setLookupError(null);
       }
     };
 
-    const timeout = setTimeout(lookup, 500);
+    const timeout = setTimeout(lookup, 600);
     return () => clearTimeout(timeout);
   }, [recipientId]);
 
@@ -59,19 +66,22 @@ export function TransferFundsForm({ balance }: { balance: number }) {
       form.setError('amount', { message: "Insufficient balance." });
       return;
     }
-    if (values.recipientId === user.uid) {
+    
+    const cleanId = values.recipientId.trim();
+    if (cleanId === user.uid) {
       form.setError('recipientId', { message: "You cannot transfer to yourself." });
       return;
     }
 
     setIsSubmitting(true);
-    const result = await transferFundsAction(user.uid, values.recipientId, values.amount);
+    const result = await transferFundsAction(user.uid, cleanId, values.amount);
     setIsSubmitting(false);
 
     if (result.success) {
       toast({ title: 'Transfer Successful', description: `₦${values.amount.toLocaleString()} sent to ${recipientName || 'user'}.` });
-      form.reset();
+      form.reset({ recipientId: '', amount: undefined });
       setRecipientName(null);
+      setLookupError(null);
     } else {
       toast({ variant: 'destructive', title: 'Transfer Failed', description: result.error });
     }
@@ -88,18 +98,36 @@ export function TransferFundsForm({ balance }: { balance: number }) {
               <FormLabel>Recipient User ID</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input placeholder="Paste recipient's UID here..." {...field} value={field.value ?? ''} />
-                  {isLookingUp && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+                  <Input 
+                    placeholder="Paste recipient's UID here..." 
+                    {...field} 
+                    value={field.value ?? ''} 
+                    autoComplete="off"
+                  />
+                  {isLookingUp && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
               </FormControl>
+              
               {recipientName && (
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1 bg-accent/5 p-2 rounded border border-accent/20">
                   <User className="h-3 w-3 text-accent" />
-                  <span className="text-xs font-bold text-accent">Sending to: {recipientName}</span>
+                  <span className="text-xs font-bold text-accent">Ready to send to: {recipientName}</span>
                 </div>
               )}
+
+              {lookupError && !isLookingUp && (
+                <div className="flex items-center gap-2 pt-1 text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  <span className="text-xs font-semibold">{lookupError}</span>
+                </div>
+              )}
+
               <FormDescription className="text-[10px]">
-                Ask the recipient for their UID (found in their profile).
+                Ask the recipient for their UID (found in their profile/wallet).
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -120,9 +148,16 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isSubmitting || isLookingUp || !recipientName}>
-          {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <Send className="mr-2" />}
-          Transfer Funds
+        <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isSubmitting || isLookingUp || !recipientName}
+        >
+          {isSubmitting ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+          ) : (
+            <><Send className="mr-2 h-4 w-4" /> Transfer NGN</>
+          )}
         </Button>
       </form>
     </Form>
