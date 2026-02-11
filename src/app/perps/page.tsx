@@ -164,7 +164,7 @@ export default function PerpetualTradingPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <p>• <b>Funding</b>: Calculated every 8 hours. Synthetic offset based on side imbalance.</p>
-                                    <p>• <b>Leverage</b>: Max 1000x. High leverage is effectively a donation to the house due to the 5% edge.</p>
+                                    <p>• <b>Leverage</b>: Max 20x. High leverage is restricted to ensure positions can survive the 5% edge.</p>
                                 </div>
                             </CardContent>
                         </Card>

@@ -51,15 +51,10 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
     }, [direction, estimatedEntryPrice, leverage]);
 
-    // Check for instant liquidation (Spread + MM vs Initial Margin)
-    // Buffer = (Spread 2.5% + MM 2.5%) = 5%. Max survivable leverage = 1 / 0.05 = 20x.
-    const isInstantLiquidation = useMemo(() => {
-        return leverage > 20;
-    }, [leverage]);
-
     const handlePercentClick = (percent: number) => {
         if (!profile?.balance) return;
-        const maxCollateralNgn = profile.balance / (1 + (leverage * 0.001));
+        // Simple approximation for UI
+        const maxCollateralNgn = profile.balance * 0.95; 
         const targetCollateralNgn = maxCollateralNgn * (percent / 100);
         setCollateralInput(convertFromNgn(targetCollateralNgn).toFixed(2));
     };
@@ -89,7 +84,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
         if (result.success) {
             if (result.isLiquidated) {
-                toast({ variant: 'destructive', title: 'INSTANT LIQUIDATION', description: 'The House Edge consumed your collateral immediately. Trade failed.' });
+                toast({ variant: 'destructive', title: 'INSTANT LIQUIDATION', description: 'The House Edge consumed your collateral immediately. Position closed.' });
             } else {
                 toast({ title: 'Position Opened!', description: `${pair.name} ${direction} is now active.` });
             }
@@ -181,7 +176,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
                 <div className="space-y-4 pt-2">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Adjust Leverage</Label>
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Adjust Leverage (Max 20x)</Label>
                         <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-mono text-[10px]">
                             {leverage}x
                         </Badge>
@@ -190,14 +185,14 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         <Slider 
                             value={[leverage]} 
                             min={1} 
-                            max={1000} 
+                            max={20} 
                             step={1} 
                             onValueChange={([val]) => setLeverage(val)}
                             className="py-2"
                         />
                     </div>
                     <div className="flex justify-between px-1">
-                        {[1, 20, 50, 100, 1000].map(v => (
+                        {[1, 5, 10, 15, 20].map(v => (
                             <button 
                                 key={v}
                                 onClick={() => setLeverage(v)}
@@ -211,18 +206,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         ))}
                     </div>
                 </div>
-
-                {isInstantLiquidation && (
-                    <div className="p-3 rounded-lg bg-destructive/10 border-2 border-destructive/20 animate-pulse">
-                        <div className="flex items-center gap-2 text-destructive mb-1">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-[10px] font-bold uppercase">SUICIDE TRADE DETECTED</span>
-                        </div>
-                        <p className="text-[9px] text-destructive leading-relaxed font-semibold">
-                            Leverage above <b>20x</b> cannot survive the 5% House Edge (2.5% Spread + 2.5% Maintenance Margin). You will be <b>LIQUIDATED INSTANTLY</b> on entry.
-                        </p>
-                    </div>
-                )}
 
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center">
