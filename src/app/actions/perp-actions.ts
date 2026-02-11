@@ -1,10 +1,9 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
 import { doc, collection, runTransaction, serverTimestamp, getDoc, increment, DocumentReference } from 'firebase/firestore';
 import type { Ticker, UserProfile, PerpPosition } from '@/lib/types';
-import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } from '@/lib/utils';
+import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
 
 const MAX_HOUSE_EXPOSURE_PER_TICKER = 5000000; // ₦5M max exposure per ticker
