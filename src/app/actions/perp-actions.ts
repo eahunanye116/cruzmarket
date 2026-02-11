@@ -55,6 +55,23 @@ export async function openPerpPositionAction(
             // 5. High-Precision Liquidation Price
             const liqPrice = calculateLiquidationPrice(direction, entryPrice, leverage);
             
+            // Check for immediate liquidation (Spread vs Initial Margin vs MM)
+            let initialStatus: PerpPosition['status'] = 'open';
+            let realizedPnL = undefined;
+            let exitPrice = undefined;
+            let closedAt = undefined;
+
+            const isImmediatelyLiquidated = direction === 'LONG' 
+                ? currentPriceNgn <= liqPrice 
+                : currentPriceNgn >= liqPrice;
+
+            if (isImmediatelyLiquidated) {
+                initialStatus = 'liquidated';
+                realizedPnL = -collateral;
+                exitPrice = currentPriceNgn;
+                closedAt = serverTimestamp() as any;
+            }
+
             const positionRef = doc(collection(firestore, `users/${userId}/perpPositions`));
             const positionData: Omit<PerpPosition, 'id'> = {
                 userId,
@@ -67,14 +84,17 @@ export async function openPerpPositionAction(
                 entryPrice,
                 entryValue: collateral * leverage,
                 liquidationPrice: liqPrice,
-                status: 'open',
+                status: initialStatus,
+                realizedPnL,
+                exitPrice,
+                closedAt,
                 createdAt: serverTimestamp() as any,
             };
 
             transaction.set(positionRef, positionData);
             transaction.update(userRef, { balance: increment(-totalRequired) });
 
-            return { positionId: positionRef.id, tickerName: market.symbol };
+            return { positionId: positionRef.id, tickerName: market.symbol, isLiquidated: isImmediatelyLiquidated };
         });
 
         revalidatePath('/perps');

@@ -45,16 +45,16 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         return getSpreadAdjustedPrice(pair.price, direction, false);
     }, [pair.price, direction]);
 
-    // REACTIVE LIQUIDATION: Uses the fixed tiered MM formula
+    // REACTIVE LIQUIDATION: Fixed 2.5% Maintenance Margin
     const liqPrice = useMemo(() => {
         if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
         return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
     }, [direction, estimatedEntryPrice, leverage]);
 
-    // Check for instant liquidation (Spread vs Initial Margin)
+    // Check for instant liquidation (Spread + MM vs Initial Margin)
+    // Buffer = (Spread 2.5% + MM 2.5%) = 5%. Max survivable leverage = 1 / 0.05 = 20x.
     const isInstantLiquidation = useMemo(() => {
-        // Spread is 2.5%. If Leverage > (1 / 0.025) = 40, you are wiped on entry.
-        return leverage > 40;
+        return leverage > 20;
     }, [leverage]);
 
     const handlePercentClick = (percent: number) => {
@@ -88,7 +88,11 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         );
 
         if (result.success) {
-            toast({ title: 'Position Opened!', description: `${pair.name} ${direction} is now active.` });
+            if (result.isLiquidated) {
+                toast({ variant: 'destructive', title: 'INSTANT LIQUIDATION', description: 'The House Edge consumed your collateral immediately. Trade failed.' });
+            } else {
+                toast({ title: 'Position Opened!', description: `${pair.name} ${direction} is now active.` });
+            }
             setCollateralInput('');
         } else {
             toast({ variant: 'destructive', title: 'Trade Failed', description: result.error });
@@ -193,7 +197,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         />
                     </div>
                     <div className="flex justify-between px-1">
-                        {[1, 50, 100, 500, 1000].map(v => (
+                        {[1, 20, 50, 100, 1000].map(v => (
                             <button 
                                 key={v}
                                 onClick={() => setLeverage(v)}
@@ -212,10 +216,10 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     <div className="p-3 rounded-lg bg-destructive/10 border-2 border-destructive/20 animate-pulse">
                         <div className="flex items-center gap-2 text-destructive mb-1">
                             <AlertTriangle className="h-4 w-4" />
-                            <span className="text-[10px] font-bold uppercase">Suicide Trade Detected</span>
+                            <span className="text-[10px] font-bold uppercase">SUICIDE TRADE DETECTED</span>
                         </div>
                         <p className="text-[9px] text-destructive leading-relaxed font-semibold">
-                            With a 2.5% market spread, any leverage over 40x will result in <b>INSTANT LIQUIDATION</b>. The cost of entry exceeds your initial collateral.
+                            Leverage above <b>20x</b> cannot survive the 5% House Edge (2.5% Spread + 2.5% Maintenance Margin). You will be <b>LIQUIDATED INSTANTLY</b> on entry.
                         </p>
                     </div>
                 )}
@@ -227,7 +231,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild><Info className="h-2.5 w-2.5 text-muted-foreground opacity-50 cursor-help" /></TooltipTrigger>
-                                    <TooltipContent><p className="text-[10px]">Includes market spread.</p></TooltipContent>
+                                    <TooltipContent><p className="text-[10px]">Includes 2.5% market spread.</p></TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
                         </div>

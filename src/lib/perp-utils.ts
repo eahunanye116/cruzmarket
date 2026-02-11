@@ -8,7 +8,8 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs as requested
+const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs
+const MAINTENANCE_MARGIN = 0.025; // 2.5% maintenance margin requirement
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
@@ -39,8 +40,8 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
 
 /**
  * Calculates the liquidation price for a position.
- * To support 1000x leverage (0.1% margin), the Maintenance Margin must be 
- * smaller than the initial margin.
+ * This formula determines the price point where the remaining equity 
+ * (collateral + unrealized PnL) equals the Maintenance Margin requirement.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -51,19 +52,17 @@ export function calculateLiquidationPrice(
         return 0;
     }
 
-    // Dynamic Maintenance Margin (MM)
-    // MM must be less than (1 / leverage) for the trade to be viable.
-    // Standard: 2.5%. High Lev: 0.05%
-    const mm = leverage > 40 ? 0.0005 : 0.025;
+    // Fixed Maintenance Margin (MM) at 2.5%
+    const mm = MAINTENANCE_MARGIN;
 
     if (direction === 'LONG') {
-        // Price where: Equity = PositionSize * MM
-        // Liq = Entry * (1 - (1/Lev) + MM)
+        // Price where: Entry * (1 - (1/Lev) + MM)
+        // Correct logic: At leverage L, initial margin is 1/L.
+        // Liquidation occurs when price drops by (1/L - MM).
         const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
         return Math.max(0, liqPrice);
     } else {
-        // Price where: Equity = PositionSize * MM
-        // Liq = Entry * (1 + (1/Lev) - MM)
+        // Short: Liquidation occurs when price rises by (1/L - MM).
         const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
         return liqPrice;
     }
