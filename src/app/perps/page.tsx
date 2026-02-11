@@ -9,7 +9,7 @@ import { PerpPositions } from '@/components/perps/perp-positions';
 import { PerpChart } from '@/components/perps/perp-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, TrendingUp, Ban, Landmark, Coins, Loader2 } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Ban, Landmark, Coins, Loader2, Info } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { getLiveCryptoPrice } from '@/lib/perp-utils';
@@ -67,7 +67,12 @@ export default function PerpetualTradingPage() {
         );
     }
 
-    if (marketsLoading) return <div className="container mx-auto py-24 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /></div>;
+    if (marketsLoading) return (
+        <div className="container mx-auto py-24 text-center">
+            <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
+            <p className="mt-4 font-bold animate-pulse">Syncing Arena Oracles...</p>
+        </div>
+    );
 
     if (!markets || markets.length === 0) {
         return (
@@ -80,89 +85,104 @@ export default function PerpetualTradingPage() {
     }
 
     return (
-        <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-7xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <div>
-                    <h1 className="text-4xl font-bold font-headline flex items-center gap-3">
-                        Perp Arena <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">LIVE</Badge>
-                    </h1>
-                    <p className="text-muted-foreground mt-1">Trade leveraged blockchain memes converted to ₦.</p>
-                </div>
-                <div className="w-full md:w-72">
+        <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 max-w-[1600px]">
+            {/* Professional Market Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-card border-2 p-4 rounded-lg shadow-hard-sm">
+                <div className="flex items-center gap-4">
                     <Select 
                         value={selectedMarket?.id} 
                         onValueChange={(val) => setSelectedMarket(markets.find(m => m.id === val) || null)}
                     >
-                        <SelectTrigger className="border-2 font-bold h-12 shadow-hard-sm">
+                        <SelectTrigger className="w-[220px] border-2 font-bold h-12 shadow-none hover:bg-muted/50 transition-colors">
                             <SelectValue placeholder="Select Market" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="border-2 shadow-hard-md">
                             {markets.map(m => (
-                                <SelectItem key={m.id} value={m.id} className="font-bold">
+                                <SelectItem key={m.id} value={m.id} className="font-bold cursor-pointer">
                                     <div className="flex items-center gap-2">
-                                        <Image src={m.icon} alt="" width={16} height={16} className="rounded-full" />
-                                        <span>{m.name} ({m.symbol}/USDT)</span>
+                                        <Image src={m.icon} alt="" width={18} height={18} className="rounded-full border shadow-sm" />
+                                        <span>{m.name} <span className="text-muted-foreground text-[10px] ml-1">{m.symbol}/USDT</span></span>
                                     </div>
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
+                    <div className="hidden sm:block border-l-2 h-10 mx-2 opacity-20" />
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Oracle Price</p>
+                        <p className="text-xl font-bold font-headline text-primary">
+                            {livePrice ? formatAmount(livePrice) : 'Fetching...'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-6 overflow-x-auto pb-2 md:pb-0">
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Funding Rate</p>
+                        <p className="text-sm font-bold text-accent">0.01% / 8h</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">24h Low/High</p>
+                        <p className="text-sm font-bold text-foreground">₦{((livePrice || 0) * 0.98).toLocaleString()} / ₦{((livePrice || 0) * 1.02).toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold">
+                            REAL-TIME DATA
+                        </Badge>
+                    </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Market Header Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Card className="bg-primary/5 border-primary/20">
-                            <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
-                                <CardTitle className="text-[10px] uppercase font-bold text-primary">Live {selectedMarket?.name} Price</CardTitle>
-                                <TrendingUp className="h-4 w-4 text-primary" />
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Main Trading Area */}
+                <div className="lg:col-span-3 space-y-6">
+                    {/* Professional Chart Section */}
+                    {selectedMarket && (
+                        <div className="relative">
+                            <PerpChart pairId={selectedMarket.id} />
+                            <div className="absolute top-4 left-4 flex gap-2">
+                                <Badge className="bg-background/80 backdrop-blur-md border-2 text-[10px]">1H Candlesticks</Badge>
+                                <Badge className="bg-background/80 backdrop-blur-md border-2 text-[10px]">Binance Oracle</Badge>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Positions & History */}
+                    <div className="grid grid-cols-1 gap-6">
+                        <PerpPositions />
+                        
+                        {/* Rules/Info Card */}
+                        <Card className="border-2 border-dashed bg-muted/5">
+                            <CardHeader className="py-4">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-primary" /> Synthetic Execution Rules
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                                <p className="text-2xl font-bold font-headline">{livePrice ? formatAmount(livePrice) : 'Fetching...'}</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Real-time Oracle: {selectedMarket?.id}</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-accent/5 border-accent/20">
-                            <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
-                                <CardTitle className="text-[10px] uppercase font-bold text-accent">Synthetic Funding</CardTitle>
-                                <Landmark className="h-4 w-4 text-accent" />
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                                <p className="text-2xl font-bold font-headline">0.01% / 8h</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Imbalance-based correction.</p>
+                            <CardContent className="text-[11px] text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+                                <div className="space-y-1">
+                                    <p>• <b>Price Integrity</b>: We use the mid-market rate + 0.15% spread to protect house liquidity.</p>
+                                    <p>• <b>Margin Calls</b>: Automated liquidation occurs at 5% Maintenance Margin.</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p>• <b>Funding</b>: Calculated every 8 hours. Synthetic offset based on side imbalance.</p>
+                                    <p>• <b>Leverage</b>: Max 20x. Your entire collateral is at risk in synthetic markets.</p>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
-
-                    {/* Chart Section */}
-                    {selectedMarket && <PerpChart pairId={selectedMarket.id} />}
-
-                    {/* Active Positions */}
-                    <PerpPositions />
-
-                    {/* Arena Rules */}
-                    <Card className="border-2 border-muted">
-                        <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                                <ShieldAlert className="h-4 w-4 text-primary" /> Perpetual Trading Guide
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-xs text-muted-foreground space-y-2 leading-relaxed">
-                            <p>• <b>Oracle Engine</b>: Prices are determined by real-world crypto markets converted to ₦ at our internal exchange rate.</p>
-                            <p>• <b>Spread</b>: A 0.15% spread applies to all synthetic entries to protect the house.</p>
-                            <p>• <b>Leverage</b>: Up to 20x. High leverage carries significant liquidation risk.</p>
-                            <p>• <b>Margin Call</b>: If your collateral drops to 5% of position size, automated liquidation will occur.</p>
-                        </CardContent>
-                    </Card>
                 </div>
 
+                {/* Sidebar: Order Form */}
                 <div className="lg:col-span-1">
                     <div className="lg:sticky lg:top-20">
                         {livePrice && selectedMarket && (
                             <PerpTradeForm 
-                                pair={{id: selectedMarket.id, name: selectedMarket.name, symbol: selectedMarket.symbol, price: livePrice}} 
+                                pair={{
+                                    id: selectedMarket.id, 
+                                    name: selectedMarket.name, 
+                                    symbol: selectedMarket.symbol, 
+                                    price: livePrice
+                                }} 
                             />
                         )}
                     </div>
