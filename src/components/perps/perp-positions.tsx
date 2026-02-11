@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore } from '@/firebase';
@@ -9,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, XCircle, History, LayoutPanelLeft } from 'lucide-react';
+import { Loader2, XCircle, History, LayoutPanelLeft, ShieldAlert } from 'lucide-react';
 import { closePerpPositionAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -17,6 +16,7 @@ import { useCurrency } from '@/hooks/use-currency';
 import { getLiveCryptoPrice } from '@/lib/perp-utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
 
 export function PerpPositions() {
     const user = useUser();
@@ -131,7 +131,7 @@ export function PerpPositions() {
                                             <TableHead className="pl-6">Market</TableHead>
                                             <TableHead>Lev</TableHead>
                                             <TableHead>Net PnL</TableHead>
-                                            <TableHead>Liq. Price</TableHead>
+                                            <TableHead>Risk / Liq</TableHead>
                                             <TableHead className="text-right pr-6">Action</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -145,6 +145,11 @@ export function PerpPositions() {
                                             const pnlPercent = (priceDiff / pos.entryPrice) * pos.leverage * 100;
                                             const realizedPnl = (pos.collateral * pos.leverage) * (priceDiff / pos.entryPrice);
                                             const isProfit = realizedPnl >= 0;
+
+                                            // Calculate risk factor (distance to liquidation)
+                                            const totalDistance = Math.abs(pos.liquidationPrice - pos.entryPrice);
+                                            const currentDistance = Math.abs(pos.liquidationPrice - currentPrice);
+                                            const riskFactor = Math.max(0, Math.min(100, (1 - (currentDistance / totalDistance)) * 100));
 
                                             return (
                                                 <TableRow key={pos.id} className="hover:bg-muted/5 border-b-2">
@@ -166,8 +171,17 @@ export function PerpPositions() {
                                                             <span className="text-[10px] font-bold">{pnlPercent.toFixed(2)}%</span>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-[10px] text-muted-foreground font-mono">
-                                                        {formatAmount(pos.liquidationPrice)}
+                                                    <TableCell>
+                                                        <div className="flex flex-col gap-1 w-24">
+                                                            <div className="flex justify-between items-center text-[9px] font-bold">
+                                                                <span className="text-muted-foreground">RISK</span>
+                                                                <span className={cn(riskFactor > 80 ? "text-destructive" : riskFactor > 50 ? "text-yellow-500" : "text-accent")}>
+                                                                    {riskFactor.toFixed(0)}%
+                                                                </span>
+                                                            </div>
+                                                            <Progress value={riskFactor} className="h-1" />
+                                                            <span className="text-[9px] text-muted-foreground font-mono">Liq: {formatAmount(pos.liquidationPrice)}</span>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="text-right pr-6">
                                                         <Button 

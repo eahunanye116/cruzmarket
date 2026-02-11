@@ -17,6 +17,7 @@ import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } 
 import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symbol: string, price: number } }) {
     const user = useUser();
@@ -205,17 +206,24 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Est. Entry (Incl. Spread)</span>
+                        <div className="flex items-center gap-1">
+                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Est. Entry Price</span>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Info className="h-2.5 w-2.5 text-muted-foreground opacity-50 cursor-help" /></TooltipTrigger>
+                                    <TooltipContent><p className="text-[10px]">Includes 0.15% market spread.</p></TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
                         <span className="font-mono text-[10px] font-bold">{formatAmount(estimatedEntryPrice)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Total Exposure Size</span>
+                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Total Position Size</span>
                         <span className="font-bold text-xs">{formatAmount(positionSizeNgn)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-1">
                             <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Execution Fee (0.1%)</span>
-                            <Info className="h-2.5 w-2.5 text-muted-foreground opacity-50" />
                         </div>
                         <span className="text-destructive font-bold text-xs">-{formatAmount(feeNgn)}</span>
                     </div>
@@ -223,6 +231,14 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         <div className="flex items-center gap-1">
                             <ShieldAlert className="h-3 w-3" />
                             <span className="text-[9px] font-bold uppercase tracking-tighter">Est. Liquidation Price</span>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Info className="h-2.5 w-2.5 opacity-50 cursor-help" /></TooltipTrigger>
+                                    <TooltipContent className="max-w-[200px]">
+                                        <p className="text-[10px]">The price at which your remaining margin drops below 2.5%. This protects house liquidity.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                         <span className="font-bold text-xs">
                             {liqPrice > 0 ? formatAmount(liqPrice) : '--'}

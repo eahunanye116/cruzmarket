@@ -8,7 +8,7 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const MAINTENANCE_MARGIN = 0.025; // 2.5% - Lowered to 2.5% to allow 20x leverage breathing room
+const MAINTENANCE_MARGIN = 0.025; // 2.5% - Provides 50% collateral breathing room at 20x leverage
 const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
 
 /**
@@ -38,25 +38,6 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
         console.error("ORACLE_FETCH_ERROR:", error.message);
         throw new Error("Market data unavailable. Ensure the symbol is listed on Binance (e.g. PEPEUSDT).");
     }
-}
-
-/**
- * Calculates current PnL for a position based on the entry price and current oracle price.
- */
-export function calculatePerpPnL(
-    direction: 'LONG' | 'SHORT',
-    entryPrice: number,
-    currentPrice: number,
-    collateral: number,
-    leverage: number
-) {
-    const size = collateral * leverage;
-    const priceDiff = direction === 'LONG' 
-        ? currentPrice - entryPrice 
-        : entryPrice - currentPrice;
-    
-    const pnlPercent = priceDiff / entryPrice;
-    return size * pnlPercent;
 }
 
 /**
