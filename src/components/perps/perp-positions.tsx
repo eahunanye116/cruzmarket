@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { PerpPosition, Ticker } from '@/lib/types';
-import { collectionGroup, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

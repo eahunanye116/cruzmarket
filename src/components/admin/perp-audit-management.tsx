@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useCollection, useFirestore } from '@/firebase';
-import { collectionGroup, query, where, orderBy, limit, doc, getDocs } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, orderBy, limit, doc, getDocs } from 'firebase/firestore';
 import { PerpPosition, Ticker } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,6 +14,7 @@ import Link from 'next/link';
 import { Button } from '../ui/button';
 import { checkAndLiquidatePosition } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export function PerpAuditManagement() {
     const firestore = useFirestore();
@@ -79,7 +79,7 @@ export function PerpAuditManagement() {
                         <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Active Positions</CardDescription>
                         <CardTitle className="text-2xl text-primary">{positions?.length ?? 0}</CardTitle>
                     </CardHeader>
-                </Card>
+                </div>
             </div>
 
             <Card>
