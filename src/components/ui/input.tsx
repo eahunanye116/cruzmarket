@@ -4,11 +4,20 @@ import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
-    // If a value prop is present (even if undefined/null), we ensure it's at least an empty string
-    // to prevent React from seeing it as a switch from uncontrolled to controlled.
+    // If a value prop is present (even if undefined/null/NaN), we ensure it's at least an empty string
+    // to prevent React from seeing it as a switch from uncontrolled to controlled or receiving NaN.
     // File inputs must remain uncontrolled.
     const isControlled = 'value' in props;
-    const controlledValue = isControlled ? (props.value ?? "") : undefined;
+    
+    // Explicitly handle NaN which can cause React to throw a warning/error
+    const sanitizeValue = (val: any) => {
+        if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) {
+            return "";
+        }
+        return val;
+    };
+
+    const controlledValue = isControlled ? sanitizeValue(props.value) : undefined;
     const valueProps = type === 'file' ? {} : { value: controlledValue };
 
     return (

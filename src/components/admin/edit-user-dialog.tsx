@@ -34,7 +34,9 @@ export function EditUserDialog({ isOpen, setIsOpen, user }: EditUserDialogProps)
 
   useEffect(() => {
     if (user) {
-      form.reset({ balance: user.balance });
+      // Ensure we don't pass NaN to the form
+      const safeBalance = Number(user.balance) || 0;
+      form.reset({ balance: safeBalance });
     }
   }, [user, form]);
 

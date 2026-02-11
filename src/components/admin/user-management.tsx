@@ -62,9 +62,10 @@ export function UserManagement() {
     return users.reduce((acc, user) => acc + (Number(user.balance) || 0), 0);
   }, [users]);
 
-  const totalFees = platformStats?.totalFeesGenerated ?? 0;
-  const userFees = platformStats?.totalUserFees ?? 0;
-  const adminFees = platformStats?.totalAdminFees ?? 0;
+  // Robustly handle potentially NaN or missing values from DB
+  const totalFees = Number(platformStats?.totalFeesGenerated) || 0;
+  const userFees = Number(platformStats?.totalUserFees) || 0;
+  const adminFees = Number(platformStats?.totalAdminFees) || 0;
   
   const loading = usersLoading || statsLoading;
 
