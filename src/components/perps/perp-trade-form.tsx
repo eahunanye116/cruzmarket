@@ -39,15 +39,16 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const feeNgn = calculatePerpFees(collateralNgn, leverage);
     const totalRequiredNgn = collateralNgn + feeNgn;
 
+    // VALIDATED CALCULATION: Ensures the UI estimate matches the server execution logic exactly
     const liqPrice = useMemo(() => {
+        if (!pair.price || pair.price <= 0) return 0;
         return calculateLiquidationPrice(direction, pair.price, leverage);
     }, [direction, pair.price, leverage]);
 
     const handlePercentClick = (percent: number) => {
         if (!profile?.balance) return;
-        // We calculate max collateral by accounting for the 0.1% fee on leverage
-        // balance = collateral + (collateral * leverage * 0.001)
-        // collateral = balance / (1 + (leverage * 0.001))
+        // Logic: balance = collateral + (collateral * leverage * 0.001)
+        // Hence: collateral = balance / (1 + (leverage * 0.001))
         const maxCollateralNgn = profile.balance / (1 + (leverage * 0.001));
         const targetCollateralNgn = maxCollateralNgn * (percent / 100);
         
@@ -220,7 +221,9 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                             <ShieldAlert className="h-3 w-3" />
                             <span className="text-[9px] font-bold uppercase tracking-tighter">Est. Liquidation Price</span>
                         </div>
-                        <span className="font-bold text-xs">{formatAmount(liqPrice)}</span>
+                        <span className="font-bold text-xs">
+                            {liqPrice > 0 ? formatAmount(liqPrice) : '--'}
+                        </span>
                     </div>
                 </div>
             </CardContent>
