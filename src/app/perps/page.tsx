@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore, useCollection } from '@/firebase';
@@ -98,7 +97,7 @@ export default function PerpetualTradingPage() {
                                 <p className="text-2xl font-bold font-headline">0.01% / hr</p>
                                 <p className="text-[10px] text-muted-foreground mt-1">Paid to house balance.</p>
                             </CardContent>
-                        </div>
+                        </Card>
                     </div>
 
                     {/* Active Positions */}
