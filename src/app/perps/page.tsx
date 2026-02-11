@@ -122,10 +122,6 @@ export default function PerpetualTradingPage() {
                         <p className="text-sm font-bold text-accent">0.01% / 8h</p>
                     </div>
                     <div>
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">24h Low/High</p>
-                        <p className="text-sm font-bold text-foreground">₦{((livePrice || 0) * 0.98).toLocaleString()} / ₦{((livePrice || 0) * 1.02).toLocaleString()}</p>
-                    </div>
-                    <div>
                         <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold">
                             REAL-TIME DATA
                         </Badge>
