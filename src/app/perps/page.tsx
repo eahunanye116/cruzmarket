@@ -10,7 +10,7 @@ import { PerpTradeForm } from '@/components/perps/perp-trade-form';
 import { PerpPositions } from '@/components/perps/perp-positions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, TrendingUp, Info, Ban } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Info, Ban, Landmark } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
@@ -98,7 +98,7 @@ export default function PerpetualTradingPage() {
                                 <p className="text-2xl font-bold font-headline">0.01% / hr</p>
                                 <p className="text-[10px] text-muted-foreground mt-1">Paid to house balance.</p>
                             </CardContent>
-                        </Card>
+                        </div>
                     </div>
 
                     {/* Active Positions */}
