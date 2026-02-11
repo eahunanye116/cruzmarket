@@ -37,10 +37,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { EditUserDialog } from './edit-user-dialog';
 import { Input } from '../ui/input';
 import Link from 'next/link';
+import { useCurrency } from '@/hooks/use-currency';
 
 
 export function UserManagement() {
   const firestore = useFirestore();
+  const { formatAmount } = useCurrency();
   const usersQuery = firestore ? collection(firestore, 'users') : null;
   const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
   
@@ -55,7 +57,11 @@ export function UserManagement() {
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   
-  const totalBalance = users?.reduce((acc, user) => acc + user.balance, 0) ?? 0;
+  const totalBalance = useMemo(() => {
+    if (!users) return 0;
+    return users.reduce((acc, user) => acc + (Number(user.balance) || 0), 0);
+  }, [users]);
+
   const totalFees = platformStats?.totalFeesGenerated ?? 0;
   const userFees = platformStats?.totalUserFees ?? 0;
   const adminFees = platformStats?.totalAdminFees ?? 0;
@@ -107,13 +113,13 @@ export function UserManagement() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t">
             <div>
                 <p className="text-foreground font-semibold">Platform Financials</p>
-                <p>Total platform balance: <span className="text-primary font-bold">₦{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+                <p>Total platform balance: <span className="text-primary font-bold">{formatAmount(totalBalance)}</span></p>
                 <p>
-                    <span className="font-semibold">Total Fees:</span> ₦{totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="font-semibold">Total Fees:</span> {formatAmount(totalFees)}
                     {' '}
-                    (<span className="font-semibold">User:</span> ₦{userFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
+                    (<span className="font-semibold">User:</span> {formatAmount(userFees)},
                     {' '}
-                    <span className="font-semibold">Admin:</span> ₦{adminFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    <span className="font-semibold">Admin:</span> {formatAmount(adminFees)})
                 </p>
             </div>
             <div>
@@ -164,7 +170,7 @@ export function UserManagement() {
                       </div>
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>₦{user.balance.toLocaleString()}</TableCell>
+                    <TableCell>{formatAmount(user.balance)}</TableCell>
                     <TableCell className="text-right">
                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
