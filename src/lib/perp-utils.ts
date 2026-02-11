@@ -3,8 +3,6 @@
  * 
  * ORACLE SOURCE:
  * This system uses the Binance Public API (v3) as its primary price oracle.
- * Binance is chosen for its high liquidity, low latency, and deep historical data
- * which powers both the trading execution engine and the interactive charts.
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
@@ -40,8 +38,6 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
 
 /**
  * Calculates the liquidation price for a position.
- * This formula determines the price point where the remaining equity 
- * (collateral + unrealized PnL) equals the Maintenance Margin requirement.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -52,18 +48,13 @@ export function calculateLiquidationPrice(
         return 0;
     }
 
-    // Fixed Maintenance Margin (MM) at 2.5%
     const mm = MAINTENANCE_MARGIN;
 
     if (direction === 'LONG') {
-        // Price where: Entry * (1 - (1/Lev) + MM)
-        // Correct logic: At leverage L, initial margin is 1/L.
-        // Liquidation occurs when price drops by (1/L - MM).
-        const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
+        const liqPrice = entryPrice * (1 - (1 / leverage - mm));
         return Math.max(0, liqPrice);
     } else {
-        // Short: Liquidation occurs when price rises by (1/L - MM).
-        const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
+        const liqPrice = entryPrice * (1 + (1 / leverage - mm));
         return liqPrice;
     }
 }
