@@ -15,6 +15,17 @@ import { Loader2, PlusCircle, Trash2, Edit, Save, X, Coins, Info, Search, CheckC
 import Image from 'next/image';
 import { Switch } from '../ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { cn } from '@/lib/utils';
 
 export function PerpMarketManagement() {
     const firestore = useFirestore();
@@ -29,6 +40,10 @@ export function PerpMarketManagement() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [validationResult, setValidationResult] = useState<{ success: boolean; price?: number } | null>(null);
     const [editingMarket, setEditingMarket] = useState<PerpMarket | null>(null);
+
+    // Deletion Confirmation State
+    const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+    const [marketToDelete, setMarketToDelete] = useState<PerpMarket | null>(null);
 
     // Form State
     const [name, setName] = useState('');
@@ -114,14 +129,15 @@ export function PerpMarketManagement() {
         }
     };
 
-    const handleDelete = async (marketId: string) => {
-        if (!firestore) return;
-        if (!confirm('Are you sure? Removing this market will break charts for existing positions.')) return;
+    const handleDelete = async () => {
+        if (!firestore || !marketToDelete) return;
         
+        const marketId = marketToDelete.id;
         setDeletingId(marketId);
         try {
+            console.log(`Attempting to delete perp market: ${marketId}`);
             await deleteDoc(doc(firestore, 'perpMarkets', marketId));
-            toast({ title: 'Market Removed' });
+            toast({ title: 'Market Removed', description: `${marketToDelete.name} has been taken offline.` });
         } catch (e: any) {
             console.error("DELETE_MARKET_ERROR:", e);
             toast({ 
@@ -131,6 +147,8 @@ export function PerpMarketManagement() {
             });
         } finally {
             setDeletingId(null);
+            setMarketToDelete(null);
+            setDeleteAlertOpen(false);
         }
     };
 
@@ -186,8 +204,11 @@ export function PerpMarketManagement() {
                                                 <Button 
                                                     size="icon" 
                                                     variant="ghost" 
-                                                    className="h-8 w-8 text-destructive" 
-                                                    onClick={() => handleDelete(market.id)}
+                                                    className="h-8 w-8 text-destructive hover:bg-destructive/10" 
+                                                    onClick={() => {
+                                                        setMarketToDelete(market);
+                                                        setDeleteAlertOpen(true);
+                                                    }}
                                                     disabled={deletingId === market.id}
                                                 >
                                                     {deletingId === market.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -204,6 +225,7 @@ export function PerpMarketManagement() {
                 </CardContent>
             </Card>
 
+            {/* Create/Edit Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -265,6 +287,26 @@ export function PerpMarketManagement() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Deletion Confirmation Dialog */}
+            <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently remove <b>{marketToDelete?.name}</b> from the arena. 
+                            Active positions for this market will no longer be able to update their prices or charts.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setMarketToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            {deletingId ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                            Delete Market
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
