@@ -1,10 +1,10 @@
-
 /**
  * @fileOverview Core logic for Pip & Lot based Perpetual Trading.
  * 
  * EXCHANGE STANDARDS:
  * - 1 Lot = 0.01 Units of underlying asset.
- * - 100 Pip price movement ($100) = $1.00 Profit/Loss per Lot.
+ * - $100.00 price movement = $1.00 Profit/Loss per Lot.
+ * - Multiplier = 0.01.
  * - Spread = 110 Pips ($1.10 cost per lot on entry).
  */
 
@@ -58,7 +58,11 @@ export function calculatePnL(
  * Applies the market-making spread (110 Pips).
  */
 export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false): number {
-    const spreadValue = PIP_SPREAD; // $110 price adjustment
+    // Spread is 110 Pips ($1.10 USD). 
+    // In NGN, this depends on the exchange rate, but the Oracle utility handles raw USD values.
+    // When called with NGN prices, the spreadValue here is treated as points.
+    // To be precise, we expect the caller to provide the spread in the same currency as price.
+    const spreadValue = PIP_SPREAD; 
     
     if (direction === 'LONG') {
         return isClosing ? price - (spreadValue / 2) : price + spreadValue;
@@ -81,7 +85,7 @@ export function calculateLiquidationPrice(
     const margin = positionValue / leverage;
     const mm = positionValue * MAINTENANCE_MARGIN_RATE;
     
-    // Max loss allowed = margin - mm
+    // Max loss allowed before MM breach = margin - mm
     const maxLoss = margin - mm;
     const priceMoveAllowed = maxLoss / (lots * CONTRACT_MULTIPLIER);
 

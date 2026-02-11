@@ -142,7 +142,7 @@ export function PerpPositions() {
                                                 ? currentPrice - pos.entryPrice 
                                                 : pos.entryPrice - currentPrice;
                                             
-                                            // Exchange Standard PnL Calculation
+                                            // EXCHANGE STANDARD CALCULATION: $100 move = $1 profit per lot
                                             const realizedPnl = priceDiff * pos.lots * CONTRACT_MULTIPLIER;
                                             const pnlPercent = (priceDiff / pos.entryPrice) * pos.leverage * 100;
                                             const isProfit = realizedPnl >= 0;

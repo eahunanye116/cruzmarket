@@ -15,6 +15,7 @@ export async function openPerpPositionAction(
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
+    // STRICT CAP: 20x Max Leverage
     const effectiveLeverage = Math.min(leverage, 20);
     
     try {
@@ -29,11 +30,15 @@ export async function openPerpPositionAction(
         ]);
         
         const currentPriceNgn = usdPrice * ngnRate;
-        const entryPriceNgn = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
+        
+        // Convert USD Spread to NGN
+        const spreadNgn = 110 * ngnRate; 
+        const entryPriceNgn = direction === 'LONG' ? currentPriceNgn + spreadNgn : currentPriceNgn - spreadNgn;
+        
         const positionValueNgn = entryPriceNgn * lots * CONTRACT_MULTIPLIER;
         const requiredMarginNgn = positionValueNgn / effectiveLeverage;
         
-        // Fee is 0.1% of position value
+        // Fee is 0.1% of contract value
         const feeNgn = positionValueNgn * 0.001;
         const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
@@ -47,8 +52,11 @@ export async function openPerpPositionAction(
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             
             if (!userDoc.exists()) throw new Error('User not found.');
-            if (userDoc.data().balance < totalRequiredNgn) {
-                throw new Error(`Insufficient balance. Required: ₦${totalRequiredNgn.toLocaleString()}`);
+            const userData = userDoc.data();
+            const balance = Number(userData.balance) || 0;
+
+            if (balance < totalRequiredNgn) {
+                throw new Error(`Insufficient balance. Required: ₦${totalRequiredNgn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
             }
 
             const liqPriceNgn = calculateLiquidationPrice(direction, entryPriceNgn, effectiveLeverage, lots);
@@ -77,7 +85,7 @@ export async function openPerpPositionAction(
                 liquidationPrice: liqPriceNgn,
                 status: initialStatus,
                 createdAt: serverTimestamp() as any,
-                exitPrice: null as any,
+                exitPrice: isImmediatelyLiquidated ? currentPriceNgn : null as any,
                 realizedPnL: isImmediatelyLiquidated ? -requiredMarginNgn : null as any,
                 closedAt: isImmediatelyLiquidated ? serverTimestamp() as any : null as any
             };
@@ -100,29 +108,27 @@ export async function closePerpPositionAction(userId: string, positionId: string
     const firestore = getFirestoreInstance();
     
     try {
-        const result = await runTransaction(firestore, async (transaction) => {
-            const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
-            const posDoc = await transaction.get(positionRef);
-            
-            if (!posDoc.exists()) throw new Error('Position not found.');
-            const posData = posDoc.data() as PerpPosition;
-            if (posData.status !== 'open') throw new Error('Position already closed.');
-
-            return posData;
-        });
+        const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
+        const posSnap = await getDoc(positionRef);
+        if (!posSnap.exists()) throw new Error('Position not found.');
+        const posData = posSnap.data() as PerpPosition;
+        if (posData.status !== 'open') throw new Error('Position already closed.');
 
         const [usdPrice, ngnRate] = await Promise.all([
-            getLiveCryptoPrice(result.tickerId),
+            getLiveCryptoPrice(posData.tickerId),
             getLatestUsdNgnRate()
         ]);
         const currentPriceNgn = usdPrice * ngnRate;
 
-        const finalResult = await runTransaction(firestore, async (transaction) => {
-            const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
-            const posDoc = await transaction.get(positionRef);
-            const posData = posDoc.data() as PerpPosition;
+        // Apply Closing Spread (Half of 110 Pips in NGN)
+        const spreadNgn = 55 * ngnRate;
+        const exitPriceNgn = posData.direction === 'LONG' ? currentPriceNgn - spreadNgn : currentPriceNgn + spreadNgn;
 
-            const exitPriceNgn = getSpreadAdjustedPrice(currentPriceNgn, posData.direction, true);
+        const result = await runTransaction(firestore, async (transaction) => {
+            const pRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
+            const pDoc = await transaction.get(pRef);
+            if (!pDoc.exists() || pDoc.data().status !== 'open') throw new Error('Position invalid.');
+
             const priceDiffNgn = posData.direction === 'LONG' 
                 ? exitPriceNgn - posData.entryPrice 
                 : posData.entryPrice - exitPriceNgn;
@@ -139,7 +145,7 @@ export async function closePerpPositionAction(userId: string, positionId: string
                 totalRealizedPnl: increment(realizedPnlNgn || 0)
             });
 
-            transaction.update(positionRef, {
+            transaction.update(pRef, {
                 status: 'closed',
                 closedAt: serverTimestamp(),
                 exitPrice: exitPriceNgn,
@@ -150,7 +156,7 @@ export async function closePerpPositionAction(userId: string, positionId: string
         });
 
         revalidatePath('/perps');
-        return { success: true, ...finalResult };
+        return { success: true, ...result };
     } catch (error: any) {
         return { success: false, error: error.message };
     }

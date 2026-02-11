@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,14 +16,12 @@ import { doc } from 'firebase/firestore';
 import { calculateLiquidationPrice, getSpreadAdjustedPrice, CONTRACT_MULTIPLIER, PIP_SPREAD } from '@/lib/perp-utils';
 import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symbol: string, price: number } }) {
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { formatAmount, symbol, exchangeRate } = useCurrency();
+    const { formatAmount, exchangeRate } = useCurrency();
 
     const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
     const { data: profile } = useDoc<UserProfile>(userProfileRef);
@@ -35,14 +32,16 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const lots = parseFloat(lotsInput) || 0;
-    const positionValueNgn = pair.price * lots * CONTRACT_MULTIPLIER;
+    
+    // Spread calculation in NGN
+    const spreadNgn = 110 * exchangeRate;
+    const estimatedEntryPrice = direction === 'LONG' ? pair.price + spreadNgn : pair.price - spreadNgn;
+
+    // EXCHANGE STANDARD: Position Value = Price * Lots * 0.01
+    const positionValueNgn = estimatedEntryPrice * lots * CONTRACT_MULTIPLIER;
     const requiredMarginNgn = positionValueNgn / leverage;
     const feeNgn = positionValueNgn * 0.001; // 0.1% Execution Fee
     const totalRequiredNgn = requiredMarginNgn + feeNgn;
-
-    const estimatedEntryPrice = useMemo(() => {
-        return getSpreadAdjustedPrice(pair.price, direction, false);
-    }, [pair.price, direction]);
 
     const liqPrice = useMemo(() => {
         if (!estimatedEntryPrice || lots <= 0) return 0;
@@ -123,7 +122,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-muted-foreground uppercase font-bold">Est. Entry (Inc. {PIP_SPREAD} Pip Spread)</span>
+                        <span className="text-muted-foreground uppercase font-bold">Est. Entry Price</span>
                         <span className="font-mono font-bold">{formatAmount(estimatedEntryPrice)}</span>
                     </div>
                     <div className="flex justify-between items-center">
