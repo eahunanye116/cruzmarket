@@ -37,8 +37,8 @@ export async function openPerpPositionAction(
         const feeNgn = positionValueNgn * 0.001;
         const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-        // CRITICAL: NaN Guard to protect user balance from corruption
-        if (!isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn)) {
+        // CRITICAL: NaN Guard
+        if (!isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn) || !isFinite(entryPriceNgn)) {
             throw new Error("Market pricing error. Please wait for oracle sync.");
         }
 
@@ -77,10 +77,9 @@ export async function openPerpPositionAction(
                 liquidationPrice: liqPriceNgn,
                 status: initialStatus,
                 createdAt: serverTimestamp() as any,
-                // Using null instead of undefined for Firestore compatibility
                 exitPrice: null as any,
-                realizedPnL: null as any,
-                closedAt: null as any
+                realizedPnL: isImmediatelyLiquidated ? -requiredMarginNgn : null as any,
+                closedAt: isImmediatelyLiquidated ? serverTimestamp() as any : null as any
             };
 
             transaction.set(positionRef, positionData);
@@ -198,10 +197,6 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
     }
 }
 
-/**
- * Global Liquidation Sweep
- * Processed platform-wide for all open risky positions.
- */
 export async function sweepAllLiquidationsAction() {
     const firestore = getFirestoreInstance();
     try {
@@ -237,7 +232,6 @@ export async function sweepAllLiquidationsAction() {
             if (pos.direction === 'SHORT' && currentPrice >= pos.liquidationPrice) isBreached = true;
 
             if (isBreached) {
-                // Call checked function for each breach
                 await checkAndLiquidatePosition(pos.userId, posDoc.id);
                 liquidatedCount++;
             }

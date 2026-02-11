@@ -13,7 +13,7 @@ import { closePerpPositionAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/use-currency';
-import { getLiveCryptoPrice } from '@/lib/perp-utils';
+import { getLiveCryptoPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
@@ -142,8 +142,9 @@ export function PerpPositions() {
                                                 ? currentPrice - pos.entryPrice 
                                                 : pos.entryPrice - currentPrice;
                                             
+                                            // Exchange Standard PnL Calculation
+                                            const realizedPnl = priceDiff * pos.lots * CONTRACT_MULTIPLIER;
                                             const pnlPercent = (priceDiff / pos.entryPrice) * pos.leverage * 100;
-                                            const realizedPnl = (pos.collateral * pos.leverage) * (priceDiff / pos.entryPrice);
                                             const isProfit = realizedPnl >= 0;
 
                                             // Calculate risk factor (distance to liquidation)
