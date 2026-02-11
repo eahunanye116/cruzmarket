@@ -2,9 +2,9 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference } from 'firebase/firestore';
-import type { UserProfile, PerpPosition } from '@/lib/types';
-import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice, getLiveCryptoPrice, SUPPORTED_PERP_PAIRS } from '@/lib/perp-utils';
+import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc } from 'firebase/firestore';
+import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
+import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice, getLiveCryptoPrice } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
 import { getLatestUsdNgnRate } from './wallet-actions';
 
@@ -16,11 +16,19 @@ export async function openPerpPositionAction(
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
-    const pair = SUPPORTED_PERP_PAIRS.find(p => p.id === pairId);
-    if (!pair) throw new Error("Unsupported pair.");
-
+    
     try {
-        // 1. Fetch Real-time Prices
+        // 1. Fetch Market Details from Firestore
+        const marketRef = doc(firestore, 'perpMarkets', pairId);
+        const marketSnap = await getDoc(marketRef);
+        
+        if (!marketSnap.exists()) {
+            throw new Error("Market no longer available.");
+        }
+        
+        const market = marketSnap.data() as PerpMarket;
+
+        // 2. Fetch Real-time Prices
         const [usdPrice, ngnRate] = await Promise.all([
             getLiveCryptoPrice(pairId),
             getLatestUsdNgnRate()
@@ -34,10 +42,10 @@ export async function openPerpPositionAction(
             
             if (!userDoc.exists()) throw new Error('User not found.');
             
-            // 2. House Edge: Apply Spread
+            // 3. House Edge: Apply Spread
             const entryPrice = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
             
-            // 3. Platform Fees: 0.1% of position size
+            // 4. Platform Fees: 0.1% of position size
             const fee = calculatePerpFees(collateral, leverage);
             const totalRequired = collateral + fee;
             
@@ -50,9 +58,9 @@ export async function openPerpPositionAction(
             const positionRef = doc(collection(firestore, `users/${userId}/perpPositions`));
             const positionData: Omit<PerpPosition, 'id'> = {
                 userId,
-                tickerId: pairId, // We use the Pair ID as tickerId
-                tickerName: pair.symbol,
-                tickerIcon: pair.icon,
+                tickerId: pairId, 
+                tickerName: market.symbol,
+                tickerIcon: market.icon,
                 direction,
                 leverage,
                 collateral,
@@ -71,8 +79,8 @@ export async function openPerpPositionAction(
             transaction.set(activityRef, {
                 type: 'PERP_OPEN',
                 tickerId: pairId,
-                tickerName: pair.symbol,
-                tickerIcon: pair.icon,
+                tickerName: market.symbol,
+                tickerIcon: market.icon,
                 value: collateral,
                 fee: fee,
                 leverage,
@@ -81,7 +89,7 @@ export async function openPerpPositionAction(
                 createdAt: serverTimestamp(),
             });
 
-            return { positionId: positionRef.id, tickerName: pair.symbol };
+            return { positionId: positionRef.id, tickerName: market.symbol };
         });
 
         revalidatePath('/perps');
@@ -105,10 +113,6 @@ export async function closePerpPositionAction(userId: string, positionId: string
             const posData = posDoc.data() as PerpPosition;
             if (posData.status !== 'open') throw new Error('Position already closed.');
 
-            // FETCH FRESH PRICE IN TRANSACTION
-            // Note: Since we can't await external fetch inside a transaction, we assume 
-            // prices were fetched just before calling this action. For simplicity in prototype,
-            // we will fetch prices before the transaction starts below.
             return posData;
         });
 
@@ -177,8 +181,8 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
     
     try {
         const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
-        const posSnap = await (getFirestoreInstance().doc(positionRef.path).get() as any);
-        if (!posSnap.exists) return;
+        const posSnap = await getDoc(positionRef);
+        if (!posSnap.exists()) return { success: false, error: 'Not found' };
         const posData = posSnap.data() as PerpPosition;
 
         const [usdPrice, ngnRate] = await Promise.all([

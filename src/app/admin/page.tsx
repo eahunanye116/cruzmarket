@@ -16,6 +16,7 @@ import { TelegramManagement } from '@/components/admin/telegram-management';
 import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
 import { PaymentManagement } from '@/components/admin/payment-management';
 import { PerpAuditManagement } from '@/components/admin/perp-audit-management';
+import { PerpMarketManagement } from '@/components/admin/perp-market-management';
 import { useState } from 'react';
 import {
   Select,
@@ -27,7 +28,6 @@ import {
 
 
 // IMPORTANT: Replace with your actual Firebase User ID to grant admin access.
-// You can find your UID in the Firebase Authentication console.
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1'; 
 
 export default function AdminPage() {
@@ -70,16 +70,17 @@ export default function AdminPage() {
       <div className="flex flex-col items-center text-center mb-8">
         <h1 className="text-4xl font-bold font-headline">Admin Control Panel</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Manage tickers, users, and platform settings.
+          Manage tickers, users, markets, and platform settings.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
-        <div className="hidden sm:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-12">
+        <div className="hidden xl:block">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7 xl:grid-cols-13">
             <TabsTrigger value="tickers">Tickers</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="perp-markets">Perp Markets</TabsTrigger>
             <TabsTrigger value="perp-audit">Perp Audit</TabsTrigger>
             <TabsTrigger value="copy-audit">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
@@ -93,8 +94,8 @@ export default function AdminPage() {
           </TabsList>
         </div>
 
-        {/* Mobile Select Dropdown */}
-        <div className="sm:hidden">
+        {/* Mobile/Tablet Select Dropdown */}
+        <div className="xl:hidden">
           <Select value={activeTab} onValueChange={setActiveTab}>
             <SelectTrigger>
               <SelectValue placeholder="Select a section..." />
@@ -102,6 +103,7 @@ export default function AdminPage() {
             <SelectContent>
               <SelectItem value="tickers">Tickers</SelectItem>
               <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="perp-markets">Perp Markets</SelectItem>
               <SelectItem value="perp-audit">Perp Audit</SelectItem>
               <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
@@ -121,6 +123,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="perp-markets" className="mt-6">
+          <PerpMarketManagement />
         </TabsContent>
         <TabsContent value="perp-audit" className="mt-6">
           <PerpAuditManagement />

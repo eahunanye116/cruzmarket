@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/use-currency';
 import { getLiveCryptoPrice } from '@/lib/perp-utils';
 
-export function PerpPositions({ tickers }: { tickers: any[] }) {
+export function PerpPositions() {
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -119,7 +119,7 @@ export function PerpPositions({ tickers }: { tickers: any[] }) {
                                         <TableCell className="pl-6 py-4">
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-foreground">{pos.tickerName}/USDT</span>
+                                                    <span className="font-bold text-foreground">{pos.tickerName}</span>
                                                     <Badge variant={pos.direction === 'LONG' ? 'default' : 'destructive'} className="text-[9px] px-1.5 h-4 font-bold">
                                                         {pos.direction}
                                                     </Badge>

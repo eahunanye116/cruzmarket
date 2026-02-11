@@ -58,7 +58,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         );
 
         if (result.success) {
-            toast({ title: 'Position Opened!', description: `${pair.symbol} ${direction} is now active.` });
+            toast({ title: 'Position Opened!', description: `${pair.name} ${direction} is now active.` });
             setCollateralInput(10000);
         } else {
             toast({ variant: 'destructive', title: 'Trade Failed', description: result.error });
@@ -90,9 +90,9 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                     <Badge variant="outline" className="font-mono text-[10px] bg-muted/50 border-2">SYNTHETIC</Badge>
                 </div>
-                <CardTitle className="text-xl">Trade {pair.symbol}</CardTitle>
+                <CardTitle className="text-xl">Trade {pair.name}</CardTitle>
                 <CardDescription>
-                    Mark Price: <span className="text-foreground font-bold">{formatAmount(pair.price)}</span>
+                    Oracle: <span className="text-foreground font-bold">{pair.id}</span>
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

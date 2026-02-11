@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useUser } from '@/firebase';
+import { useUser, useCollection, useFirestore } from '@/firebase';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PerpTradeForm } from '@/components/perps/perp-trade-form';
@@ -9,29 +9,51 @@ import { PerpPositions } from '@/components/perps/perp-positions';
 import { PerpChart } from '@/components/perps/perp-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, TrendingUp, Ban, Landmark, Coins } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Ban, Landmark, Coins, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { SUPPORTED_PERP_PAIRS, getLiveCryptoPrice } from '@/lib/perp-utils';
+import { getLiveCryptoPrice } from '@/lib/perp-utils';
 import { useCurrency } from '@/hooks/use-currency';
+import { collection, query, where } from 'firebase/firestore';
+import { PerpMarket } from '@/lib/types';
+import Image from 'next/image';
 
 export default function PerpetualTradingPage() {
     const user = useUser();
+    const firestore = useFirestore();
     const { formatAmount, exchangeRate } = useCurrency();
-    const [selectedPair, setSelectedPair] = useState(SUPPORTED_PERP_PAIRS[0]);
+
+    // Fetch Active Markets from Firestore
+    const marketsQuery = firestore ? query(collection(firestore, 'perpMarkets'), where('isActive', '==', true)) : null;
+    const { data: markets, loading: marketsLoading } = useCollection<PerpMarket>(marketsQuery);
+
+    const [selectedMarket, setSelectedMarket] = useState<PerpMarket | null>(null);
     const [livePrice, setLivePrice] = useState<number | null>(null);
 
+    // Initial Selection
     useEffect(() => {
+        if (markets && markets.length > 0 && !selectedMarket) {
+            setSelectedMarket(markets[0]);
+        }
+    }, [markets, selectedMarket]);
+
+    // Live Price Engine
+    useEffect(() => {
+        if (!selectedMarket) return;
+
         const updatePrice = async () => {
             try {
-                const usd = await getLiveCryptoPrice(selectedPair.id);
+                const usd = await getLiveCryptoPrice(selectedMarket.id);
                 setLivePrice(usd * exchangeRate);
-            } catch (e) {}
+            } catch (e) {
+                console.error("LIVE_PRICE_FAILED:", e);
+            }
         };
+
         updatePrice();
-        const interval = setInterval(updatePrice, 5000); // Quick refresh for trading feel
+        const interval = setInterval(updatePrice, 5000); 
         return () => clearInterval(interval);
-    }, [selectedPair, exchangeRate]);
+    }, [selectedMarket, exchangeRate]);
 
     if (!user) {
         return (
@@ -45,29 +67,41 @@ export default function PerpetualTradingPage() {
         );
     }
 
+    if (marketsLoading) return <div className="container mx-auto py-24 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /></div>;
+
+    if (!markets || markets.length === 0) {
+        return (
+            <div className="container mx-auto py-24 text-center space-y-4">
+                <Coins className="h-16 w-16 mx-auto opacity-20" />
+                <h1 className="text-2xl font-bold">Arena Closed</h1>
+                <p className="text-muted-foreground">No active perp markets available. Please contact an admin.</p>
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-7xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-4xl font-bold font-headline flex items-center gap-3">
-                        Perp Arena <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">BETA</Badge>
+                        Perp Arena <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">LIVE</Badge>
                     </h1>
-                    <p className="text-muted-foreground mt-1">Synthetic leverage on real-world crypto. Trade against the house.</p>
+                    <p className="text-muted-foreground mt-1">Trade leveraged blockchain memes converted to ₦.</p>
                 </div>
-                <div className="w-full md:w-64">
+                <div className="w-full md:w-72">
                     <Select 
-                        value={selectedPair.id} 
-                        onValueChange={(val) => setSelectedPair(SUPPORTED_PERP_PAIRS.find(p => p.id === val)!)}
+                        value={selectedMarket?.id} 
+                        onValueChange={(val) => setSelectedMarket(markets.find(m => m.id === val) || null)}
                     >
                         <SelectTrigger className="border-2 font-bold h-12 shadow-hard-sm">
                             <SelectValue placeholder="Select Market" />
                         </SelectTrigger>
                         <SelectContent>
-                            {SUPPORTED_PERP_PAIRS.map(p => (
-                                <SelectItem key={p.id} value={p.id} className="font-bold">
+                            {markets.map(m => (
+                                <SelectItem key={m.id} value={m.id} className="font-bold">
                                     <div className="flex items-center gap-2">
-                                        <Coins className="h-4 w-4" />
-                                        <span>{p.symbol}/USDT</span>
+                                        <Image src={m.icon} alt="" width={16} height={16} className="rounded-full" />
+                                        <span>{m.name} ({m.symbol}/USDT)</span>
                                     </div>
                                 </SelectItem>
                             ))}
@@ -82,12 +116,12 @@ export default function PerpetualTradingPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Card className="bg-primary/5 border-primary/20">
                             <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
-                                <CardTitle className="text-[10px] uppercase font-bold text-primary">Live {selectedPair.symbol} Price</CardTitle>
+                                <CardTitle className="text-[10px] uppercase font-bold text-primary">Live {selectedMarket?.name} Price</CardTitle>
                                 <TrendingUp className="h-4 w-4 text-primary" />
                             </CardHeader>
                             <CardContent className="p-4 pt-0">
                                 <p className="text-2xl font-bold font-headline">{livePrice ? formatAmount(livePrice) : 'Fetching...'}</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Price sources from global liquidity pools.</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Real-time Oracle: {selectedMarket?.id}</p>
                             </CardContent>
                         </Card>
                         <Card className="bg-accent/5 border-accent/20">
@@ -97,16 +131,16 @@ export default function PerpetualTradingPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-0">
                                 <p className="text-2xl font-bold font-headline">0.01% / 8h</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Applied to open interest imbalance.</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Imbalance-based correction.</p>
                             </CardContent>
-                        </Card>
+                        </div>
                     </div>
 
                     {/* Chart Section */}
-                    <PerpChart pairId={selectedPair.id} />
+                    {selectedMarket && <PerpChart pairId={selectedMarket.id} />}
 
                     {/* Active Positions */}
-                    <PerpPositions tickers={[]} />
+                    <PerpPositions />
 
                     {/* Arena Rules */}
                     <Card className="border-2 border-muted">
@@ -126,9 +160,9 @@ export default function PerpetualTradingPage() {
 
                 <div className="lg:col-span-1">
                     <div className="lg:sticky lg:top-20">
-                        {livePrice && (
+                        {livePrice && selectedMarket && (
                             <PerpTradeForm 
-                                pair={{...selectedPair, price: livePrice}} 
+                                pair={{id: selectedMarket.id, name: selectedMarket.name, symbol: selectedMarket.symbol, price: livePrice}} 
                             />
                         )}
                     </div>

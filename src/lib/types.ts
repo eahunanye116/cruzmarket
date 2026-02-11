@@ -59,6 +59,15 @@ export type Activity = {
   direction?: 'LONG' | 'SHORT';
 };
 
+export type PerpMarket = {
+    id: string; // The Symbol (e.g. BTCUSDT)
+    name: string;
+    symbol: string;
+    icon: string;
+    isActive: boolean;
+    createdAt: Timestamp;
+};
+
 export type PerpPosition = {
     id: string;
     userId: string;

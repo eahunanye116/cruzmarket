@@ -7,13 +7,6 @@ const TRADING_FEE_RATE = 0.001; // 0.1%
 const MAINTENANCE_MARGIN = 0.05; // 5%
 const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
 
-export const SUPPORTED_PERP_PAIRS = [
-    { id: 'BTCUSDT', name: 'Bitcoin', symbol: 'BTC', icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png' },
-    { id: 'ETHUSDT', name: 'Ethereum', symbol: 'ETH', icon: 'https://cryptologos.cc/logos/ethereum-eth-logo.png' },
-    { id: 'SOLUSDT', name: 'Solana', symbol: 'SOL', icon: 'https://cryptologos.cc/logos/solana-sol-logo.png' },
-    { id: 'DOGEUSDT', name: 'Dogecoin', symbol: 'DOGE', icon: 'https://cryptologos.cc/logos/dogecoin-doge-logo.png' },
-];
-
 /**
  * Fetches the current price for a crypto pair from a public API.
  * Used by the house engine to determine entry/exit prices.
@@ -24,10 +17,15 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
             next: { revalidate: 0 } // No caching for trading prices
         });
         const data = await response.json();
+        
+        if (!data.price) {
+            throw new Error(`Price not found for ${pair}.`);
+        }
+        
         return parseFloat(data.price);
     } catch (error) {
         console.error("PRICE_FETCH_ERROR:", error);
-        throw new Error("Market data unavailable. Please try again.");
+        throw new Error("Market data unavailable. Please verify the symbol is correct.");
     }
 }
 
