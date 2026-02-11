@@ -1,78 +1,66 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc } from 'firebase/firestore';
 import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
-import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice, getLiveCryptoPrice } from '@/lib/perp-utils';
+import { calculateLiquidationPrice, getSpreadAdjustedPrice, getLiveCryptoPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
 import { getLatestUsdNgnRate } from './wallet-actions';
 
 export async function openPerpPositionAction(
     userId: string,
     pairId: string,
-    collateral: number,
+    lots: number,
     leverage: number,
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
-    
-    // Strict Leverage Cap
     const effectiveLeverage = Math.min(leverage, 20);
     
     try {
-        // 1. Fetch Market Details
         const marketRef = doc(firestore, 'perpMarkets', pairId);
         const marketSnap = await getDoc(marketRef);
-        
-        if (!marketSnap.exists()) {
-            throw new Error("Market no longer available.");
-        }
-        
+        if (!marketSnap.exists()) throw new Error("Market no longer available.");
         const market = marketSnap.data() as PerpMarket;
 
-        // 2. Fetch Real-time Prices (Server-side Oracle)
         const [usdPrice, ngnRate] = await Promise.all([
             getLiveCryptoPrice(pairId),
             getLatestUsdNgnRate()
         ]);
         
         const currentPriceNgn = usdPrice * ngnRate;
+        const entryPriceNgn = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
+        const positionValueNgn = entryPriceNgn * lots * CONTRACT_MULTIPLIER;
+        const requiredMarginNgn = positionValueNgn / effectiveLeverage;
+        
+        // Fee is 0.1% of position value
+        const feeNgn = positionValueNgn * 0.001;
+        const totalRequiredNgn = requiredMarginNgn + feeNgn;
+
+        // CRITICAL: NaN Guard
+        if (!isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn)) {
+            throw new Error("Market pricing error. Please wait for oracle sync.");
+        }
 
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
             
             if (!userDoc.exists()) throw new Error('User not found.');
-            
-            // 3. House Edge: Apply Spread
-            const entryPrice = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
-            
-            // 4. Platform Fees
-            const fee = calculatePerpFees(collateral, effectiveLeverage);
-            const totalRequired = collateral + fee;
-            
-            if (userDoc.data().balance < totalRequired) {
-                throw new Error(`Insufficient balance. Required: ₦${totalRequired.toLocaleString()}`);
+            if (userDoc.data().balance < totalRequiredNgn) {
+                throw new Error(`Insufficient balance. Required: ₦${totalRequiredNgn.toLocaleString()}`);
             }
 
-            // 5. High-Precision Liquidation Price
-            const liqPrice = calculateLiquidationPrice(direction, entryPrice, effectiveLeverage);
+            const liqPriceNgn = calculateLiquidationPrice(direction, entryPriceNgn, effectiveLeverage, lots);
             
-            // Check for immediate liquidation (Spread vs Initial Margin vs MM)
             let initialStatus: PerpPosition['status'] = 'open';
-            let realizedPnL: number | null = null;
-            let exitPrice: number | null = null;
-            let closedAt: any = null;
-
             const isImmediatelyLiquidated = direction === 'LONG' 
-                ? currentPriceNgn <= liqPrice 
-                : currentPriceNgn >= liqPrice;
+                ? currentPriceNgn <= liqPriceNgn 
+                : currentPriceNgn >= liqPriceNgn;
 
             if (isImmediatelyLiquidated) {
                 initialStatus = 'liquidated';
-                realizedPnL = -collateral;
-                exitPrice = currentPriceNgn;
-                closedAt = serverTimestamp();
             }
 
             const positionRef = doc(collection(firestore, `users/${userId}/perpPositions`));
@@ -83,28 +71,26 @@ export async function openPerpPositionAction(
                 tickerIcon: market.icon,
                 direction,
                 leverage: effectiveLeverage,
-                collateral,
-                entryPrice,
-                entryValue: collateral * effectiveLeverage,
-                liquidationPrice: liqPrice,
+                lots,
+                collateral: requiredMarginNgn,
+                entryPrice: entryPriceNgn,
+                entryValue: positionValueNgn,
+                liquidationPrice: liqPriceNgn,
                 status: initialStatus,
-                realizedPnL,
-                exitPrice,
-                closedAt,
                 createdAt: serverTimestamp() as any,
             };
 
             transaction.set(positionRef, positionData);
-            transaction.update(userRef, { balance: increment(-totalRequired) });
+            transaction.update(userRef, { balance: increment(-totalRequiredNgn) });
 
-            return { positionId: positionRef.id, tickerName: market.symbol, isLiquidated: isImmediatelyLiquidated };
+            return { positionId: positionRef.id, isLiquidated: isImmediatelyLiquidated };
         });
 
         revalidatePath('/perps');
         return { success: true, ...result };
     } catch (error: any) {
         console.error('Failed to open perp:', error);
-        return { success: false, error: error.message || 'Trade failed due to invalid data' };
+        return { success: false, error: error.message || 'Trade failed due to invalid pricing data' };
     }
 }
 
@@ -134,32 +120,31 @@ export async function closePerpPositionAction(userId: string, positionId: string
             const posDoc = await transaction.get(positionRef);
             const posData = posDoc.data() as PerpPosition;
 
-            const exitPrice = getSpreadAdjustedPrice(currentPriceNgn, posData.direction, true);
+            const exitPriceNgn = getSpreadAdjustedPrice(currentPriceNgn, posData.direction, true);
+            const priceDiffNgn = posData.direction === 'LONG' 
+                ? exitPriceNgn - posData.entryPrice 
+                : posData.entryPrice - exitPriceNgn;
             
-            const priceDiff = posData.direction === 'LONG' 
-                ? exitPrice - posData.entryPrice 
-                : posData.entryPrice - exitPrice;
-            
-            const pnlPercent = priceDiff / posData.entryPrice;
-            const realizedPnl = (posData.collateral * posData.leverage) * pnlPercent;
-            const exitFee = calculatePerpFees(posData.collateral, posData.leverage);
-            
-            const totalToReturn = Math.max(0, posData.collateral + realizedPnl - exitFee);
+            const realizedPnlNgn = priceDiffNgn * posData.lots * CONTRACT_MULTIPLIER;
+            const totalToReturn = Math.max(0, posData.collateral + realizedPnlNgn);
+
+            // NAN GUARD
+            if (isNaN(totalToReturn)) throw new Error("Closure price invalid.");
 
             const userRef = doc(firestore, 'users', userId);
             transaction.update(userRef, { 
                 balance: increment(totalToReturn),
-                totalRealizedPnl: increment(realizedPnl - exitFee)
+                totalRealizedPnl: increment(realizedPnlNgn)
             });
 
             transaction.update(positionRef, {
                 status: 'closed',
                 closedAt: serverTimestamp(),
-                exitPrice: exitPrice,
-                realizedPnL: realizedPnl - exitFee
+                exitPrice: exitPriceNgn,
+                realizedPnL: realizedPnlNgn
             });
 
-            return { realizedPnl: realizedPnl - exitFee, amountReturned: totalToReturn };
+            return { realizedPnl: realizedPnlNgn, amountReturned: totalToReturn };
         });
 
         revalidatePath('/perps');
@@ -169,22 +154,15 @@ export async function closePerpPositionAction(userId: string, positionId: string
     }
 }
 
-/**
- * ROBUST LIQUIDATION SENTINEL ACTION
- * Checks a specific position against the Binance Oracle server-side.
- */
 export async function checkAndLiquidatePosition(userId: string, positionId: string) {
     const firestore = getFirestoreInstance();
-    
     try {
         const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
         const posSnap = await getDoc(positionRef);
         if (!posSnap.exists()) return { success: false, error: 'Position not found' };
         const posData = posSnap.data() as PerpPosition;
-
         if (posData.status !== 'open') return { success: false, error: 'Position not active' };
 
-        // Server-side Oracle Fetch
         const [usdPrice, ngnRate] = await Promise.all([
             getLiveCryptoPrice(posData.tickerId),
             getLatestUsdNgnRate()
@@ -211,47 +189,8 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
             revalidatePath('/perps');
             return { success: true, liquidated: true };
         }
-
         return { success: true, liquidated: false };
     } catch (e: any) {
-        console.error("LIQUIDATION_ACTION_ERROR:", e.message);
-        return { success: false, error: e.message };
-    }
-}
-
-/**
- * GLOBAL SWEEP UTILITY
- * Scans all open positions and processes liquidations.
- * Optimized for cron usage.
- */
-export async function sweepAllLiquidationsAction() {
-    const firestore = getFirestoreInstance();
-    try {
-        const q = query(collectionGroup(firestore, 'perpPositions'), where('status', '==', 'open'));
-        const snap = await getDocs(q);
-        
-        if (snap.empty) {
-            return { success: true, message: 'No open positions to audit.' };
-        }
-
-        let count = 0;
-        const auditPromises = snap.docs.map(async (docSnap) => {
-            const data = docSnap.data() as PerpPosition;
-            // The parent of the subcollection is the user doc
-            const userId = docSnap.ref.parent.parent?.id;
-            if (!userId) return;
-
-            const res = await checkAndLiquidatePosition(userId, docSnap.id);
-            if (res.success && res.liquidated) {
-                count++;
-            }
-        });
-
-        await Promise.allSettled(auditPromises);
-        
-        return { success: true, message: `Audit complete. ${count} positions liquidated.` };
-    } catch (e: any) {
-        console.error('[Sweep] Global sweep failed:', e);
         return { success: false, error: e.message };
     }
 }

@@ -57,6 +57,7 @@ export type Activity = {
   // Perps extra
   leverage?: number;
   direction?: 'LONG' | 'SHORT';
+  lots?: number;
 };
 
 export type PerpMarket = {
@@ -76,9 +77,10 @@ export type PerpPosition = {
     tickerIcon?: string;
     direction: 'LONG' | 'SHORT';
     leverage: number;
-    collateral: number; // The ₦ amount locked
+    lots: number; // Standardized Sizing
+    collateral: number; // The ₦ margin amount locked
     entryPrice: number;
-    entryValue: number; // collateral * leverage
+    entryValue: number; // Position value at entry (lots * multiplier * price)
     liquidationPrice: number;
     status: 'open' | 'closed' | 'liquidated';
     createdAt: Timestamp;

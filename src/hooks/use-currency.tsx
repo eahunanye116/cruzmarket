@@ -1,3 +1,4 @@
+
 'use client';
 /**
  * @fileOverview Global currency context for switching between NGN and USD.
@@ -34,8 +35,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const fetchRate = async () => {
       try {
         const rate = await getLatestUsdNgnRate();
-        // Ensure rate is a valid number greater than zero
-        if (typeof rate === 'number' && rate > 0) {
+        if (typeof rate === 'number' && rate > 0 && !isNaN(rate)) {
           setExchangeRate(rate);
         }
       } catch (error) {
@@ -53,7 +53,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   };
 
   const convertFromNgn = (amount: any) => {
-    // Aggressively parse input to number
     const num = parseFloat(amount);
     const safeAmount = isNaN(num) ? 0 : num;
     const safeRate = (typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0) ? 1600 : exchangeRate;
@@ -74,43 +73,22 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const symbol = currency === 'NGN' ? '₦' : '$';
 
   const formatAmount = (amountInNgn: any, options: Intl.NumberFormatOptions = {}) => {
-    // Parse input to number to handle strings, nulls, or NaNs
     const num = parseFloat(amountInNgn);
     const safeAmountInNgn = isNaN(num) ? 0 : num;
-    
     const displayAmount = convertFromNgn(safeAmountInNgn);
     
-    // Smart defaults for fraction digits
-    const isSmall = safeAmountInNgn > 0 && safeAmountInNgn < 100;
-    
-    let minDigits = options.minimumFractionDigits;
-    let maxDigits = options.maximumFractionDigits;
-
-    if (minDigits === undefined && maxDigits === undefined) {
-        minDigits = 2;
-        maxDigits = isSmall ? 8 : 2;
-    } else if (maxDigits !== undefined && minDigits === undefined) {
-        minDigits = Math.min(2, maxDigits);
-    } else if (minDigits !== undefined && maxDigits === undefined) {
-        maxDigits = Math.max(minDigits, isSmall ? 8 : 2);
-    }
-
-    const finalMin = Math.max(0, Math.min(20, minDigits ?? 2));
-    const finalMax = Math.max(finalMin, Math.min(20, maxDigits ?? finalMin));
-
     const finalOptions: Intl.NumberFormatOptions = {
         style: 'currency',
         currency: currency,
         ...options,
-        minimumFractionDigits: finalMin,
-        maximumFractionDigits: finalMax,
+        minimumFractionDigits: options.minimumFractionDigits ?? 2,
+        maximumFractionDigits: options.maximumFractionDigits ?? (safeAmountInNgn > 0 && safeAmountInNgn < 100 ? 8 : 2),
     };
 
     try {
         return new Intl.NumberFormat('en-US', finalOptions).format(displayAmount);
     } catch (e) {
-        console.error("Formatting error:", e);
-        return `${symbol}${displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `${symbol}${displayAmount.toFixed(2)}`;
     }
   };
 

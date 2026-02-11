@@ -1,13 +1,16 @@
+
 /**
- * @fileOverview Core logic for synthetic perpetual trading.
+ * @fileOverview Core logic for Pip & Lot based Perpetual Trading.
  * 
- * ORACLE SOURCE:
- * This system uses the Binance Public API (v3) as its primary price oracle.
+ * EXCHANGE STANDARDS:
+ * - 1 Lot = 0.01 Units of underlying asset.
+ * - 100 Pip price movement ($100) = $1.00 Profit/Loss per Lot.
+ * - Spread = 110 Pips ($1.10 cost per lot on entry).
  */
 
-const TRADING_FEE_RATE = 0.001; // 0.1%
-const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs
-const MAINTENANCE_MARGIN = 0.025; // 2.5% maintenance margin requirement
+export const CONTRACT_MULTIPLIER = 0.01; // 1 Lot = 0.01 units
+export const PIP_SPREAD = 110; // 110 Pips ($1.10 USD per Lot)
+export const MAINTENANCE_MARGIN_RATE = 0.025; // 2.5% of position value required
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
@@ -24,62 +27,67 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
         }
 
         const data = await response.json();
+        const price = parseFloat(data.price);
         
-        if (!data.price) {
-            throw new Error(`Symbol ${pair} not found on Binance Oracle.`);
+        if (isNaN(price)) {
+            throw new Error(`Invalid price returned for ${pair}`);
         }
         
-        return parseFloat(data.price);
+        return price;
     } catch (error: any) {
         console.error("ORACLE_FETCH_ERROR:", error.message);
-        throw new Error("Market data unavailable. Ensure the symbol is listed on Binance (e.g. BTCUSDT).");
+        throw new Error("Market data unavailable. Please try again in a few seconds.");
     }
 }
 
 /**
- * Calculates the liquidation price for a position.
- * 
- * Formula for Long: Entry * (1 - (1/Leverage) + MM)
- * Formula for Short: Entry * (1 + (1/Leverage) - MM)
- * 
- * Note: At 20x leverage, 1/Leverage is 0.05. With MM at 0.025, 
- * you have a 2.5% price movement window before liquidation.
+ * Standardized Profit/Loss Calculation.
+ * PnL = (Current Price - Entry Price) * Lots * Multiplier
+ */
+export function calculatePnL(
+    direction: 'LONG' | 'SHORT',
+    entryPrice: number,
+    currentPrice: number,
+    lots: number
+): number {
+    const diff = direction === 'LONG' ? currentPrice - entryPrice : entryPrice - currentPrice;
+    return diff * lots * CONTRACT_MULTIPLIER;
+}
+
+/**
+ * Applies the market-making spread (110 Pips).
+ */
+export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false): number {
+    const spreadValue = PIP_SPREAD; // $110 price adjustment
+    
+    if (direction === 'LONG') {
+        return isClosing ? price - (spreadValue / 2) : price + spreadValue;
+    } else {
+        return isClosing ? price + (spreadValue / 2) : price - spreadValue;
+    }
+}
+
+/**
+ * Calculates the liquidation price based on maintenance margin.
+ * Position is liquidated when Equity (Margin + PnL) < Maintenance Margin.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
     entryPrice: number,
-    leverage: number
+    leverage: number,
+    lots: number
 ): number {
-    if (!entryPrice || entryPrice <= 0 || !leverage || leverage < 1) {
-        return 0;
-    }
-
-    const mm = MAINTENANCE_MARGIN;
-    const initialMarginRatio = 1 / leverage;
+    const positionValue = entryPrice * lots * CONTRACT_MULTIPLIER;
+    const margin = positionValue / leverage;
+    const mm = positionValue * MAINTENANCE_MARGIN_RATE;
+    
+    // Max loss allowed = margin - mm
+    const maxLoss = margin - mm;
+    const priceMoveAllowed = maxLoss / (lots * CONTRACT_MULTIPLIER);
 
     if (direction === 'LONG') {
-        const liqPrice = entryPrice * (1 - initialMarginRatio + mm);
-        return Math.max(0, liqPrice);
+        return Math.max(0, entryPrice - priceMoveAllowed);
     } else {
-        const liqPrice = entryPrice * (1 + initialMarginRatio - mm);
-        return liqPrice;
+        return entryPrice + priceMoveAllowed;
     }
-}
-
-/**
- * Applies the 'House Edge' by adjusting the entry/exit price with a spread.
- */
-export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false) {
-    const multiplier = (direction === 'LONG' && !isClosing) || (direction === 'SHORT' && isClosing) 
-        ? (1 + PERP_SPREAD) 
-        : (1 - PERP_SPREAD);
-    
-    return price * multiplier;
-}
-
-/**
- * Calculates the platform fee based on the total position size.
- */
-export function calculatePerpFees(collateral: number, leverage: number) {
-    return (collateral * leverage) * TRADING_FEE_RATE;
 }

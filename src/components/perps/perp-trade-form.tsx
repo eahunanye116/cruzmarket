@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,10 +11,10 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info } from 'lucide-react';
 import { openPerpPositionAction } from '@/app/actions/perp-actions';
 import { doc } from 'firebase/firestore';
-import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } from '@/lib/perp-utils';
+import { calculateLiquidationPrice, getSpreadAdjustedPrice, CONTRACT_MULTIPLIER, PIP_SPREAD } from '@/lib/perp-utils';
 import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,49 +24,38 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { formatAmount, symbol, convertToNgn, convertFromNgn } = useCurrency();
+    const { formatAmount, symbol, exchangeRate } = useCurrency();
 
     const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
     const { data: profile } = useDoc<UserProfile>(userProfileRef);
 
     const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
-    const [collateralInput, setCollateralInput] = useState<string>('10000');
-    const [leverage, setLeverage] = useState<number>(5);
+    const [lotsInput, setLotsInput] = useState<string>('1');
+    const [leverage, setLeverage] = useState<number>(10);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [orderType, setOrderType] = useState('MARKET');
 
-    const numCollateral = parseFloat(collateralInput) || 0;
-    const collateralNgn = convertToNgn(numCollateral);
-    const positionSizeNgn = collateralNgn * leverage;
-    const feeNgn = calculatePerpFees(collateralNgn, leverage);
-    const totalRequiredNgn = collateralNgn + feeNgn;
+    const lots = parseFloat(lotsInput) || 0;
+    const positionValueNgn = pair.price * lots * CONTRACT_MULTIPLIER;
+    const requiredMarginNgn = positionValueNgn / leverage;
+    const feeNgn = positionValueNgn * 0.001; // 0.1% Execution Fee
+    const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-    // REACTIVE ENTRY: Updates instantly when direction or price changes
     const estimatedEntryPrice = useMemo(() => {
         return getSpreadAdjustedPrice(pair.price, direction, false);
     }, [pair.price, direction]);
 
-    // REACTIVE LIQUIDATION: Fixed 2.5% Maintenance Margin
     const liqPrice = useMemo(() => {
-        if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
-        return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
-    }, [direction, estimatedEntryPrice, leverage]);
-
-    const handlePercentClick = (percent: number) => {
-        if (!profile?.balance) return;
-        // Simple approximation for UI
-        const maxCollateralNgn = profile.balance * 0.95; 
-        const targetCollateralNgn = maxCollateralNgn * (percent / 100);
-        setCollateralInput(convertFromNgn(targetCollateralNgn).toFixed(2));
-    };
+        if (!estimatedEntryPrice || lots <= 0) return 0;
+        return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage, lots);
+    }, [direction, estimatedEntryPrice, leverage, lots]);
 
     const handleTrade = async () => {
         if (!user) {
             toast({ variant: 'destructive', title: 'Auth Required', description: 'Sign in to trade.' });
             return;
         }
-        if (numCollateral <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Size', description: 'Enter a valid collateral amount.' });
+        if (lots <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Size', description: 'Enter lot size.' });
             return;
         }
         if (totalRequiredNgn > (profile?.balance ?? 0)) {
@@ -74,191 +64,90 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         }
 
         setIsSubmitting(true);
-        const result = await openPerpPositionAction(
-            user.uid,
-            pair.id,
-            collateralNgn,
-            leverage,
-            direction
-        );
+        const result = await openPerpPositionAction(user.uid, pair.id, lots, leverage, direction);
 
         if (result.success) {
             if (result.isLiquidated) {
-                toast({ variant: 'destructive', title: 'INSTANT LIQUIDATION', description: 'The House Edge consumed your collateral immediately. Position closed.' });
+                toast({ variant: 'destructive', title: 'INSTANT LIQUIDATION', description: 'Spread & margin buffer exhausted collateral instantly.' });
             } else {
-                toast({ title: 'Position Opened!', description: `${pair.name} ${direction} is now active.` });
+                toast({ title: 'Trade Success', description: `Opened ${lots} Lot(s) on ${pair.symbol}` });
             }
-            setCollateralInput('');
+            setLotsInput('1');
         } else {
             toast({ variant: 'destructive', title: 'Trade Failed', description: result.error });
         }
         setIsSubmitting(false);
     };
 
-    const availableBalance = profile?.balance ?? 0;
-
     return (
         <Card className="border-2 shadow-hard-lg overflow-hidden bg-card/50 backdrop-blur-sm">
-            <div className={cn(
-                "h-1.5 w-full transition-colors duration-300",
-                direction === 'LONG' ? "bg-primary" : "bg-destructive"
-            )} />
+            <div className={cn("h-1.5 w-full", direction === 'LONG' ? "bg-primary" : "bg-destructive")} />
             
             <CardHeader className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wallet className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Available Balance</span>
-                    </div>
-                    <span className="text-xs font-bold text-primary">{formatAmount(availableBalance)}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">My Wallet</span>
+                    <span className="text-xs font-bold text-primary">{formatAmount(profile?.balance ?? 0)}</span>
                 </div>
 
-                <div className="flex p-1 bg-muted/50 rounded-md border-2 border-transparent">
-                    <button 
-                        onClick={() => setDirection('LONG')}
-                        className={cn(
-                            "flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded",
-                            direction === 'LONG' ? "bg-primary text-primary-foreground shadow-hard-sm" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        Long
-                    </button>
-                    <button 
-                        onClick={() => setDirection('SHORT')}
-                        className={cn(
-                            "flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded",
-                            direction === 'SHORT' ? "bg-destructive text-destructive-foreground shadow-hard-sm" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        Short
-                    </button>
+                <div className="flex p-1 bg-muted/50 rounded-md">
+                    <button onClick={() => setDirection('LONG')} className={cn("flex-1 py-2 text-xs font-bold uppercase rounded", direction === 'LONG' ? "bg-primary text-primary-foreground shadow-hard-sm" : "text-muted-foreground")}>Long</button>
+                    <button onClick={() => setDirection('SHORT')} className={cn("flex-1 py-2 text-xs font-bold uppercase rounded", direction === 'SHORT' ? "bg-destructive text-destructive-foreground shadow-hard-sm" : "text-muted-foreground")}>Short</button>
                 </div>
-
-                <Tabs value={orderType} onValueChange={setOrderType} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 h-8 bg-muted/30 p-0.5">
-                        <TabsTrigger value="MARKET" className="text-[10px] font-bold data-[state=active]:bg-background">MARKET</TabsTrigger>
-                        <TabsTrigger value="LIMIT" disabled className="text-[10px] font-bold opacity-50 cursor-not-allowed">LIMIT</TabsTrigger>
-                    </TabsList>
-                </Tabs>
             </CardHeader>
 
             <CardContent className="p-4 pt-0 space-y-6">
                 <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Margin Collateral</Label>
-                        <span className="text-[10px] font-bold text-muted-foreground">({symbol})</span>
-                    </div>
-                    <div className="relative group">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Position Size (Lots)</Label>
+                    <div className="relative">
                         <Input 
                             type="number" 
-                            value={collateralInput} 
-                            onChange={(e) => setCollateralInput(e.target.value)}
-                            placeholder="0.00"
-                            className="font-bold h-12 text-xl border-2 bg-background/50 focus-visible:ring-primary pr-12 transition-all group-hover:border-primary/50"
+                            value={lotsInput} 
+                            onChange={(e) => setLotsInput(e.target.value)}
+                            placeholder="1.0"
+                            className="font-bold h-12 text-xl border-2"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <Badge variant="outline" className="text-[9px] font-mono h-5 px-1 bg-muted/50 border-none">{symbol}</Badge>
+                            <Badge variant="outline" className="text-[9px] h-5">LOTS</Badge>
                         </div>
                     </div>
-                    
-                    <div className="grid grid-cols-4 gap-1.5 pt-1">
-                        {[25, 50, 75, 100].map(p => (
-                            <button
-                                key={p}
-                                onClick={() => handlePercentClick(p)}
-                                className="py-1 text-[9px] font-bold bg-muted/30 hover:bg-primary/20 hover:text-primary border-2 border-transparent transition-all rounded shadow-sm active:translate-y-0.5"
-                            >
-                                {p}%
-                            </button>
-                        ))}
-                    </div>
+                    <p className="text-[10px] text-muted-foreground">1 Lot = 0.01 {pair.symbol}</p>
                 </div>
 
-                <div className="space-y-4 pt-2">
+                <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Adjust Leverage (Max 20x)</Label>
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-mono text-[10px]">
-                            {leverage}x
-                        </Badge>
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Leverage</Label>
+                        <Badge variant="secondary" className="font-mono text-[10px]">{leverage}x</Badge>
                     </div>
-                    <div className="px-2">
-                        <Slider 
-                            value={[leverage]} 
-                            min={1} 
-                            max={20} 
-                            step={1} 
-                            onValueChange={([val]) => setLeverage(val)}
-                            className="py-2"
-                        />
-                    </div>
-                    <div className="flex justify-between px-1">
-                        {[1, 5, 10, 15, 20].map(v => (
-                            <button 
-                                key={v}
-                                onClick={() => setLeverage(v)}
-                                className={cn(
-                                    "text-[9px] font-bold transition-colors",
-                                    leverage === v ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {v}x
-                            </button>
-                        ))}
-                    </div>
+                    <Slider value={[leverage]} min={1} max={20} step={1} onValueChange={([v]) => setLeverage(v)} />
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1">
-                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Est. Entry Price</span>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild><Info className="h-2.5 w-2.5 text-muted-foreground opacity-50 cursor-help" /></TooltipTrigger>
-                                    <TooltipContent><p className="text-[10px]">Includes 2.5% market spread.</p></TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                        <span className="font-mono text-[10px] font-bold">{formatAmount(estimatedEntryPrice)}</span>
+                    <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-muted-foreground uppercase font-bold">Est. Entry (Inc. {PIP_SPREAD} Pip Spread)</span>
+                        <span className="font-mono font-bold">{formatAmount(estimatedEntryPrice)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Total Position Size</span>
-                        <span className="font-bold text-xs">{formatAmount(positionSizeNgn)}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Required Margin</span>
+                        <span className="font-bold text-xs">{formatAmount(requiredMarginNgn)}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1">
-                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Execution Fee (0.1%)</span>
-                        </div>
-                        <span className="text-destructive font-bold text-xs">-{formatAmount(feeNgn)}</span>
-                    </div>
-                    <div className="pt-2 border-t border-muted-foreground/10 flex justify-between items-center text-destructive">
+                    <div className="pt-2 border-t flex justify-between items-center text-destructive">
                         <div className="flex items-center gap-1">
                             <ShieldAlert className="h-3 w-3" />
-                            <span className="text-[9px] font-bold uppercase tracking-tighter">Est. Liquidation Price</span>
+                            <span className="text-[10px] font-bold uppercase">Liq. Price</span>
                         </div>
-                        <span className="font-bold text-xs">
-                            {liqPrice > 0 ? formatAmount(liqPrice) : '--'}
-                        </span>
+                        <span className="font-bold text-xs">{formatAmount(liqPrice)}</span>
                     </div>
                 </div>
             </CardContent>
 
             <CardFooter className="p-4 pt-0">
                 <Button 
-                    className={cn(
-                        "w-full h-14 text-lg font-headline shadow-hard-md transition-all active:translate-x-0.5 active:translate-y-0.5 group",
-                        direction === 'LONG' ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    )} 
+                    className={cn("w-full h-14 text-lg font-headline shadow-hard-md", direction === 'LONG' ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground")} 
                     onClick={handleTrade}
-                    disabled={isSubmitting || !collateralInput || numCollateral <= 0}
+                    disabled={isSubmitting || lots <= 0}
                 >
-                    {isSubmitting ? (
-                        <Loader2 className="animate-spin mr-2 h-5 w-5" />
-                    ) : (
-                        direction === 'LONG' ? 
-                        <TrendingUp className="mr-2 h-5 w-5 group-hover:translate-y-[-2px] transition-transform" /> : 
-                        <TrendingDown className="mr-2 h-5 w-5 group-hover:translate-y-[2px] transition-transform" />
-                    )}
-                    {direction === 'LONG' ? `BUY / LONG ${pair.symbol}` : `SELL / SHORT ${pair.symbol}`}
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : (direction === 'LONG' ? <TrendingUp className="mr-2 h-5 w-5" /> : <TrendingDown className="mr-2 h-5 w-5" />)}
+                    {direction === 'LONG' ? `BUY LONG ${pair.symbol}` : `SELL SHORT ${pair.symbol}`}
                 </Button>
             </CardFooter>
         </Card>
