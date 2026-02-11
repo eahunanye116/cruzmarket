@@ -159,12 +159,12 @@ export default function PerpetualTradingPage() {
                             </CardHeader>
                             <CardContent className="text-[11px] text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
                                 <div className="space-y-1">
-                                    <p>• <b>Price Integrity</b>: We use the mid-market rate + 0.15% spread to protect house liquidity.</p>
-                                    <p>• <b>Margin Calls</b>: Automated liquidation occurs at 2.5% Maintenance Margin.</p>
+                                    <p>• <b>Price Integrity</b>: We use the mid-market rate + 0.02% spread to protect house liquidity.</p>
+                                    <p>• <b>Margin Calls</b>: Automated liquidation occurs at 0.02% Maintenance Margin.</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p>• <b>Funding</b>: Calculated every 8 hours. Synthetic offset based on side imbalance.</p>
-                                    <p>• <b>Leverage</b>: Max 20x. Your entire collateral is at risk in synthetic markets.</p>
+                                    <p>• <b>Leverage</b>: Max 1000x. High leverage carries extreme liquidation risk.</p>
                                 </div>
                             </CardContent>
                         </Card>

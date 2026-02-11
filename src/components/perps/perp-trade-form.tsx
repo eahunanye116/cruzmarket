@@ -182,14 +182,14 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         <Slider 
                             value={[leverage]} 
                             min={1} 
-                            max={20} 
+                            max={1000} 
                             step={1} 
                             onValueChange={([val]) => setLeverage(val)}
                             className="py-2"
                         />
                     </div>
                     <div className="flex justify-between px-1">
-                        {[1, 5, 10, 15, 20].map(v => (
+                        {[1, 50, 100, 500, 1000].map(v => (
                             <button 
                                 key={v}
                                 onClick={() => setLeverage(v)}
@@ -211,7 +211,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild><Info className="h-2.5 w-2.5 text-muted-foreground opacity-50 cursor-help" /></TooltipTrigger>
-                                    <TooltipContent><p className="text-[10px]">Includes 0.15% market spread.</p></TooltipContent>
+                                    <TooltipContent><p className="text-[10px]">Includes market spread.</p></TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
                         </div>
@@ -235,7 +235,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                                 <Tooltip>
                                     <TooltipTrigger asChild><Info className="h-2.5 w-2.5 opacity-50 cursor-help" /></TooltipTrigger>
                                     <TooltipContent className="max-w-[200px]">
-                                        <p className="text-[10px]">The price at which your remaining margin drops below 2.5%. This protects house liquidity.</p>
+                                        <p className="text-[10px]">The price at which your remaining margin drops below the maintenance threshold. High leverage significantly increases liquidation risk.</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>

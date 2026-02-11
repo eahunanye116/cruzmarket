@@ -8,8 +8,8 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const MAINTENANCE_MARGIN = 0.025; // 2.5% - Provides 50% collateral breathing room at 20x leverage
-const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
+const MAINTENANCE_MARGIN = 0.0002; // 0.02% - Tuned for extreme leverage (up to 1000x)
+const PERP_SPREAD = 0.0002; // 0.02% spread for synthetic pairs
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
