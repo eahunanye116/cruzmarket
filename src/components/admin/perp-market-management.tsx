@@ -26,6 +26,7 @@ export function PerpMarketManagement() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [validationResult, setValidationResult] = useState<{ success: boolean; price?: number } | null>(null);
     const [editingMarket, setEditingMarket] = useState<PerpMarket | null>(null);
 
@@ -114,12 +115,22 @@ export function PerpMarketManagement() {
     };
 
     const handleDelete = async (marketId: string) => {
+        if (!firestore) return;
         if (!confirm('Are you sure? Removing this market will break charts for existing positions.')) return;
+        
+        setDeletingId(marketId);
         try {
             await deleteDoc(doc(firestore, 'perpMarkets', marketId));
             toast({ title: 'Market Removed' });
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'Remove Failed' });
+            console.error("DELETE_MARKET_ERROR:", e);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Remove Failed', 
+                description: e.message || 'Check console for details.' 
+            });
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -172,8 +183,14 @@ export function PerpMarketManagement() {
                                                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleOpenEdit(market)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(market.id)}>
-                                                    <Trash2 className="h-4 w-4" />
+                                                <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    className="h-8 w-8 text-destructive" 
+                                                    onClick={() => handleDelete(market.id)}
+                                                    disabled={deletingId === market.id}
+                                                >
+                                                    {deletingId === market.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                                 </Button>
                                             </div>
                                         </TableCell>
