@@ -15,8 +15,8 @@ export async function openPerpPositionAction(
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
-    // STRICT CAP: 20x Max Leverage
-    const effectiveLeverage = Math.min(leverage, 20);
+    // Support up to 1000x Leverage
+    const effectiveLeverage = Math.min(leverage, 1000);
     
     try {
         const marketRef = doc(firestore, 'perpMarkets', pairId);

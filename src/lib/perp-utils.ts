@@ -10,7 +10,7 @@
 
 export const CONTRACT_MULTIPLIER = 0.01; // 1 Lot = 0.01 units
 export const PIP_SPREAD = 110; // 110 Pips ($1.10 USD per Lot)
-export const MAINTENANCE_MARGIN_RATE = 0.025; // 2.5% of position value required
+export const MAINTENANCE_MARGIN_RATE = 0.0005; // 0.05% of position value required (Supports up to 1000x)
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
@@ -59,9 +59,6 @@ export function calculatePnL(
  */
 export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false): number {
     // Spread is 110 Pips ($1.10 USD). 
-    // In NGN, this depends on the exchange rate, but the Oracle utility handles raw USD values.
-    // When called with NGN prices, the spreadValue here is treated as points.
-    // To be precise, we expect the caller to provide the spread in the same currency as price.
     const spreadValue = PIP_SPREAD; 
     
     if (direction === 'LONG') {

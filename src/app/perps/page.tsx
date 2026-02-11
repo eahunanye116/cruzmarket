@@ -2,14 +2,13 @@
 
 import { useUser, useCollection, useFirestore } from '@/firebase';
 import { useState, useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { PerpTradeForm } from '@/components/perps/perp-trade-form';
 import { PerpPositions } from '@/components/perps/perp-positions';
 import { PerpChart } from '@/components/perps/perp-chart';
 import { PerpSentinel } from '@/components/perps/perp-sentinel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, TrendingUp, Ban, Landmark, Coins, Loader2, Info } from 'lucide-react';
+import { Ban, Coins, Loader2, Info } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { getLiveCryptoPrice } from '@/lib/perp-utils';
@@ -154,17 +153,17 @@ export default function PerpetualTradingPage() {
                         <Card className="border-2 border-dashed bg-muted/5">
                             <CardHeader className="py-4">
                                 <CardTitle className="text-sm flex items-center gap-2">
-                                    <Info className="h-4 w-4 text-primary" /> Synthetic Execution Rules
+                                    <Info className="h-4 w-4 text-primary" /> High Leverage Execution Rules
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-[11px] text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
                                 <div className="space-y-1">
-                                    <p>• <b>House Edge</b>: 2.5% Entry Spread + 2.5% Maintenance Margin (5% total buffer required).</p>
-                                    <p>• <b>Immediate Liquidation</b>: Any trade with &gt;20x leverage will be liquidated instantly on entry.</p>
+                                    <p>• <b>Lot Trading</b>: 1 Lot = 0.01 units. $100 price move = $1.00 Profit per Lot.</p>
+                                    <p>• <b>Spread</b>: 110 Pip Entry Spread applies to every entry.</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p>• <b>Funding</b>: Calculated every 8 hours. Synthetic offset based on side imbalance.</p>
-                                    <p>• <b>Leverage</b>: Max 20x. High leverage is restricted to ensure positions can survive the 5% edge.</p>
+                                    <p>• <b>Leverage</b>: Max 1000x. Supports micro-entries from 1700 Naira.</p>
+                                    <p>• <b>Maintenance</b>: 0.05% buffer required. Volatility at 1000x is extremely high.</p>
                                 </div>
                             </CardContent>
                         </Card>
