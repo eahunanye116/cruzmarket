@@ -15,6 +15,7 @@ import { SupportManagement } from '@/components/admin/support-management';
 import { TelegramManagement } from '@/components/admin/telegram-management';
 import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
 import { PaymentManagement } from '@/components/admin/payment-management';
+import { PerpAuditManagement } from '@/components/admin/perp-audit-management';
 import { useState } from 'react';
 import {
   Select,
@@ -76,9 +77,10 @@ export default function AdminPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
         <div className="hidden sm:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-11">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-12">
             <TabsTrigger value="tickers">Tickers</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="perp-audit">Perp Audit</TabsTrigger>
             <TabsTrigger value="copy-audit">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -100,6 +102,7 @@ export default function AdminPage() {
             <SelectContent>
               <SelectItem value="tickers">Tickers</SelectItem>
               <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="perp-audit">Perp Audit</SelectItem>
               <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
               <SelectItem value="payments">Payments</SelectItem>
@@ -118,6 +121,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="perp-audit" className="mt-6">
+          <PerpAuditManagement />
         </TabsContent>
         <TabsContent value="copy-audit" className="mt-6">
           <CopyAuditManagement />

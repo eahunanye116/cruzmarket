@@ -39,7 +39,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'COPY_BUY' | 'COPY_SELL';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'COPY_BUY' | 'COPY_SELL' | 'PERP_OPEN' | 'PERP_CLOSE' | 'PERP_LIQUIDATE';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
@@ -54,7 +54,29 @@ export type Activity = {
   senderId?: string;
   senderName?: string;
   createdAt: Timestamp;
+  // Perps extra
+  leverage?: number;
+  direction?: 'LONG' | 'SHORT';
 };
+
+export type PerpPosition = {
+    id: string;
+    userId: string;
+    tickerId: string;
+    tickerName: string;
+    tickerIcon?: string;
+    direction: 'LONG' | 'SHORT';
+    leverage: number;
+    collateral: number; // The ₦ amount locked
+    entryPrice: number;
+    entryValue: number; // collateral * leverage
+    liquidationPrice: number;
+    status: 'open' | 'closed' | 'liquidated';
+    createdAt: Timestamp;
+    closedAt?: Timestamp;
+    exitPrice?: Timestamp;
+    realizedPnL?: number;
+}
 
 export type BotSession = {
   type: 'CREATE_TICKER' | 'WITHDRAW_FUNDS';
