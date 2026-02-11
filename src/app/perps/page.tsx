@@ -133,7 +133,7 @@ export default function PerpetualTradingPage() {
                                 <p className="text-2xl font-bold font-headline">0.01% / 8h</p>
                                 <p className="text-[10px] text-muted-foreground mt-1">Imbalance-based correction.</p>
                             </CardContent>
-                        </div>
+                        </Card>
                     </div>
 
                     {/* Chart Section */}
