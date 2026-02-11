@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from 'next/link';
@@ -9,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { doc } from 'firebase/firestore';
 import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -22,14 +21,21 @@ function UserBalance() {
   const user = useUser();
   const firestore = useFirestore();
   const { formatAmount } = useCurrency();
-  const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
+  
+  // Memoize reference to prevent unnecessary hook re-runs
+  const userProfileRef = useMemo(() => 
+    (user && firestore) ? doc(firestore, 'users', user.uid) : null,
+    [user, firestore]
+  );
+  
   const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
 
   if (loading) {
     return <Skeleton className="h-6 w-24" />;
   }
 
-  const balance = userProfile?.balance ?? 0;
+  // Ensure we fallback to 0 if balance is null, undefined, or NaN
+  const balance = (userProfile && typeof userProfile.balance === 'number') ? userProfile.balance : 0;
 
   return (
     <div className="font-semibold text-primary">
@@ -59,7 +65,10 @@ export function Header() {
   const user = useUser();
   const firestore = useFirestore();
 
-  const settingsRef = firestore ? doc(firestore, 'settings', 'privacy') : null;
+  const settingsRef = useMemo(() => 
+    firestore ? doc(firestore, 'settings', 'privacy') : null,
+    [firestore]
+  );
   const { data: settings } = useDoc<PlatformSettings>(settingsRef);
   
   const signupEnabled = settings === null || settings?.signupEnabled !== false;

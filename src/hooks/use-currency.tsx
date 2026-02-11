@@ -34,7 +34,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const fetchRate = async () => {
       try {
         const rate = await getLatestUsdNgnRate();
-        setExchangeRate(rate);
+        // Ensure rate is a valid number greater than zero
+        if (typeof rate === 'number' && rate > 0) {
+          setExchangeRate(rate);
+        }
       } catch (error) {
         console.error("Failed to fetch exchange rate for context:", error);
       } finally {
@@ -50,22 +53,33 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   };
 
   const convertFromNgn = (amount: number) => {
-    if (currency === 'NGN') return amount;
-    return amount / exchangeRate;
+    // Sanitize input to handle NaN/undefined
+    const safeAmount = (typeof amount !== 'number' || isNaN(amount)) ? 0 : amount;
+    const safeRate = (typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0) ? 1600 : exchangeRate;
+    
+    if (currency === 'NGN') return safeAmount;
+    return safeAmount / safeRate;
   };
 
   const convertToNgn = (amount: number) => {
-    if (currency === 'NGN') return amount;
-    return amount * exchangeRate;
+    // Sanitize input to handle NaN/undefined
+    const safeAmount = (typeof amount !== 'number' || isNaN(amount)) ? 0 : amount;
+    const safeRate = (typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0) ? 1600 : exchangeRate;
+
+    if (currency === 'NGN') return safeAmount;
+    return safeAmount * safeRate;
   }
 
   const symbol = currency === 'NGN' ? '₦' : '$';
 
   const formatAmount = (amountInNgn: number, options: Intl.NumberFormatOptions = {}) => {
-    const displayAmount = convertFromNgn(amountInNgn);
+    // Primary safety: force NaN or non-numbers to 0
+    const safeAmountInNgn = (typeof amountInNgn !== 'number' || isNaN(amountInNgn)) ? 0 : amountInNgn;
+    
+    const displayAmount = convertFromNgn(safeAmountInNgn);
     
     // Smart defaults for fraction digits based on amount and context
-    const isSmall = amountInNgn > 0 && amountInNgn < 100;
+    const isSmall = safeAmountInNgn > 0 && safeAmountInNgn < 100;
     
     let minDigits = options.minimumFractionDigits;
     let maxDigits = options.maximumFractionDigits;
