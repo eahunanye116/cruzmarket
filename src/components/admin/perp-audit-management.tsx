@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import { checkAndLiquidatePosition, sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/popover'; // Using popover for better mobile touch support
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; 
 
 export function PerpAuditManagement() {
     const firestore = useFirestore();
@@ -76,14 +76,14 @@ export function PerpAuditManagement() {
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
                                 <CardDescription className="text-[10px] uppercase font-bold">House Net Exposure</CardDescription>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-[200px]">
-                                        The House's directional risk. If Positive, users are mostly LONG (House is SHORT). If Negative, users are mostly SHORT (House is LONG).
-                                    </TooltipContent>
-                                </Tooltip>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Info className="h-3 w-3 text-muted-foreground cursor-pointer" />
+                                    </PopoverTrigger>
+                                    <PopoverContent className="max-w-[200px]">
+                                        <p className="text-xs">The House's directional risk. If Positive, users are mostly LONG (House is SHORT). If Negative, users are mostly SHORT (House is LONG).</p>
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                             <CardTitle className={cn("text-xl sm:text-2xl", houseExposure > 0 ? "text-destructive" : "text-accent")}>
                                 ₦{houseExposure.toLocaleString()}
@@ -97,14 +97,14 @@ export function PerpAuditManagement() {
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
                                 <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Total Open Interest</CardDescription>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-[200px]">
-                                        Total value of all active contracts (Longs + Shorts). Represents the total capital currently at risk in the market.
-                                    </TooltipContent>
-                                </Tooltip>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Info className="h-3 w-3 text-muted-foreground cursor-pointer" />
+                                    </PopoverTrigger>
+                                    <PopoverContent className="max-w-[200px]">
+                                        <p className="text-xs">Total value of all active contracts (Longs + Shorts). Represents the total capital currently at risk in the market.</p>
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                             <CardTitle className="text-xl sm:text-2xl">₦{totalOpenInterest.toLocaleString()}</CardTitle>
                         </CardHeader>
