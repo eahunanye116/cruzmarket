@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, XCircle, History, LayoutPanelLeft, ShieldAlert } from 'lucide-react';
+import { Loader2, XCircle, History, LayoutPanelLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { closePerpPositionAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -219,21 +219,23 @@ export function PerpPositions() {
                                     <TableHeader>
                                         <TableRow className="bg-muted/10">
                                             <TableHead className="pl-6">Market</TableHead>
-                                            <TableHead>Type</TableHead>
                                             <TableHead>Execution</TableHead>
-                                            <TableHead>Realized PnL</TableHead>
-                                            <TableHead className="text-right pr-6">Time</TableHead>
+                                            <TableHead>Outcome</TableHead>
+                                            <TableHead>Profit / Loss</TableHead>
+                                            <TableHead className="text-right pr-6">Closed At</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {historyPositions.map(pos => {
-                                            const isProfit = (pos.realizedPnL || 0) >= 0;
+                                            const realizedPnl = pos.realizedPnL || 0;
+                                            const isProfit = realizedPnl > 0;
+                                            
                                             return (
-                                                <TableRow key={pos.id} className="hover:bg-muted/5 border-b-2">
+                                                <TableRow key={pos.id} className="hover:bg-muted/5 border-b-2 group">
                                                     <TableCell className="pl-6 py-4">
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-bold">{pos.tickerName}</span>
+                                                                <span className="font-bold text-foreground">{pos.tickerName}</span>
                                                                 <Badge variant={pos.direction === 'LONG' ? 'default' : 'destructive'} className="text-[9px] h-4 font-bold">
                                                                     {pos.direction}
                                                                 </Badge>
@@ -242,34 +244,44 @@ export function PerpPositions() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {pos.status === 'liquidated' ? (
-                                                            <Badge variant="destructive" className="text-[9px] uppercase font-bold px-1.5 h-4">Liquidation</Badge>
-                                                        ) : (
-                                                            <Badge variant="secondary" className="text-[9px] uppercase font-bold px-1.5 h-4">Closed</Badge>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col text-[10px] font-mono">
-                                                            <div className="flex justify-between gap-4">
-                                                                <span className="text-muted-foreground">Entry:</span>
-                                                                <span>{formatAmount(pos.entryPrice)}</span>
+                                                        <div className="flex flex-col text-[10px] font-mono space-y-0.5">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-muted-foreground w-10">ENTRY:</span>
+                                                                <span className="font-bold">{formatAmount(pos.entryPrice)}</span>
                                                             </div>
                                                             {pos.exitPrice && (
-                                                                <div className="flex justify-between gap-4">
-                                                                    <span className="text-muted-foreground">Exit:</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-muted-foreground w-10">EXIT:</span>
                                                                     <span className="text-foreground font-bold">{formatAmount(pos.exitPrice)}</span>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className={cn("flex flex-col font-bold", isProfit ? "text-accent" : "text-destructive")}>
-                                                            <span>{formatAmount(pos.realizedPnL || 0, { signDisplay: 'always' })}</span>
-                                                            <span className="text-[9px] opacity-70">Incl. Fees</span>
+                                                        {pos.status === 'liquidated' ? (
+                                                            <Badge variant="destructive" className="text-[9px] uppercase font-bold px-1.5 h-4 flex items-center gap-1 w-fit">
+                                                                <TrendingDown className="h-2.5 w-2.5" /> LIQUIDATED
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="secondary" className="text-[9px] uppercase font-bold px-1.5 h-4 flex items-center gap-1 w-fit">
+                                                                <History className="h-2.5 w-2.5" /> CLOSED
+                                                            </Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className={cn("flex flex-col", isProfit ? "text-accent" : "text-destructive")}>
+                                                            <div className="flex items-center gap-1">
+                                                                {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                                                <span className="font-bold text-sm">{formatAmount(realizedPnl, { signDisplay: 'always' })}</span>
+                                                            </div>
+                                                            <span className="text-[9px] opacity-70 font-bold ml-4">NET RETURN</span>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right pr-6 text-[10px] text-muted-foreground font-mono">
-                                                        {pos.closedAt ? formatDistanceToNow(pos.closedAt.toDate(), { addSuffix: true }) : 'N/A'}
+                                                    <TableCell className="text-right pr-6">
+                                                        <div className="flex flex-col text-right">
+                                                            <span className="text-[10px] font-bold text-muted-foreground">{pos.closedAt ? formatDistanceToNow(pos.closedAt.toDate(), { addSuffix: true }) : 'N/A'}</span>
+                                                            <span className="text-[8px] text-muted-foreground/50 font-mono">{pos.id.substring(0,8)}</span>
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             );

@@ -8,8 +8,8 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const MAINTENANCE_MARGIN = 0.0002; // 0.02% - Tuned for extreme leverage (up to 1000x)
-const PERP_SPREAD = 0.0002; // 0.02% spread for synthetic pairs
+const MAINTENANCE_MARGIN = 0.025; // 2.5% - Robust buffer for high leverage
+const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
@@ -44,8 +44,8 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
  * Calculates the liquidation price for a position using industry-standard margin math.
  * 
  * FORMULA:
- * Long: LiqPrice = Entry * ((Leverage - 1) / (Leverage * (1 - MaintenanceMargin)))
- * Short: LiqPrice = Entry * ((Leverage + 1) / (Leverage * (1 + MaintenanceMargin)))
+ * Long: LiqPrice = Entry * (1 - (1/Leverage) + MaintenanceMargin)
+ * Short: LiqPrice = Entry * (1 + (1/Leverage) - MaintenanceMargin)
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -60,11 +60,12 @@ export function calculateLiquidationPrice(
 
     if (direction === 'LONG') {
         // Price at which remaining margin hits MM threshold
-        const liqPrice = entryPrice * ((leverage - 1) / (leverage * (1 - mm)));
+        // Liq = Entry * (1 - (Collateral / PositionSize) + MM)
+        const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
         return Math.max(0, liqPrice);
     } else {
         // Price at which losses hit MM threshold
-        const liqPrice = entryPrice * ((leverage + 1) / (leverage * (1 + mm)));
+        const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
         return liqPrice;
     }
 }
