@@ -79,7 +79,7 @@ export function PerpAuditManagement() {
                         <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Active Positions</CardDescription>
                         <CardTitle className="text-2xl text-primary">{positions?.length ?? 0}</CardTitle>
                     </CardHeader>
-                </div>
+                </Card>
             </div>
 
             <Card>
