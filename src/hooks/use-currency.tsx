@@ -1,4 +1,3 @@
-
 'use client';
 /**
  * @fileOverview Global currency context for switching between NGN and USD.

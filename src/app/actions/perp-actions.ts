@@ -1,8 +1,7 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup } from 'firebase/firestore';
 import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
 import { calculateLiquidationPrice, getSpreadAdjustedPrice, getLiveCryptoPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
@@ -38,7 +37,7 @@ export async function openPerpPositionAction(
         const feeNgn = positionValueNgn * 0.001;
         const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-        // CRITICAL: NaN Guard
+        // CRITICAL: NaN Guard to protect user balance from corruption
         if (!isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn)) {
             throw new Error("Market pricing error. Please wait for oracle sync.");
         }
@@ -78,6 +77,10 @@ export async function openPerpPositionAction(
                 liquidationPrice: liqPriceNgn,
                 status: initialStatus,
                 createdAt: serverTimestamp() as any,
+                // Using null instead of undefined for Firestore compatibility
+                exitPrice: null as any,
+                realizedPnL: null as any,
+                closedAt: null as any
             };
 
             transaction.set(positionRef, positionData);
@@ -129,12 +132,12 @@ export async function closePerpPositionAction(userId: string, positionId: string
             const totalToReturn = Math.max(0, posData.collateral + realizedPnlNgn);
 
             // NAN GUARD
-            if (isNaN(totalToReturn)) throw new Error("Closure price invalid.");
+            if (!isFinite(totalToReturn) || isNaN(totalToReturn)) throw new Error("Closure price invalid.");
 
             const userRef = doc(firestore, 'users', userId);
             transaction.update(userRef, { 
                 balance: increment(totalToReturn),
-                totalRealizedPnl: increment(realizedPnlNgn)
+                totalRealizedPnl: increment(realizedPnlNgn || 0)
             });
 
             transaction.update(positionRef, {
@@ -192,5 +195,57 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
         return { success: true, liquidated: false };
     } catch (e: any) {
         return { success: false, error: e.message };
+    }
+}
+
+/**
+ * Global Liquidation Sweep
+ * Processed platform-wide for all open risky positions.
+ */
+export async function sweepAllLiquidationsAction() {
+    const firestore = getFirestoreInstance();
+    try {
+        const positionsQuery = query(
+            collectionGroup(firestore, 'perpPositions'),
+            where('status', '==', 'open')
+        );
+        const snapshot = await getDocs(positionsQuery);
+        
+        if (snapshot.empty) return { success: true, message: 'No open positions.' };
+
+        const uniquePairs = Array.from(new Set(snapshot.docs.map(d => d.data().tickerId)));
+        const ngnRate = await getLatestUsdNgnRate();
+        const prices: Record<string, number> = {};
+
+        for (const pair of uniquePairs) {
+            try {
+                const usd = await getLiveCryptoPrice(pair);
+                prices[pair] = usd * ngnRate;
+            } catch (e) {
+                console.error(`Failed to get price for ${pair}`);
+            }
+        }
+
+        let liquidatedCount = 0;
+        for (const posDoc of snapshot.docs) {
+            const pos = posDoc.data() as PerpPosition;
+            const currentPrice = prices[pos.tickerId];
+            if (!currentPrice) continue;
+
+            let isBreached = false;
+            if (pos.direction === 'LONG' && currentPrice <= pos.liquidationPrice) isBreached = true;
+            if (pos.direction === 'SHORT' && currentPrice >= pos.liquidationPrice) isBreached = true;
+
+            if (isBreached) {
+                // Call checked function for each breach
+                await checkAndLiquidatePosition(pos.userId, posDoc.id);
+                liquidatedCount++;
+            }
+        }
+
+        revalidatePath('/admin');
+        return { success: true, message: `Audit complete. ${liquidatedCount} positions liquidated.` };
+    } catch (error: any) {
+        return { success: false, error: error.message };
     }
 }
