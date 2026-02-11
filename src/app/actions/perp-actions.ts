@@ -1,7 +1,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup } from 'firebase/firestore';
 import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
 import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice, getLiveCryptoPrice } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
@@ -17,7 +17,7 @@ export async function openPerpPositionAction(
     const firestore = getFirestoreInstance();
     
     try {
-        // 1. Fetch Market Details from Firestore
+        // 1. Fetch Market Details
         const marketRef = doc(firestore, 'perpMarkets', pairId);
         const marketSnap = await getDoc(marketRef);
         
@@ -27,7 +27,7 @@ export async function openPerpPositionAction(
         
         const market = marketSnap.data() as PerpMarket;
 
-        // 2. Fetch Real-time Prices
+        // 2. Fetch Real-time Prices (Server-side Oracle)
         const [usdPrice, ngnRate] = await Promise.all([
             getLiveCryptoPrice(pairId),
             getLatestUsdNgnRate()
@@ -44,7 +44,7 @@ export async function openPerpPositionAction(
             // 3. House Edge: Apply Spread
             const entryPrice = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
             
-            // 4. Platform Fees: 0.1% of position size
+            // 4. Platform Fees
             const fee = calculatePerpFees(collateral, leverage);
             const totalRequired = collateral + fee;
             
@@ -52,6 +52,7 @@ export async function openPerpPositionAction(
                 throw new Error(`Insufficient balance. Required: ₦${totalRequired.toLocaleString()}`);
             }
 
+            // 5. High-Precision Liquidation Price
             const liqPrice = calculateLiquidationPrice(direction, entryPrice, leverage);
             
             const positionRef = doc(collection(firestore, `users/${userId}/perpPositions`));
@@ -77,7 +78,6 @@ export async function openPerpPositionAction(
         });
 
         revalidatePath('/perps');
-        revalidatePath('/transactions');
         return { success: true, ...result };
     } catch (error: any) {
         console.error('Failed to open perp:', error);
@@ -140,42 +140,80 @@ export async function closePerpPositionAction(userId: string, positionId: string
         });
 
         revalidatePath('/perps');
-        revalidatePath('/transactions');
         return { success: true, ...finalResult };
     } catch (error: any) {
         return { success: false, error: error.message };
     }
 }
 
+/**
+ * ROBUST LIQUIDATION SENTINEL ACTION
+ * Checks a specific position against the Binance Oracle server-side.
+ */
 export async function checkAndLiquidatePosition(userId: string, positionId: string) {
     const firestore = getFirestoreInstance();
     
     try {
         const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
         const posSnap = await getDoc(positionRef);
-        if (!posSnap.exists()) return { success: false, error: 'Not found' };
+        if (!posSnap.exists()) return { success: false, error: 'Position not found' };
         const posData = posSnap.data() as PerpPosition;
 
+        if (posData.status !== 'open') return { success: false, error: 'Position not active' };
+
+        // Server-side Oracle Fetch
         const [usdPrice, ngnRate] = await Promise.all([
             getLiveCryptoPrice(posData.tickerId),
             getLatestUsdNgnRate()
         ]);
         const currentPriceNgn = usdPrice * ngnRate;
 
-        await runTransaction(firestore, async (transaction) => {
-            const pRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
-            const pDoc = await transaction.get(pRef);
-            if (!pDoc.exists() || pDoc.data().status !== 'open') return;
+        let isLiquidatable = false;
+        if (posData.direction === 'LONG' && currentPriceNgn <= posData.liquidationPrice) isLiquidatable = true;
+        if (posData.direction === 'SHORT' && currentPriceNgn >= posData.liquidationPrice) isLiquidatable = true;
 
-            let isLiquidatable = false;
-            if (posData.direction === 'LONG' && currentPriceNgn <= posData.liquidationPrice) isLiquidatable = true;
-            if (posData.direction === 'SHORT' && currentPriceNgn >= posData.liquidationPrice) isLiquidatable = true;
+        if (isLiquidatable) {
+            await runTransaction(firestore, async (transaction) => {
+                const pRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
+                const pDoc = await transaction.get(pRef);
+                if (!pDoc.exists() || pDoc.data().status !== 'open') return;
 
-            if (isLiquidatable) {
-                transaction.update(pRef, { status: 'liquidated', closedAt: serverTimestamp() });
-            }
-        });
-        return { success: true };
+                transaction.update(pRef, { 
+                    status: 'liquidated', 
+                    closedAt: serverTimestamp(),
+                    exitPrice: currentPriceNgn,
+                    realizedPnL: -posData.collateral // Entire collateral is lost
+                });
+            });
+            revalidatePath('/perps');
+            return { success: true, liquidated: true };
+        }
+
+        return { success: true, liquidated: false };
+    } catch (e: any) {
+        console.error("LIQUIDATION_ACTION_ERROR:", e.message);
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * GLOBAL SWEEP UTILITY
+ * Scans all open positions and processes liquidations.
+ */
+export async function sweepAllLiquidationsAction() {
+    const firestore = getFirestoreInstance();
+    try {
+        const q = query(collectionGroup(firestore, 'perpPositions'), where('status', '==', 'open'));
+        const snap = await getDocs(q);
+        
+        let count = 0;
+        for (const docSnap of snap.docs) {
+            const data = docSnap.data() as PerpPosition;
+            const res = await checkAndLiquidatePosition(data.userId, docSnap.id);
+            if (res.success && res.liquidated) count++;
+        }
+        
+        return { success: true, message: `Audit complete. ${count} positions liquidated.` };
     } catch (e: any) {
         return { success: false, error: e.message };
     }

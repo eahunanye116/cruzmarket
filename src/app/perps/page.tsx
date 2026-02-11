@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useCollection, useFirestore } from '@/firebase';
@@ -7,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PerpTradeForm } from '@/components/perps/perp-trade-form';
 import { PerpPositions } from '@/components/perps/perp-positions';
 import { PerpChart } from '@/components/perps/perp-chart';
+import { PerpSentinel } from '@/components/perps/perp-sentinel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShieldAlert, TrendingUp, Ban, Landmark, Coins, Loader2, Info } from 'lucide-react';
@@ -86,6 +86,9 @@ export default function PerpetualTradingPage() {
 
     return (
         <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 max-w-[1600px]">
+            {/* Background Sentinel Processes Offline Liquidations */}
+            <PerpSentinel />
+
             {/* Professional Market Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-card border-2 p-4 rounded-lg shadow-hard-sm">
                 <div className="flex items-center gap-4">
@@ -157,7 +160,7 @@ export default function PerpetualTradingPage() {
                             <CardContent className="text-[11px] text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
                                 <div className="space-y-1">
                                     <p>• <b>Price Integrity</b>: We use the mid-market rate + 0.15% spread to protect house liquidity.</p>
-                                    <p>• <b>Margin Calls</b>: Automated liquidation occurs at 5% Maintenance Margin.</p>
+                                    <p>• <b>Margin Calls</b>: Automated liquidation occurs at 2.5% Maintenance Margin.</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p>• <b>Funding</b>: Calculated every 8 hours. Synthetic offset based on side imbalance.</p>
