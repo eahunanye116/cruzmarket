@@ -83,7 +83,7 @@ export type PerpPosition = {
     status: 'open' | 'closed' | 'liquidated';
     createdAt: Timestamp;
     closedAt?: Timestamp;
-    exitPrice?: Timestamp;
+    exitPrice?: number;
     realizedPnL?: number;
 }
 
