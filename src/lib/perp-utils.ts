@@ -8,7 +8,7 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const MAINTENANCE_MARGIN = 0.05; // 5% - The point at which the house liquidates the position
+const MAINTENANCE_MARGIN = 0.025; // 2.5% - Lowered to 2.5% to allow 20x leverage breathing room
 const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
 
 /**
@@ -60,14 +60,11 @@ export function calculatePerpPnL(
 }
 
 /**
- * Calculates the liquidation price for a position with high precision.
+ * Calculates the liquidation price for a position using industry-standard margin math.
  * 
- * FORMULA DERIVATION:
- * Long: Price where Collateral + (Price - Entry) * Size = MM * Size * Entry
- * Short: Price where Collateral + (Entry - Price) * Size = MM * Size * Entry
- * 
- * Where Size = (Collateral * Leverage) / Entry
- * MM = Maintenance Margin (5%)
+ * FORMULA:
+ * Long: LiqPrice = Entry * ((Leverage - 1) / (Leverage * (1 - MaintenanceMargin)))
+ * Short: LiqPrice = Entry * ((Leverage + 1) / (Leverage * (1 + MaintenanceMargin)))
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -81,14 +78,12 @@ export function calculateLiquidationPrice(
     const mm = MAINTENANCE_MARGIN;
 
     if (direction === 'LONG') {
-        // For Longs, price drops. We liquidate when user equity drops to 5% of position value.
-        // LiqPrice = Entry * (1 - (1/Leverage) + MM)
-        const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
+        // Price at which remaining margin hits MM threshold
+        const liqPrice = entryPrice * ((leverage - 1) / (leverage * (1 - mm)));
         return Math.max(0, liqPrice);
     } else {
-        // For Shorts, price rises.
-        // LiqPrice = Entry * (1 + (1/Leverage) - MM)
-        const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
+        // Price at which losses hit MM threshold
+        const liqPrice = entryPrice * ((leverage + 1) / (leverage * (1 + mm)));
         return liqPrice;
     }
 }

@@ -39,13 +39,12 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const feeNgn = calculatePerpFees(collateralNgn, leverage);
     const totalRequiredNgn = collateralNgn + feeNgn;
 
-    // VALIDATED CALCULATION: Apply spread to the estimate to match server execution
-    // This now strictly depends on direction to ensure reactivity when switching
+    // REACTIVE ENTRY: Updates instantly when direction or price changes
     const estimatedEntryPrice = useMemo(() => {
         return getSpreadAdjustedPrice(pair.price, direction, false);
     }, [pair.price, direction]);
 
-    // Liquidation math specifically depends on the direction and leverage state
+    // REACTIVE LIQUIDATION: Uses industry-standard math to avoid entry-level liquidations
     const liqPrice = useMemo(() => {
         if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
         return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
@@ -54,7 +53,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const handlePercentClick = (percent: number) => {
         if (!profile?.balance) return;
         // Logic: balance = collateral + (collateral * leverage * 0.001)
-        // Hence: collateral = balance / (1 + (leverage * 0.001))
         const maxCollateralNgn = profile.balance / (1 + (leverage * 0.001));
         const targetCollateralNgn = maxCollateralNgn * (percent / 100);
         
@@ -97,7 +95,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
     return (
         <Card className="border-2 shadow-hard-lg overflow-hidden bg-card/50 backdrop-blur-sm">
-            {/* Action Bar Indicator */}
             <div className={cn(
                 "h-1.5 w-full transition-colors duration-300",
                 direction === 'LONG' ? "bg-primary" : "bg-destructive"
@@ -142,7 +139,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
             </CardHeader>
 
             <CardContent className="p-4 pt-0 space-y-6">
-                {/* Collateral Input Section */}
                 <div className="space-y-2">
                     <div className="flex justify-between items-end">
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Margin Collateral</Label>
@@ -174,7 +170,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                 </div>
 
-                {/* Leverage Slider */}
                 <div className="space-y-4 pt-2">
                     <div className="flex justify-between items-center">
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Adjust Leverage</Label>
@@ -208,7 +203,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                 </div>
 
-                {/* Tactical Trade Information */}
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center">
                         <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Est. Entry (Incl. Spread)</span>
