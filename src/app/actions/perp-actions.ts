@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -74,21 +73,6 @@ export async function openPerpPositionAction(
             transaction.set(positionRef, positionData);
             transaction.update(userRef, { balance: increment(-totalRequired) });
 
-            // Activity Log
-            const activityRef = doc(collection(firestore, 'activities'));
-            transaction.set(activityRef, {
-                type: 'PERP_OPEN',
-                tickerId: pairId,
-                tickerName: market.symbol,
-                tickerIcon: market.icon,
-                value: collateral,
-                fee: fee,
-                leverage,
-                direction,
-                userId,
-                createdAt: serverTimestamp(),
-            });
-
             return { positionId: positionRef.id, tickerName: market.symbol };
         });
 
@@ -152,19 +136,6 @@ export async function closePerpPositionAction(userId: string, positionId: string
                 realizedPnL: realizedPnl - exitFee
             });
 
-            const activityRef = doc(collection(firestore, 'activities'));
-            transaction.set(activityRef, {
-                type: 'PERP_CLOSE',
-                tickerId: posData.tickerId,
-                tickerName: posData.tickerName,
-                tickerIcon: posData.tickerIcon,
-                value: totalToReturn,
-                realizedPnl: realizedPnl - exitFee,
-                fee: exitFee,
-                userId,
-                createdAt: serverTimestamp(),
-            });
-
             return { realizedPnl: realizedPnl - exitFee, amountReturned: totalToReturn };
         });
 
@@ -202,15 +173,6 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
 
             if (isLiquidatable) {
                 transaction.update(pRef, { status: 'liquidated', closedAt: serverTimestamp() });
-                const activityRef = doc(collection(firestore, 'activities'));
-                transaction.set(activityRef, {
-                    type: 'PERP_LIQUIDATE',
-                    tickerId: posData.tickerId,
-                    tickerName: posData.tickerName,
-                    userId,
-                    value: posData.collateral,
-                    createdAt: serverTimestamp(),
-                });
             }
         });
         return { success: true };
