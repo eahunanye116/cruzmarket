@@ -162,8 +162,8 @@ export default function PerpetualTradingPage() {
                                     <p>• <b>Spread</b>: 110 Pip Entry Spread applies to every entry.</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p>• <b>Leverage</b>: Max 1000x. Supports micro-entries from 1700 Naira.</p>
-                                    <p>• <b>Maintenance</b>: 0.05% buffer required. Volatility at 1000x is extremely high.</p>
+                                    <p>• <b>Leverage</b>: Max 400x. Supports micro-entries from 1700 Naira.</p>
+                                    <p>• <b>Maintenance</b>: 0.05% buffer required. Volatility at 400x is extremely high.</p>
                                 </div>
                             </CardContent>
                         </Card>

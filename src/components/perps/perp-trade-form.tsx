@@ -28,7 +28,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
     const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
     const [lotsInput, setLotsInput] = useState<string>('1');
-    const [leverage, setLeverage] = useState<number>(100); // Default to higher leverage
+    const [leverage, setLeverage] = useState<number>(100); 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const lots = parseFloat(lotsInput) || 0;
@@ -117,7 +117,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Leverage</Label>
                         <Badge variant="secondary" className="font-mono text-[10px]">{leverage}x</Badge>
                     </div>
-                    <Slider value={[leverage]} min={1} max={1000} step={1} onValueChange={([v]) => setLeverage(v)} />
+                    <Slider value={[leverage]} min={1} max={400} step={1} onValueChange={([v]) => setLeverage(v)} />
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
