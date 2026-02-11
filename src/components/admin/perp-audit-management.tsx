@@ -8,12 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMemo, useState } from 'react';
-import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw } from 'lucide-react';
+import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw, Info } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { checkAndLiquidatePosition, sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/popover'; // Using popover for better mobile touch support
 
 export function PerpAuditManagement() {
     const firestore = useFirestore();
@@ -73,18 +74,38 @@ export function PerpAuditManagement() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 w-full">
                     <Card className="border-primary/20 bg-primary/5">
                         <CardHeader className="pb-2">
-                            <CardDescription className="text-[10px] uppercase font-bold">House Net Exposure</CardDescription>
+                            <div className="flex items-center gap-2">
+                                <CardDescription className="text-[10px] uppercase font-bold">House Net Exposure</CardDescription>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-[200px]">
+                                        The House's directional risk. If Positive, users are mostly LONG (House is SHORT). If Negative, users are mostly SHORT (House is LONG).
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
                             <CardTitle className={cn("text-xl sm:text-2xl", houseExposure > 0 ? "text-destructive" : "text-accent")}>
                                 ₦{houseExposure.toLocaleString()}
                             </CardTitle>
                             <p className="text-[10px] text-muted-foreground mt-1">
-                                {houseExposure > 0 ? 'House is net SHORT' : 'House is net LONG'}
+                                {houseExposure > 0 ? 'House is counter-party SHORT' : 'House is counter-party LONG'}
                             </p>
                         </CardHeader>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Total Open Interest</CardDescription>
+                            <div className="flex items-center gap-2">
+                                <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Total Open Interest</CardDescription>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-[200px]">
+                                        Total value of all active contracts (Longs + Shorts). Represents the total capital currently at risk in the market.
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
                             <CardTitle className="text-xl sm:text-2xl">₦{totalOpenInterest.toLocaleString()}</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0 pb-2 sm:pb-6">
@@ -113,7 +134,7 @@ export function PerpAuditManagement() {
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
-                                <TableRow>
+                                <TableRow className="bg-muted/10">
                                     <TableHead className="pl-6 min-w-[120px]">User / Market</TableHead>
                                     <TableHead className="min-w-[100px]">Position</TableHead>
                                     <TableHead className="min-w-[120px]">Risk (₦)</TableHead>
@@ -124,7 +145,7 @@ export function PerpAuditManagement() {
                             <TableBody>
                                 {positions && positions.length > 0 ? positions.map(pos => {
                                     return (
-                                        <TableRow key={pos.id}>
+                                        <TableRow key={pos.id} className="hover:bg-muted/5">
                                             <TableCell className="pl-6">
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] font-bold font-mono truncate max-w-[80px]">{pos.userId}</span>
