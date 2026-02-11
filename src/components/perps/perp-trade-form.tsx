@@ -40,10 +40,12 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const totalRequiredNgn = collateralNgn + feeNgn;
 
     // VALIDATED CALCULATION: Apply spread to the estimate to match server execution
+    // This now strictly depends on direction to ensure reactivity when switching
     const estimatedEntryPrice = useMemo(() => {
         return getSpreadAdjustedPrice(pair.price, direction, false);
     }, [pair.price, direction]);
 
+    // Liquidation math specifically depends on the direction and leverage state
     const liqPrice = useMemo(() => {
         if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
         return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
