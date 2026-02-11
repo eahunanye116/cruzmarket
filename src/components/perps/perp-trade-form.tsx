@@ -10,7 +10,7 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info, AlertTriangle } from 'lucide-react';
 import { openPerpPositionAction } from '@/app/actions/perp-actions';
 import { doc } from 'firebase/firestore';
 import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } from '@/lib/perp-utils';
@@ -45,18 +45,22 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         return getSpreadAdjustedPrice(pair.price, direction, false);
     }, [pair.price, direction]);
 
-    // REACTIVE LIQUIDATION: Uses industry-standard math to avoid entry-level liquidations
+    // REACTIVE LIQUIDATION: Uses the fixed tiered MM formula
     const liqPrice = useMemo(() => {
         if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
         return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
     }, [direction, estimatedEntryPrice, leverage]);
 
+    // Check for instant liquidation (Spread vs Initial Margin)
+    const isInstantLiquidation = useMemo(() => {
+        // Spread is 2.5%. If Leverage > (1 / 0.025) = 40, you are wiped on entry.
+        return leverage > 40;
+    }, [leverage]);
+
     const handlePercentClick = (percent: number) => {
         if (!profile?.balance) return;
-        // Logic: balance = collateral + (collateral * leverage * 0.001)
         const maxCollateralNgn = profile.balance / (1 + (leverage * 0.001));
         const targetCollateralNgn = maxCollateralNgn * (percent / 100);
-        
         setCollateralInput(convertFromNgn(targetCollateralNgn).toFixed(2));
     };
 
@@ -204,6 +208,18 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                 </div>
 
+                {isInstantLiquidation && (
+                    <div className="p-3 rounded-lg bg-destructive/10 border-2 border-destructive/20 animate-pulse">
+                        <div className="flex items-center gap-2 text-destructive mb-1">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="text-[10px] font-bold uppercase">Suicide Trade Detected</span>
+                        </div>
+                        <p className="text-[9px] text-destructive leading-relaxed font-semibold">
+                            With a 2.5% market spread, any leverage over 40x will result in <b>INSTANT LIQUIDATION</b>. The cost of entry exceeds your initial collateral.
+                        </p>
+                    </div>
+                )}
+
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-1">
@@ -231,14 +247,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         <div className="flex items-center gap-1">
                             <ShieldAlert className="h-3 w-3" />
                             <span className="text-[9px] font-bold uppercase tracking-tighter">Est. Liquidation Price</span>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild><Info className="h-2.5 w-2.5 opacity-50 cursor-help" /></TooltipTrigger>
-                                    <TooltipContent className="max-w-[200px]">
-                                        <p className="text-[10px]">The price at which your remaining margin drops below the maintenance threshold. High leverage significantly increases liquidation risk.</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
                         </div>
                         <span className="font-bold text-xs">
                             {liqPrice > 0 ? formatAmount(liqPrice) : '--'}

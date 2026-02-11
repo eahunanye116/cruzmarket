@@ -8,18 +8,15 @@
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
-const MAINTENANCE_MARGIN = 0.025; // 2.5% - Robust buffer for high leverage
-const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs
+const PERP_SPREAD = 0.025; // 2.5% spread for synthetic pairs as requested
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
- * This is used server-side during trade execution to prevent price manipulation.
  */
 export async function getLiveCryptoPrice(pair: string): Promise<number> {
     try {
-        // We use Binance v3 ticker/price endpoint for reliable, low-latency data
         const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`, {
-            next: { revalidate: 0 }, // Ensure we always get the freshest price for trades
+            next: { revalidate: 0 },
             cache: 'no-store'
         });
         
@@ -41,11 +38,9 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
 }
 
 /**
- * Calculates the liquidation price for a position using industry-standard margin math.
- * 
- * FORMULA:
- * Long: LiqPrice = Entry * (1 - (1/Leverage) + MaintenanceMargin)
- * Short: LiqPrice = Entry * (1 + (1/Leverage) - MaintenanceMargin)
+ * Calculates the liquidation price for a position.
+ * To support 1000x leverage (0.1% margin), the Maintenance Margin must be 
+ * smaller than the initial margin.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -56,15 +51,19 @@ export function calculateLiquidationPrice(
         return 0;
     }
 
-    const mm = MAINTENANCE_MARGIN;
+    // Dynamic Maintenance Margin (MM)
+    // MM must be less than (1 / leverage) for the trade to be viable.
+    // Standard: 2.5%. High Lev: 0.05%
+    const mm = leverage > 40 ? 0.0005 : 0.025;
 
     if (direction === 'LONG') {
-        // Price at which remaining margin hits MM threshold
-        // Liq = Entry * (1 - (Collateral / PositionSize) + MM)
+        // Price where: Equity = PositionSize * MM
+        // Liq = Entry * (1 - (1/Lev) + MM)
         const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
         return Math.max(0, liqPrice);
     } else {
-        // Price at which losses hit MM threshold
+        // Price where: Equity = PositionSize * MM
+        // Liq = Entry * (1 + (1/Lev) - MM)
         const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
         return liqPrice;
     }
@@ -74,7 +73,6 @@ export function calculateLiquidationPrice(
  * Applies the 'House Edge' by adjusting the entry/exit price with a spread.
  */
 export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false) {
-    // Longs enter higher and exit lower. Shorts enter lower and exit higher.
     const multiplier = (direction === 'LONG' && !isClosing) || (direction === 'SHORT' && isClosing) 
         ? (1 + PERP_SPREAD) 
         : (1 - PERP_SPREAD);
