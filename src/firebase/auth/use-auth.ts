@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -10,7 +9,7 @@ import {
   UserCredential,
   FirebaseError
 } from 'firebase/auth';
-import { doc, setDoc, getFirestore } from 'firebase/firestore';
+import { doc, setDoc, getFirestore, getDoc } from 'firebase/firestore';
 
 
 type AuthResult = {
@@ -30,16 +29,25 @@ export function useAuth() {
       await updateProfile(user, { displayName });
       
       const userProfileRef = doc(firestore, 'users', user.uid);
-      const newUserProfile = {
-        email: user.email,
-        displayName: displayName,
-        photoURL: user.photoURL,
-        balance: 0,
-      };
-
-      // We are not handling permission errors here anymore,
-      // as they are logged in the hooks.
-      setDoc(userProfileRef, newUserProfile).catch(console.error);
+      
+      // Check if profile already exists to prevent accidental balance wipe
+      const existingDoc = await getDoc(userProfileRef);
+      
+      if (!existingDoc.exists()) {
+        const newUserProfile = {
+          email: user.email,
+          displayName: displayName,
+          photoURL: user.photoURL,
+          balance: 0,
+        };
+        await setDoc(userProfileRef, newUserProfile);
+      } else {
+        // Just update display name/email if doc exists
+        await setDoc(userProfileRef, {
+          email: user.email,
+          displayName: displayName,
+        }, { merge: true });
+      }
 
       return { userCredential };
     } catch (error) {

@@ -52,18 +52,19 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('app_currency', c);
   };
 
-  const convertFromNgn = (amount: number) => {
-    // Sanitize input to handle NaN/undefined
-    const safeAmount = (typeof amount !== 'number' || isNaN(amount)) ? 0 : amount;
+  const convertFromNgn = (amount: any) => {
+    // Aggressively parse input to number
+    const num = parseFloat(amount);
+    const safeAmount = isNaN(num) ? 0 : num;
     const safeRate = (typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0) ? 1600 : exchangeRate;
     
     if (currency === 'NGN') return safeAmount;
     return safeAmount / safeRate;
   };
 
-  const convertToNgn = (amount: number) => {
-    // Sanitize input to handle NaN/undefined
-    const safeAmount = (typeof amount !== 'number' || isNaN(amount)) ? 0 : amount;
+  const convertToNgn = (amount: any) => {
+    const num = parseFloat(amount);
+    const safeAmount = isNaN(num) ? 0 : num;
     const safeRate = (typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0) ? 1600 : exchangeRate;
 
     if (currency === 'NGN') return safeAmount;
@@ -72,32 +73,28 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
   const symbol = currency === 'NGN' ? '₦' : '$';
 
-  const formatAmount = (amountInNgn: number, options: Intl.NumberFormatOptions = {}) => {
-    // Primary safety: force NaN or non-numbers to 0
-    const safeAmountInNgn = (typeof amountInNgn !== 'number' || isNaN(amountInNgn)) ? 0 : amountInNgn;
+  const formatAmount = (amountInNgn: any, options: Intl.NumberFormatOptions = {}) => {
+    // Parse input to number to handle strings, nulls, or NaNs
+    const num = parseFloat(amountInNgn);
+    const safeAmountInNgn = isNaN(num) ? 0 : num;
     
     const displayAmount = convertFromNgn(safeAmountInNgn);
     
-    // Smart defaults for fraction digits based on amount and context
+    // Smart defaults for fraction digits
     const isSmall = safeAmountInNgn > 0 && safeAmountInNgn < 100;
     
     let minDigits = options.minimumFractionDigits;
     let maxDigits = options.maximumFractionDigits;
 
-    // Safe merging logic to prevent RangeError: minDigits > maxDigits
     if (minDigits === undefined && maxDigits === undefined) {
-        // Default behavior: 2 decimals for balance, up to 8 for token prices
         minDigits = 2;
         maxDigits = isSmall ? 8 : 2;
     } else if (maxDigits !== undefined && minDigits === undefined) {
-        // If user wants whole numbers (max: 0), min must also be 0
         minDigits = Math.min(2, maxDigits);
     } else if (minDigits !== undefined && maxDigits === undefined) {
-        // If user wants specific precision (min: 4), max must be at least that
         maxDigits = Math.max(minDigits, isSmall ? 8 : 2);
     }
 
-    // Final safety clamp for Intl requirements
     const finalMin = Math.max(0, Math.min(20, minDigits ?? 2));
     const finalMax = Math.max(finalMin, Math.min(20, maxDigits ?? finalMin));
 
@@ -113,8 +110,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         return new Intl.NumberFormat('en-US', finalOptions).format(displayAmount);
     } catch (e) {
         console.error("Formatting error:", e);
-        // Fallback to basic string if Intl fails
-        return `${symbol}${displayAmount.toFixed(2)}`;
+        return `${symbol}${displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
   };
 

@@ -22,7 +22,6 @@ function UserBalance() {
   const firestore = useFirestore();
   const { formatAmount } = useCurrency();
   
-  // Memoize reference to prevent unnecessary hook re-runs
   const userProfileRef = useMemo(() => 
     (user && firestore) ? doc(firestore, 'users', user.uid) : null,
     [user, firestore]
@@ -34,8 +33,8 @@ function UserBalance() {
     return <Skeleton className="h-6 w-24" />;
   }
 
-  // Ensure we fallback to 0 if balance is null, undefined, or NaN
-  const balance = (userProfile && typeof userProfile.balance === 'number') ? userProfile.balance : 0;
+  // Fallback to 0 if data is missing or profile hasn't loaded yet
+  const balance = userProfile?.balance ?? 0;
 
   return (
     <div className="font-semibold text-primary">
