@@ -7,6 +7,30 @@ const TRADING_FEE_RATE = 0.001; // 0.1%
 const MAINTENANCE_MARGIN = 0.05; // 5%
 const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
 
+export const SUPPORTED_PERP_PAIRS = [
+    { id: 'BTCUSDT', name: 'Bitcoin', symbol: 'BTC', icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png' },
+    { id: 'ETHUSDT', name: 'Ethereum', symbol: 'ETH', icon: 'https://cryptologos.cc/logos/ethereum-eth-logo.png' },
+    { id: 'SOLUSDT', name: 'Solana', symbol: 'SOL', icon: 'https://cryptologos.cc/logos/solana-sol-logo.png' },
+    { id: 'DOGEUSDT', name: 'Dogecoin', symbol: 'DOGE', icon: 'https://cryptologos.cc/logos/dogecoin-doge-logo.png' },
+];
+
+/**
+ * Fetches the current price for a crypto pair from a public API.
+ * Used by the house engine to determine entry/exit prices.
+ */
+export async function getLiveCryptoPrice(pair: string): Promise<number> {
+    try {
+        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, {
+            next: { revalidate: 0 } // No caching for trading prices
+        });
+        const data = await response.json();
+        return parseFloat(data.price);
+    } catch (error) {
+        console.error("PRICE_FETCH_ERROR:", error);
+        throw new Error("Market data unavailable. Please try again.");
+    }
+}
+
 /**
  * Calculates current PnL for a position.
  */
@@ -23,16 +47,11 @@ export function calculatePerpPnL(
         : entryPrice - currentPrice;
     
     const pnlPercent = priceDiff / entryPrice;
-    const grossPnl = size * pnlPercent;
-    
-    // Account for potential exit fees and spread impact
-    // For UI display, we show the gross, but for closure we use net
-    return grossPnl;
+    return size * pnlPercent;
 }
 
 /**
  * Calculates the liquidation price for a position.
- * Maintenance margin is 5%.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -40,9 +59,6 @@ export function calculateLiquidationPrice(
     leverage: number
 ) {
     if (direction === 'LONG') {
-        // Price where remaining margin = size * 0.05
-        // (Collateral - Loss) / Size = 0.05
-        // (1/leverage - (entry - current)/entry) = 0.05
         return entryPrice * (1 - (1 / leverage) + MAINTENANCE_MARGIN);
     } else {
         return entryPrice * (1 + (1 / leverage) - MAINTENANCE_MARGIN);
@@ -50,8 +66,6 @@ export function calculateLiquidationPrice(
 }
 
 export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false) {
-    // Longs enter at higher price, exit at lower
-    // Shorts enter at lower price, exit at higher
     const multiplier = (direction === 'LONG' && !isClosing) || (direction === 'SHORT' && isClosing) 
         ? (1 + PERP_SPREAD) 
         : (1 - PERP_SPREAD);

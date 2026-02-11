@@ -1,32 +1,37 @@
+
 'use client';
 
-import { useUser, useFirestore, useCollection } from '@/firebase';
-import { Ticker } from '@/lib/types';
-import { collection, query, orderBy } from 'firebase/firestore';
-import { useMemo, useState } from 'react';
+import { useUser } from '@/firebase';
+import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PerpTradeForm } from '@/components/perps/perp-trade-form';
 import { PerpPositions } from '@/components/perps/perp-positions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PerpChart } from '@/components/perps/perp-chart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, TrendingUp, Info, Ban, Landmark } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Ban, Landmark, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { SUPPORTED_PERP_PAIRS, getLiveCryptoPrice } from '@/lib/perp-utils';
+import { useCurrency } from '@/hooks/use-currency';
 
 export default function PerpetualTradingPage() {
     const user = useUser();
-    const firestore = useFirestore();
+    const { formatAmount, exchangeRate } = useCurrency();
+    const [selectedPair, setSelectedPair] = useState(SUPPORTED_PERP_PAIRS[0]);
+    const [livePrice, setLivePrice] = useState<number | null>(null);
 
-    const tickersQuery = firestore ? query(collection(firestore, 'tickers'), orderBy('marketCap', 'desc')) : null;
-    const { data: tickers, loading } = useCollection<Ticker>(tickersQuery);
-
-    const [selectedTickerId, setSelectedTickerId] = useState<string | null>(null);
-
-    const selectedTicker = useMemo(() => {
-        if (!tickers) return null;
-        if (selectedTickerId) return tickers.find(t => t.id === selectedTickerId) || tickers[0];
-        return tickers[0];
-    }, [tickers, selectedTickerId]);
+    useEffect(() => {
+        const updatePrice = async () => {
+            try {
+                const usd = await getLiveCryptoPrice(selectedPair.id);
+                setLivePrice(usd * exchangeRate);
+            } catch (e) {}
+        };
+        updatePrice();
+        const interval = setInterval(updatePrice, 5000); // Quick refresh for trading feel
+        return () => clearInterval(interval);
+    }, [selectedPair, exchangeRate]);
 
     if (!user) {
         return (
@@ -40,33 +45,30 @@ export default function PerpetualTradingPage() {
         );
     }
 
-    if (loading) {
-        return (
-            <div className="container mx-auto py-8 px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8"><Skeleton className="h-96 w-full" /><Skeleton className="h-64 w-full" /></div>
-                <div className="lg:col-span-1"><Skeleton className="h-96 w-full" /></div>
-            </div>
-        );
-    }
-
     return (
         <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-7xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-4xl font-bold font-headline flex items-center gap-3">
-                        Perp Arena <Badge variant="secondary" className="bg-accent/10 text-accent">BETA</Badge>
+                        Perp Arena <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">BETA</Badge>
                     </h1>
-                    <p className="text-muted-foreground mt-1">Leveraged synthetic trading. High risk, higher chaos.</p>
+                    <p className="text-muted-foreground mt-1">Synthetic leverage on real-world crypto. Trade against the house.</p>
                 </div>
                 <div className="w-full md:w-64">
-                    <Select value={selectedTicker?.id} onValueChange={setSelectedTickerId}>
-                        <SelectTrigger className="border-2 font-bold h-12">
+                    <Select 
+                        value={selectedPair.id} 
+                        onValueChange={(val) => setSelectedPair(SUPPORTED_PERP_PAIRS.find(p => p.id === val)!)}
+                    >
+                        <SelectTrigger className="border-2 font-bold h-12 shadow-hard-sm">
                             <SelectValue placeholder="Select Market" />
                         </SelectTrigger>
                         <SelectContent>
-                            {tickers?.map(t => (
-                                <SelectItem key={t.id} value={t.id} className="font-bold">
-                                    ${t.name} (₦{t.price.toLocaleString(undefined, { maximumFractionDigits: 4 })})
+                            {SUPPORTED_PERP_PAIRS.map(p => (
+                                <SelectItem key={p.id} value={p.id} className="font-bold">
+                                    <div className="flex items-center gap-2">
+                                        <Coins className="h-4 w-4" />
+                                        <span>{p.symbol}/USDT</span>
+                                    </div>
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -76,34 +78,37 @@ export default function PerpetualTradingPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    {/* Performance Summary / Stats */}
+                    {/* Market Header Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Card className="bg-accent/5 border-accent/20">
-                            <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
-                                <CardTitle className="text-xs uppercase font-bold text-accent">Synthetic Price</CardTitle>
-                                <TrendingUp className="h-4 w-4 text-accent" />
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                                <p className="text-2xl font-bold font-headline">₦{selectedTicker?.price.toLocaleString()}</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Updates every ticker trade.</p>
-                            </CardContent>
-                        </Card>
                         <Card className="bg-primary/5 border-primary/20">
                             <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
-                                <CardTitle className="text-xs uppercase font-bold text-primary">Funding Rate</CardTitle>
-                                <Landmark className="h-4 w-4 text-primary" />
+                                <CardTitle className="text-[10px] uppercase font-bold text-primary">Live {selectedPair.symbol} Price</CardTitle>
+                                <TrendingUp className="h-4 w-4 text-primary" />
                             </CardHeader>
                             <CardContent className="p-4 pt-0">
-                                <p className="text-2xl font-bold font-headline">0.01% / hr</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">Paid to house balance.</p>
+                                <p className="text-2xl font-bold font-headline">{livePrice ? formatAmount(livePrice) : 'Fetching...'}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Price sources from global liquidity pools.</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-accent/5 border-accent/20">
+                            <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                                <CardTitle className="text-[10px] uppercase font-bold text-accent">Synthetic Funding</CardTitle>
+                                <Landmark className="h-4 w-4 text-accent" />
+                            </CardHeader>
+                            <CardContent className="p-4 pt-0">
+                                <p className="text-2xl font-bold font-headline">0.01% / 8h</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Applied to open interest imbalance.</p>
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* Active Positions */}
-                    <PerpPositions tickers={tickers || []} />
+                    {/* Chart Section */}
+                    <PerpChart pairId={selectedPair.id} />
 
-                    {/* Arena Rules Card */}
+                    {/* Active Positions */}
+                    <PerpPositions tickers={[]} />
+
+                    {/* Arena Rules */}
                     <Card className="border-2 border-muted">
                         <CardHeader>
                             <CardTitle className="text-sm flex items-center gap-2">
@@ -111,17 +116,21 @@ export default function PerpetualTradingPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="text-xs text-muted-foreground space-y-2 leading-relaxed">
-                            <p>• <b>House Model</b>: You are trading against CruzMarket synthetic reserves. No counterparty liquidity is required.</p>
-                            <p>• <b>Spread</b>: A small spread is applied to all entries and exits to protect the house pool from toxicity.</p>
-                            <p>• <b>Leverage</b>: Up to 20x leverage available. Note that higher leverage significantly increases liquidation risk.</p>
-                            <p>• <b>Liquidation</b>: If your margin ratio hits 5%, your position will be automatically liquidated by the platform.</p>
+                            <p>• <b>Oracle Engine</b>: Prices are determined by real-world crypto markets converted to ₦ at our internal exchange rate.</p>
+                            <p>• <b>Spread</b>: A 0.15% spread applies to all synthetic entries to protect the house.</p>
+                            <p>• <b>Leverage</b>: Up to 20x. High leverage carries significant liquidation risk.</p>
+                            <p>• <b>Margin Call</b>: If your collateral drops to 5% of position size, automated liquidation will occur.</p>
                         </CardContent>
                     </Card>
                 </div>
 
                 <div className="lg:col-span-1">
                     <div className="lg:sticky lg:top-20">
-                        {selectedTicker && <PerpTradeForm ticker={selectedTicker} />}
+                        {livePrice && (
+                            <PerpTradeForm 
+                                pair={{...selectedPair, price: livePrice}} 
+                            />
+                        )}
                     </div>
                 </div>
             </div>
