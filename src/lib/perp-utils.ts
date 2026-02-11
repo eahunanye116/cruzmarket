@@ -67,6 +67,7 @@ export function calculatePerpPnL(
  * Short: Price where Collateral + (Entry - Price) * Size = MM * Size * Entry
  * 
  * Where Size = (Collateral * Leverage) / Entry
+ * MM = Maintenance Margin (5%)
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -77,17 +78,16 @@ export function calculateLiquidationPrice(
         return 0;
     }
 
-    // Safety check: Clamp maintenance margin
     const mm = MAINTENANCE_MARGIN;
 
     if (direction === 'LONG') {
-        // For Longs, the price must drop. 
-        // We liquidate when the user has 5% of their position value left in equity.
+        // For Longs, price drops. We liquidate when user equity drops to 5% of position value.
+        // LiqPrice = Entry * (1 - (1/Leverage) + MM)
         const liqPrice = entryPrice * (1 - (1 / leverage) + mm);
         return Math.max(0, liqPrice);
     } else {
-        // For Shorts, the price must rise.
-        // We liquidate when the user has 5% of their position value left in equity.
+        // For Shorts, price rises.
+        // LiqPrice = Entry * (1 + (1/Leverage) - MM)
         const liqPrice = entryPrice * (1 + (1 / leverage) - mm);
         return liqPrice;
     }

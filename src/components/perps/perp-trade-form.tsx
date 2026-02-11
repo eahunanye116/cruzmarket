@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info } from 'lucide-react';
 import { openPerpPositionAction } from '@/app/actions/perp-actions';
 import { doc } from 'firebase/firestore';
-import { calculateLiquidationPrice, calculatePerpFees } from '@/lib/perp-utils';
+import { calculateLiquidationPrice, calculatePerpFees, getSpreadAdjustedPrice } from '@/lib/perp-utils';
 import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,11 +39,15 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const feeNgn = calculatePerpFees(collateralNgn, leverage);
     const totalRequiredNgn = collateralNgn + feeNgn;
 
-    // VALIDATED CALCULATION: Ensures the UI estimate matches the server execution logic exactly
+    // VALIDATED CALCULATION: Apply spread to the estimate to match server execution
+    const estimatedEntryPrice = useMemo(() => {
+        return getSpreadAdjustedPrice(pair.price, direction, false);
+    }, [pair.price, direction]);
+
     const liqPrice = useMemo(() => {
-        if (!pair.price || pair.price <= 0) return 0;
-        return calculateLiquidationPrice(direction, pair.price, leverage);
-    }, [direction, pair.price, leverage]);
+        if (!estimatedEntryPrice || estimatedEntryPrice <= 0) return 0;
+        return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage);
+    }, [direction, estimatedEntryPrice, leverage]);
 
     const handlePercentClick = (percent: number) => {
         if (!profile?.balance) return;
@@ -155,7 +159,6 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                         </div>
                     </div>
                     
-                    {/* Intelligent Percentage Buttons */}
                     <div className="grid grid-cols-4 gap-1.5 pt-1">
                         {[25, 50, 75, 100].map(p => (
                             <button
@@ -169,7 +172,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                 </div>
 
-                {/* Advanced Leverage Slider Section */}
+                {/* Leverage Slider */}
                 <div className="space-y-4 pt-2">
                     <div className="flex justify-between items-center">
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Adjust Leverage</Label>
@@ -203,8 +206,12 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                     </div>
                 </div>
 
-                {/* Tactical Trade Information Grid */}
+                {/* Tactical Trade Information */}
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Est. Entry (Incl. Spread)</span>
+                        <span className="font-mono text-[10px] font-bold">{formatAmount(estimatedEntryPrice)}</span>
+                    </div>
                     <div className="flex justify-between items-center">
                         <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">Total Exposure Size</span>
                         <span className="font-bold text-xs">{formatAmount(positionSizeNgn)}</span>
