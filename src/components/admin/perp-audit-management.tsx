@@ -1,7 +1,7 @@
 'use client';
 
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, collectionGroup, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, orderBy } from 'firebase/firestore';
 import { PerpPosition, Ticker } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -69,12 +69,12 @@ export function PerpAuditManagement() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center mb-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 w-full">
                     <Card className="border-primary/20 bg-primary/5">
                         <CardHeader className="pb-2">
                             <CardDescription className="text-[10px] uppercase font-bold">House Net Exposure</CardDescription>
-                            <CardTitle className={cn("text-2xl", houseExposure > 0 ? "text-destructive" : "text-accent")}>
+                            <CardTitle className={cn("text-xl sm:text-2xl", houseExposure > 0 ? "text-destructive" : "text-accent")}>
                                 ₦{houseExposure.toLocaleString()}
                             </CardTitle>
                             <p className="text-[10px] text-muted-foreground mt-1">
@@ -85,18 +85,18 @@ export function PerpAuditManagement() {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">Total Open Interest</CardDescription>
-                            <CardTitle className="text-2xl">₦{totalOpenInterest.toLocaleString()}</CardTitle>
+                            <CardTitle className="text-xl sm:text-2xl">₦{totalOpenInterest.toLocaleString()}</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0">
+                        <CardContent className="pt-0 pb-2 sm:pb-6">
                              <p className="text-[10px] text-muted-foreground">Across {positions?.length ?? 0} positions.</p>
                         </CardContent>
                     </Card>
                 </div>
-                <div className="ml-6">
+                <div className="w-full lg:w-auto">
                     <Button 
                         onClick={handleGlobalSweep} 
                         disabled={isSweeping} 
-                        className="bg-destructive hover:bg-destructive/90"
+                        className="w-full lg:w-auto bg-destructive hover:bg-destructive/90"
                     >
                         {isSweeping ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
                         Scan & Sweep All
@@ -106,72 +106,74 @@ export function PerpAuditManagement() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Open Positions Risk Audit</CardTitle>
-                    <CardDescription>Real-time monitoring of every leveraged position on the house book.</CardDescription>
+                    <CardTitle className="text-lg">Open Positions Risk Audit</CardTitle>
+                    <CardDescription>Real-time monitoring of leveraged positions.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="pl-6">User / Market</TableHead>
-                                <TableHead>Position</TableHead>
-                                <TableHead>Risk (₦)</TableHead>
-                                <TableHead>Liq. Price</TableHead>
-                                <TableHead className="text-right pr-6">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {positions && positions.length > 0 ? positions.map(pos => {
-                                return (
-                                    <TableRow key={pos.id}>
-                                        <TableCell className="pl-6">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold font-mono truncate max-w-[100px]">{pos.userId}</span>
-                                                <span className="font-bold text-sm text-primary">${pos.tickerName}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant={pos.direction === 'LONG' ? 'default' : 'destructive'} className="text-[10px] h-4">
-                                                    {pos.direction}
-                                                </Badge>
-                                                <span className="font-bold text-xs">{pos.leverage}x</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold">₦{pos.collateral.toLocaleString()}</span>
-                                                <span className="text-[10px] text-muted-foreground">Entry: ₦{pos.entryPrice.toLocaleString()}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="font-mono text-xs font-bold text-destructive">₦{pos.liquidationPrice.toLocaleString()}</span>
-                                        </TableCell>
-                                        <TableCell className="text-right pr-6">
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" asChild title="Audit User">
-                                                    <Link href={`/admin/audit/${pos.userId}`}><ArrowRight className="h-4 w-4" /></Link>
-                                                </Button>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="destructive" 
-                                                    className="h-8 text-[10px]"
-                                                    onClick={() => handleManualLiquidate(pos.userId, pos.id)}
-                                                    disabled={liquidatingId === pos.id}
-                                                >
-                                                    {liquidatingId === pos.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'FORCE AUDIT'}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            }) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No open positions.</TableCell>
+                                    <TableHead className="pl-6 min-w-[120px]">User / Market</TableHead>
+                                    <TableHead className="min-w-[100px]">Position</TableHead>
+                                    <TableHead className="min-w-[120px]">Risk (₦)</TableHead>
+                                    <TableHead className="min-w-[100px]">Liq. Price</TableHead>
+                                    <TableHead className="text-right pr-6">Action</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {positions && positions.length > 0 ? positions.map(pos => {
+                                    return (
+                                        <TableRow key={pos.id}>
+                                            <TableCell className="pl-6">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold font-mono truncate max-w-[80px]">{pos.userId}</span>
+                                                    <span className="font-bold text-sm text-primary">${pos.tickerName}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={pos.direction === 'LONG' ? 'default' : 'destructive'} className="text-[9px] h-4">
+                                                        {pos.direction}
+                                                    </Badge>
+                                                    <span className="font-bold text-[10px]">{pos.leverage}x</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs sm:text-sm font-bold">₦{pos.collateral.toLocaleString()}</span>
+                                                    <span className="text-[9px] text-muted-foreground">Entry: ₦{pos.entryPrice.toLocaleString()}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="font-mono text-[10px] sm:text-xs font-bold text-destructive">₦{pos.liquidationPrice.toLocaleString()}</span>
+                                            </TableCell>
+                                            <TableCell className="text-right pr-6">
+                                                <div className="flex justify-end gap-1 sm:gap-2">
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 sm:h-8 sm:w-8" asChild title="Audit User">
+                                                        <Link href={`/admin/audit/${pos.userId}`}><ArrowRight className="h-4 w-4" /></Link>
+                                                    </Button>
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="destructive" 
+                                                        className="h-7 sm:h-8 text-[9px] sm:text-[10px] px-2"
+                                                        onClick={() => handleManualLiquidate(pos.userId, pos.id)}
+                                                        disabled={liquidatingId === pos.id}
+                                                    >
+                                                        {liquidatingId === pos.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'FORCE'}
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                }) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No open positions.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>
