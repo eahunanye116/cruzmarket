@@ -15,7 +15,7 @@ export async function openPerpPositionAction(
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
-    // Support up to 1000x Leverage
+    // Maximum leverage supported by the engine
     const effectiveLeverage = Math.min(leverage, 1000);
     
     try {
@@ -31,7 +31,7 @@ export async function openPerpPositionAction(
         
         const currentPriceNgn = usdPrice * ngnRate;
         
-        // Convert USD Spread to NGN
+        // Convert USD Spread to NGN (110 Pips)
         const spreadNgn = 110 * ngnRate; 
         const entryPriceNgn = direction === 'LONG' ? currentPriceNgn + spreadNgn : currentPriceNgn - spreadNgn;
         
@@ -42,8 +42,8 @@ export async function openPerpPositionAction(
         const feeNgn = positionValueNgn * 0.001;
         const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-        // CRITICAL: NaN Guard
-        if (!isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn) || !isFinite(entryPriceNgn)) {
+        // CRITICAL: NaN/Finite Guard to prevent Firestore corruption
+        if (!Number.isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn) || !Number.isFinite(entryPriceNgn)) {
             throw new Error("Market pricing error. Please wait for oracle sync.");
         }
 
@@ -75,7 +75,7 @@ export async function openPerpPositionAction(
                 userId,
                 tickerId: pairId, 
                 tickerName: market.symbol,
-                tickerIcon: market.icon,
+                tickerIcon: market.icon || '',
                 direction,
                 leverage: effectiveLeverage,
                 lots,
@@ -85,9 +85,9 @@ export async function openPerpPositionAction(
                 liquidationPrice: liqPriceNgn,
                 status: initialStatus,
                 createdAt: serverTimestamp() as any,
-                exitPrice: isImmediatelyLiquidated ? currentPriceNgn : null as any,
-                realizedPnL: isImmediatelyLiquidated ? -requiredMarginNgn : null as any,
-                closedAt: isImmediatelyLiquidated ? serverTimestamp() as any : null as any
+                exitPrice: isImmediatelyLiquidated ? currentPriceNgn : null,
+                realizedPnL: isImmediatelyLiquidated ? -requiredMarginNgn : null,
+                closedAt: isImmediatelyLiquidated ? serverTimestamp() as any : null
             };
 
             transaction.set(positionRef, positionData);
@@ -137,7 +137,7 @@ export async function closePerpPositionAction(userId: string, positionId: string
             const totalToReturn = Math.max(0, posData.collateral + realizedPnlNgn);
 
             // NAN GUARD
-            if (!isFinite(totalToReturn) || isNaN(totalToReturn)) throw new Error("Closure price invalid.");
+            if (!Number.isFinite(totalToReturn) || isNaN(totalToReturn)) throw new Error("Closure price invalid.");
 
             const userRef = doc(firestore, 'users', userId);
             transaction.update(userRef, { 

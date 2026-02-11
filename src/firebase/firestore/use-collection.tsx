@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { onSnapshot, Query, FirestoreError, getDocs, queryEqual } from 'firebase/firestore';
 import { useFirestore } from '..';
 
@@ -9,22 +8,25 @@ type UseCollectionOptions = {
   listen?: boolean;
 };
 
-// Custom hook to compare queries deeply.
 const useMemoizedQuery = (query: Query | null) => {
   const [memoizedQuery, setMemoizedQuery] = useState(query);
+  const queryRef = useRef<Query | null>(null);
 
   useEffect(() => {
-    if (!query && !memoizedQuery) {
+    if (!query) {
+      if (memoizedQuery !== null) setMemoizedQuery(null);
       return;
     }
-    if ((query && !memoizedQuery) || (!query && memoizedQuery) || (query && memoizedQuery && !queryEqual(query, memoizedQuery))) {
+    
+    // Using queryEqual for deep comparison of Firestore query objects
+    if (!queryRef.current || !queryEqual(query, queryRef.current)) {
+      queryRef.current = query;
       setMemoizedQuery(query);
     }
   }, [query, memoizedQuery]);
 
   return memoizedQuery;
 }
-
 
 export function useCollection<T>(
   query: Query | null,
@@ -43,24 +45,30 @@ export function useCollection<T>(
       setLoading(false);
       return;
     }
+    
     setLoading(true);
 
     const handleError = (err: FirestoreError) => {
+        console.error("useCollection error:", err);
         setError(err);
         setLoading(false);
     }
 
     if (options.listen) {
-      const unsubscribe = onSnapshot(memoizedQuery, (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-        setData(docs);
-        setLoading(false);
-        setError(null);
-      }, (err) => {
-        handleError(err);
-      });
+      try {
+        const unsubscribe = onSnapshot(memoizedQuery, (snapshot) => {
+          const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+          setData(docs);
+          setLoading(false);
+          setError(null);
+        }, (err) => {
+          handleError(err);
+        });
 
-      return () => unsubscribe();
+        return () => unsubscribe();
+      } catch (err: any) {
+        handleError(err);
+      }
     } else {
       getDocs(memoizedQuery)
         .then(snapshot => {

@@ -2,9 +2,9 @@
 
 import { useUser, useFirestore } from '@/firebase';
 import { PerpPosition } from '@/lib/types';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,12 +25,13 @@ export function PerpPositions() {
     const { formatAmount, exchangeRate } = useCurrency();
     
     const [closingId, setClosingId] = useState<string | null>(null);
-    const [openPositions, setOpenPositions] = useState<PerpPosition[]>([]);
-    const [historyPositions, setHistoryPositions] = useState<PerpPosition[]>([]);
+    const [openPositionsRaw, setOpenPositionsRaw] = useState<PerpPosition[]>([]);
+    const [historyPositionsRaw, setHistoryPositionsRaw] = useState<PerpPosition[]>([]);
     const [loading, setLoading] = useState(true);
     const [livePrices, setLivePrices] = useState<Record<string, number>>({});
 
-    // Fetch Open Positions
+    // Fetch Open Positions - Avoiding orderBy on serverTimestamp fields in real-time listeners
+    // to prevent Firestore SDK internal assertion failures.
     useEffect(() => {
         if (!user || !firestore) {
             setLoading(false);
@@ -38,11 +39,10 @@ export function PerpPositions() {
         }
         const q = query(
             collection(firestore, `users/${user.uid}/perpPositions`), 
-            where('status', '==', 'open'),
-            orderBy('createdAt', 'desc')
+            where('status', '==', 'open')
         );
         const unsub = onSnapshot(q, (snap) => {
-            setOpenPositions(snap.docs.map(d => ({ id: d.id, ...d.data() } as PerpPosition)));
+            setOpenPositionsRaw(snap.docs.map(d => ({ id: d.id, ...d.data() } as PerpPosition)));
             setLoading(false);
         });
         return () => unsub();
@@ -54,14 +54,30 @@ export function PerpPositions() {
         const q = query(
             collection(firestore, `users/${user.uid}/perpPositions`), 
             where('status', 'in', ['closed', 'liquidated']),
-            orderBy('createdAt', 'desc'),
-            limit(20)
+            limit(30)
         );
         const unsub = onSnapshot(q, (snap) => {
-            setHistoryPositions(snap.docs.map(d => ({ id: d.id, ...d.data() } as PerpPosition)));
+            setHistoryPositionsRaw(snap.docs.map(d => ({ id: d.id, ...d.data() } as PerpPosition)));
         });
         return () => unsub();
     }, [user, firestore]);
+
+    // Memory-based sorting to avoid Firestore SDK cache conflicts
+    const openPositions = useMemo(() => {
+        return [...openPositionsRaw].sort((a, b) => {
+            const timeA = a.createdAt?.toMillis?.() || 0;
+            const timeB = b.createdAt?.toMillis?.() || 0;
+            return timeB - timeA;
+        });
+    }, [openPositionsRaw]);
+
+    const historyPositions = useMemo(() => {
+        return [...historyPositionsRaw].sort((a, b) => {
+            const timeA = a.closedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+            const timeB = b.closedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+            return timeB - timeA;
+        });
+    }, [historyPositionsRaw]);
 
     // Live Price engine for open positions
     useEffect(() => {
@@ -142,13 +158,12 @@ export function PerpPositions() {
                                                 ? currentPrice - pos.entryPrice 
                                                 : pos.entryPrice - currentPrice;
                                             
-                                            // EXCHANGE STANDARD CALCULATION: $100 move = $1 profit per lot
                                             const realizedPnl = priceDiff * pos.lots * CONTRACT_MULTIPLIER;
                                             const pnlPercent = (priceDiff / pos.entryPrice) * pos.leverage * 100;
                                             const isProfit = realizedPnl >= 0;
 
-                                            // Calculate risk factor (distance to liquidation)
-                                            const totalDistance = Math.abs(pos.liquidationPrice - pos.entryPrice);
+                                            // Calculate risk factor
+                                            const totalDistance = Math.abs(pos.liquidationPrice - pos.entryPrice) || 1;
                                             const currentDistance = Math.abs(pos.liquidationPrice - currentPrice);
                                             const riskFactor = Math.max(0, Math.min(100, (1 - (currentDistance / totalDistance)) * 100));
 
