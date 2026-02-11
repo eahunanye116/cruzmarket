@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -12,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, Edit, Save, X, Coins, Info } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Edit, Save, X, Coins, Info, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Switch } from '../ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -26,6 +25,8 @@ export function PerpMarketManagement() {
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{ success: boolean; price?: number } | null>(null);
     const [editingMarket, setEditingMarket] = useState<PerpMarket | null>(null);
 
     // Form State
@@ -40,16 +41,39 @@ export function PerpMarketManagement() {
         setSymbol('');
         setIcon('');
         setIsActive(true);
+        setValidationResult(null);
         setIsDialogOpen(true);
     };
 
     const handleOpenEdit = (market: PerpMarket) => {
         setEditingMarket(market);
         setName(market.name);
-        setSymbol(market.id); // The ID is the symbol (BTCUSDT)
+        setSymbol(market.id); 
         setIcon(market.icon);
         setIsActive(market.isActive);
+        setValidationResult(null);
         setIsDialogOpen(true);
+    };
+
+    const validateSymbol = async () => {
+        if (!symbol) return;
+        setIsValidating(true);
+        setValidationResult(null);
+        try {
+            const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol.toUpperCase().trim()}`);
+            const data = await res.json();
+            if (data.price) {
+                setValidationResult({ success: true, price: parseFloat(data.price) });
+                toast({ title: "Symbol Verified", description: `Oracle price: $${parseFloat(data.price).toLocaleString()}` });
+            } else {
+                setValidationResult({ success: false });
+                toast({ variant: 'destructive', title: "Invalid Symbol", description: "This pair was not found on the Binance Oracle." });
+            }
+        } catch (e) {
+            setValidationResult({ success: false });
+        } finally {
+            setIsValidating(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -64,14 +88,13 @@ export function PerpMarketManagement() {
             const marketRef = doc(firestore, 'perpMarkets', cleanSymbol);
             const marketData = {
                 name,
-                symbol: cleanSymbol.replace('USDT', ''), // Visual symbol
+                symbol: cleanSymbol.replace('USDT', ''), 
                 icon,
                 isActive,
                 updatedAt: serverTimestamp(),
             };
 
             if (!editingMarket) {
-                // Check if symbol already exists would be good, but setDoc handles it
                 await setDoc(marketRef, {
                     ...marketData,
                     id: cleanSymbol,
@@ -91,7 +114,7 @@ export function PerpMarketManagement() {
     };
 
     const handleDelete = async (marketId: string) => {
-        if (!confirm('Are you sure you want to remove this market? Existing positions will remain but no new trades can be opened.')) return;
+        if (!confirm('Are you sure? Removing this market will break charts for existing positions.')) return;
         try {
             await deleteDoc(doc(firestore, 'perpMarkets', marketId));
             toast({ title: 'Market Removed' });
@@ -109,7 +132,7 @@ export function PerpMarketManagement() {
                             <CardTitle className="flex items-center gap-2">
                                 <Coins className="h-5 w-5 text-primary" /> Perpetual Markets
                             </CardTitle>
-                            <CardDescription>Configure which crypto assets are available for high-leverage synthetic trading.</CardDescription>
+                            <CardDescription>Configure synthetic assets. Note: Assets MUST be listed on Binance for the oracle to work.</CardDescription>
                         </div>
                         <Button onClick={handleOpenCreate}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add Market
@@ -122,7 +145,7 @@ export function PerpMarketManagement() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="pl-6">Asset</TableHead>
-                                    <TableHead>Market Symbol</TableHead>
+                                    <TableHead>Oracle ID</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right pr-6">Actions</TableHead>
                                 </TableRow>
@@ -134,7 +157,7 @@ export function PerpMarketManagement() {
                                     <TableRow key={market.id}>
                                         <TableCell className="pl-6">
                                             <div className="flex items-center gap-3">
-                                                <Image src={market.icon} alt={market.name} width={24} height={24} className="rounded-full" />
+                                                <Image src={market.icon} alt={market.name} width={24} height={24} className="rounded-full aspect-square object-cover" />
                                                 <span className="font-bold">{market.name}</span>
                                             </div>
                                         </TableCell>
@@ -165,25 +188,47 @@ export function PerpMarketManagement() {
             </Card>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>{editingMarket ? 'Edit Perp Market' : 'Add New Perp Market'}</DialogTitle>
-                        <DialogDescription>Add any crypto asset supported by the global oracle engine.</DialogDescription>
+                        <DialogDescription>The oracle and charting engine rely on <b>Binance USDT pairs</b>.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
                             <Label>Display Name</Label>
-                            <Input placeholder="e.g. Dogecoin" value={name} onChange={e => setName(e.target.value)} />
+                            <Input placeholder="e.g. Pepe" value={name} onChange={e => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <div className="flex justify-between">
-                                <Label>Market Symbol (Binance Format)</Label>
-                                <Badge variant="outline" className="text-[10px] bg-primary/5">CRITICAL</Badge>
+                            <Label>Binance Symbol (Oracle Source)</Label>
+                            <div className="flex gap-2">
+                                <Input 
+                                    placeholder="e.g. PEPEUSDT" 
+                                    value={symbol} 
+                                    onChange={e => setSymbol(e.target.value.toUpperCase())} 
+                                    disabled={!!editingMarket} 
+                                />
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={validateSymbol} 
+                                    disabled={isValidating || !symbol}
+                                    className="shrink-0"
+                                >
+                                    {isValidating ? <Loader2 className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
+                                </Button>
                             </div>
-                            <Input placeholder="e.g. DOGEUSDT" value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} disabled={!!editingMarket} />
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Info className="h-3 w-3" /> Must match a valid Binance USDT pair for live price & charts.
-                            </p>
+                            {validationResult && (
+                                <div className={cn(
+                                    "flex items-center gap-2 p-2 rounded text-[10px] font-bold",
+                                    validationResult.success ? "bg-accent/10 text-accent" : "bg-destructive/10 text-destructive"
+                                )}>
+                                    {validationResult.success ? (
+                                        <><CheckCircle2 className="h-3 w-3" /> Oracle confirmed: ${validationResult.price?.toLocaleString()}</>
+                                    ) : (
+                                        <><AlertTriangle className="h-3 w-3" /> Symbol not found on Binance.</>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label>Icon URL</Label>
@@ -196,7 +241,7 @@ export function PerpMarketManagement() {
                     </div>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSubmit} disabled={isSubmitting}>
+                        <Button onClick={handleSubmit} disabled={isSubmitting || (validationResult && !validationResult.success)}>
                             {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
                             {editingMarket ? 'Update Market' : 'Launch Market'}
                         </Button>

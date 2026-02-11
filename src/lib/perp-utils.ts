@@ -1,6 +1,10 @@
-
 /**
  * @fileOverview Core logic for synthetic perpetual trading.
+ * 
+ * ORACLE SOURCE:
+ * This system uses the Binance Public API (v3) as its primary price oracle.
+ * Binance is chosen for its high liquidity, low latency, and deep historical data
+ * which powers both the trading execution engine and the interactive charts.
  */
 
 const TRADING_FEE_RATE = 0.001; // 0.1%
@@ -8,29 +12,36 @@ const MAINTENANCE_MARGIN = 0.05; // 5%
 const PERP_SPREAD = 0.0015; // 0.15% spread for synthetic pairs
 
 /**
- * Fetches the current price for a crypto pair from a public API.
- * Used by the house engine to determine entry/exit prices.
+ * Fetches the current price for a crypto pair from the Binance Oracle.
+ * This is used server-side during trade execution to prevent price manipulation.
  */
 export async function getLiveCryptoPrice(pair: string): Promise<number> {
     try {
-        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, {
-            next: { revalidate: 0 } // No caching for trading prices
+        // We use Binance v3 ticker/price endpoint for reliable, low-latency data
+        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`, {
+            next: { revalidate: 0 }, // Ensure we always get the freshest price for trades
+            cache: 'no-store'
         });
+        
+        if (!response.ok) {
+            throw new Error(`Oracle rejected request for symbol: ${pair}`);
+        }
+
         const data = await response.json();
         
         if (!data.price) {
-            throw new Error(`Price not found for ${pair}.`);
+            throw new Error(`Symbol ${pair} not found on Binance Oracle.`);
         }
         
         return parseFloat(data.price);
-    } catch (error) {
-        console.error("PRICE_FETCH_ERROR:", error);
-        throw new Error("Market data unavailable. Please verify the symbol is correct.");
+    } catch (error: any) {
+        console.error("ORACLE_FETCH_ERROR:", error.message);
+        throw new Error("Market data unavailable. Ensure the symbol is listed on Binance (e.g. PEPEUSDT).");
     }
 }
 
 /**
- * Calculates current PnL for a position.
+ * Calculates current PnL for a position based on the entry price and current oracle price.
  */
 export function calculatePerpPnL(
     direction: 'LONG' | 'SHORT',
@@ -50,12 +61,14 @@ export function calculatePerpPnL(
 
 /**
  * Calculates the liquidation price for a position.
+ * The house liquidates when the user's equity hits the maintenance margin (5%).
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
     entryPrice: number,
     leverage: number
 ) {
+    // Math logic to determine at what price the collateral is effectively exhausted
     if (direction === 'LONG') {
         return entryPrice * (1 - (1 / leverage) + MAINTENANCE_MARGIN);
     } else {
@@ -63,7 +76,11 @@ export function calculateLiquidationPrice(
     }
 }
 
+/**
+ * Applies the 'House Edge' by adjusting the entry/exit price with a spread.
+ */
 export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false) {
+    // Longs enter higher and exit lower. Shorts enter lower and exit higher.
     const multiplier = (direction === 'LONG' && !isClosing) || (direction === 'SHORT' && isClosing) 
         ? (1 + PERP_SPREAD) 
         : (1 - PERP_SPREAD);
@@ -71,6 +88,9 @@ export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT
     return price * multiplier;
 }
 
+/**
+ * Calculates the platform fee based on the total position size.
+ */
 export function calculatePerpFees(collateral: number, leverage: number) {
     return (collateral * leverage) * TRADING_FEE_RATE;
 }
