@@ -32,12 +32,18 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
         return parseFloat(data.price);
     } catch (error: any) {
         console.error("ORACLE_FETCH_ERROR:", error.message);
-        throw new Error("Market data unavailable. Ensure the symbol is listed on Binance (e.g. PEPEUSDT).");
+        throw new Error("Market data unavailable. Ensure the symbol is listed on Binance (e.g. BTCUSDT).");
     }
 }
 
 /**
  * Calculates the liquidation price for a position.
+ * 
+ * Formula for Long: Entry * (1 - (1/Leverage) + MM)
+ * Formula for Short: Entry * (1 + (1/Leverage) - MM)
+ * 
+ * Note: At 20x leverage, 1/Leverage is 0.05. With MM at 0.025, 
+ * you have a 2.5% price movement window before liquidation.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
@@ -49,12 +55,13 @@ export function calculateLiquidationPrice(
     }
 
     const mm = MAINTENANCE_MARGIN;
+    const initialMarginRatio = 1 / leverage;
 
     if (direction === 'LONG') {
-        const liqPrice = entryPrice * (1 - (1 / leverage - mm));
+        const liqPrice = entryPrice * (1 - initialMarginRatio + mm);
         return Math.max(0, liqPrice);
     } else {
-        const liqPrice = entryPrice * (1 + (1 / leverage - mm));
+        const liqPrice = entryPrice * (1 + initialMarginRatio - mm);
         return liqPrice;
     }
 }

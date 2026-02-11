@@ -16,6 +16,9 @@ export async function openPerpPositionAction(
 ) {
     const firestore = getFirestoreInstance();
     
+    // Strict Leverage Cap
+    const effectiveLeverage = Math.min(leverage, 20);
+    
     try {
         // 1. Fetch Market Details
         const marketRef = doc(firestore, 'perpMarkets', pairId);
@@ -45,7 +48,7 @@ export async function openPerpPositionAction(
             const entryPrice = getSpreadAdjustedPrice(currentPriceNgn, direction, false);
             
             // 4. Platform Fees
-            const fee = calculatePerpFees(collateral, leverage);
+            const fee = calculatePerpFees(collateral, effectiveLeverage);
             const totalRequired = collateral + fee;
             
             if (userDoc.data().balance < totalRequired) {
@@ -53,13 +56,13 @@ export async function openPerpPositionAction(
             }
 
             // 5. High-Precision Liquidation Price
-            const liqPrice = calculateLiquidationPrice(direction, entryPrice, leverage);
+            const liqPrice = calculateLiquidationPrice(direction, entryPrice, effectiveLeverage);
             
             // Check for immediate liquidation (Spread vs Initial Margin vs MM)
             let initialStatus: PerpPosition['status'] = 'open';
-            let realizedPnL = undefined;
-            let exitPrice = undefined;
-            let closedAt = undefined;
+            let realizedPnL: number | null = null;
+            let exitPrice: number | null = null;
+            let closedAt: any = null;
 
             const isImmediatelyLiquidated = direction === 'LONG' 
                 ? currentPriceNgn <= liqPrice 
@@ -69,7 +72,7 @@ export async function openPerpPositionAction(
                 initialStatus = 'liquidated';
                 realizedPnL = -collateral;
                 exitPrice = currentPriceNgn;
-                closedAt = serverTimestamp() as any;
+                closedAt = serverTimestamp();
             }
 
             const positionRef = doc(collection(firestore, `users/${userId}/perpPositions`));
@@ -79,10 +82,10 @@ export async function openPerpPositionAction(
                 tickerName: market.symbol,
                 tickerIcon: market.icon,
                 direction,
-                leverage,
+                leverage: effectiveLeverage,
                 collateral,
                 entryPrice,
-                entryValue: collateral * leverage,
+                entryValue: collateral * effectiveLeverage,
                 liquidationPrice: liqPrice,
                 status: initialStatus,
                 realizedPnL,
@@ -101,7 +104,7 @@ export async function openPerpPositionAction(
         return { success: true, ...result };
     } catch (error: any) {
         console.error('Failed to open perp:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: error.message || 'Trade failed due to invalid data' };
     }
 }
 
