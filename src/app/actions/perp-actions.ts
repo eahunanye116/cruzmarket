@@ -205,7 +205,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
                     status: 'liquidated', 
                     closedAt: serverTimestamp(),
                     exitPrice: currentPriceNgn,
-                    realizedPnL: -posData.collateral // Entire collateral is lost
+                    realizedPnL: -posData.collateral 
                 });
             });
             revalidatePath('/perps');
@@ -222,6 +222,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
 /**
  * GLOBAL SWEEP UTILITY
  * Scans all open positions and processes liquidations.
+ * Optimized for cron usage.
  */
 export async function sweepAllLiquidationsAction() {
     const firestore = getFirestoreInstance();
@@ -229,15 +230,28 @@ export async function sweepAllLiquidationsAction() {
         const q = query(collectionGroup(firestore, 'perpPositions'), where('status', '==', 'open'));
         const snap = await getDocs(q);
         
-        let count = 0;
-        for (const docSnap of snap.docs) {
-            const data = docSnap.data() as PerpPosition;
-            const res = await checkAndLiquidatePosition(data.userId, docSnap.id);
-            if (res.success && res.liquidated) count++;
+        if (snap.empty) {
+            return { success: true, message: 'No open positions to audit.' };
         }
+
+        let count = 0;
+        const auditPromises = snap.docs.map(async (docSnap) => {
+            const data = docSnap.data() as PerpPosition;
+            // The parent of the subcollection is the user doc
+            const userId = docSnap.ref.parent.parent?.id;
+            if (!userId) return;
+
+            const res = await checkAndLiquidatePosition(userId, docSnap.id);
+            if (res.success && res.liquidated) {
+                count++;
+            }
+        });
+
+        await Promise.allSettled(auditPromises);
         
         return { success: true, message: `Audit complete. ${count} positions liquidated.` };
     } catch (e: any) {
+        console.error('[Sweep] Global sweep failed:', e);
         return { success: false, error: e.message };
     }
 }
