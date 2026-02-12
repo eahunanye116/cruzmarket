@@ -14,7 +14,7 @@ export const MAINTENANCE_MARGIN_RATE = 0.0005; // 0.05% of position value requir
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
- * Uses multiple fallback endpoints to bypass cloud provider IP restrictions.
+ * Uses multiple fallback endpoints and browser headers to bypass cloud provider IP restrictions.
  * Returns USD price.
  */
 export async function getLiveCryptoPrice(pair: string): Promise<number> {
@@ -28,16 +28,29 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
     const cleanPair = pair.toUpperCase().trim();
     let lastError = null;
 
+    // Use a browser-like User Agent to avoid being flagged as a bot by cloud filters
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+    };
+
     for (const baseUrl of endpoints) {
         try {
             const url = `${baseUrl}/api/v3/ticker/price?symbol=${cleanPair}`;
+            
             const response = await fetch(url, {
+                method: 'GET',
+                headers: headers,
                 next: { revalidate: 0 },
                 cache: 'no-store',
-                signal: AbortSignal.timeout(3000) // 3s timeout per attempt
+                signal: AbortSignal.timeout(6000) // Increased to 6s for better stability in cloud environments
             });
             
-            if (!response.ok) continue;
+            if (!response.ok) {
+                console.warn(`[Oracle] Endpoint ${baseUrl} returned ${response.status}`);
+                continue;
+            }
 
             const data = await response.json();
             const price = parseFloat(data.price);
@@ -53,7 +66,7 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
     }
 
     console.error(`[Oracle] Critical: All endpoints failed for ${cleanPair}. Last error: ${lastError}`);
-    throw new Error("Arena connectivity issues. The market oracle is currently unreachable from this region.");
+    throw new Error("Arena connectivity issues. The market oracle is currently unreachable from this region. Please try again in a few moments.");
 }
 
 /**
