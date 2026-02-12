@@ -3,15 +3,20 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, Trophy } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, Zap, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
   { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-6 w-6" /> },
-  { href: '/transactions', label: 'Wallet', icon: <History className="h-6 w-6" /> },
 ];
 
 export function BottomNav() {
@@ -57,6 +62,40 @@ export function BottomNav() {
             </Link>
           );
         })}
+
+        {/* More Menu Button */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors outline-none',
+                ['/perps', '/transactions', '/blog'].includes(pathname)
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-primary'
+              )}
+            >
+              <MoreVertical className="h-6 w-6" />
+              More
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 mb-4 border-2 shadow-hard-md">
+            <DropdownMenuItem asChild>
+              <Link href="/perps" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
+                <Zap className="h-4 w-4 text-primary" /> Leverage Perps
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/transactions" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
+                <History className="h-4 w-4 text-primary" /> My Wallet
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/blog" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
+                <TrendingUp className="h-4 w-4 text-primary" /> Market Trends
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </nav>
   );
