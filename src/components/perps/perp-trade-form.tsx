@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -54,8 +55,8 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
             toast({ variant: 'destructive', title: 'Auth Required', description: 'Sign in to trade.' });
             return;
         }
-        if (lots <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Size', description: 'Enter lot size.' });
+        if (lots < 1) {
+            toast({ variant: 'destructive', title: 'Invalid Size', description: 'Minimum 1 Lot required.' });
             return;
         }
         if (totalRequiredNgn > (profile?.balance ?? 0)) {
@@ -106,7 +107,9 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                             type="number" 
                             value={lotsInput} 
                             onChange={(e) => setLotsInput(e.target.value)}
-                            placeholder="1.0"
+                            placeholder="1"
+                            min="1"
+                            step="1"
                             className="font-bold h-12 text-xl border-2"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -147,7 +150,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                 <Button 
                     className={cn("w-full h-14 text-lg font-headline shadow-hard-md", direction === 'LONG' ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground")} 
                     onClick={handleTrade}
-                    disabled={isSubmitting || lots <= 0}
+                    disabled={isSubmitting || lots < 1}
                 >
                     {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : (direction === 'LONG' ? <TrendingUp className="mr-2 h-5 w-5" /> : <TrendingDown className="mr-2 h-5 w-5" />)}
                     {direction === 'LONG' ? `BUY LONG ${pair.symbol}` : `SELL SHORT ${pair.symbol}`}

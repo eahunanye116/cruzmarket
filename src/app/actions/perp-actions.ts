@@ -67,6 +67,8 @@ export async function openPerpPositionAction(
     leverage: number,
     direction: 'LONG' | 'SHORT'
 ) {
+    if (lots < 1) throw new Error("Minimum trade size is 1 Lot.");
+    
     const firestore = getFirestoreInstance();
     const effectiveLeverage = Math.min(leverage, 400);
     
