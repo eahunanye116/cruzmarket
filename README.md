@@ -7,29 +7,46 @@ CruzMarket isn't just another trading platform—it's a high-octane arena where 
 
 ---
 
-## 🛠 Production Worker Setup (Google Cloud Scheduler)
+## 🔥 Professional Perpetual Worker (Cloud Run)
 
-To ensure leveraged positions are liquidated in real-time even when no one is using the site, you must configure a **Cloud Scheduler** job.
+For high-leverage perpetual trading (400x), standard 1-minute cron jobs are too slow. We provide a dedicated worker script that runs every 10 seconds.
+
+### 1. Requirements
+Ensure your `NEXT_PUBLIC_FIREBASE_API_KEY` and other credentials are set in the environment where the worker runs.
+
+### 2. Local/VPS Run
+To run the worker manually on a server:
+```bash
+npm run worker:liquidate
+```
+
+### 3. Production (Google Cloud Run)
+1.  **Dockerize**: Create a Dockerfile that installs dependencies and runs `npm run worker:liquidate`.
+2.  **Deploy**: Deploy to **Google Cloud Run** as a "Service".
+3.  **Config**: Ensure "Always Allocate CPU" is enabled so the `setInterval` loop stays active.
+
+---
+
+## 🛠 Backup Cron Setup (Google Cloud Scheduler)
+
+Use this as a fallback if your primary worker is offline.
 
 ### 1. Set Security Secret
 In your **Vercel/App Hosting Dashboard**, add a new environment variable:
-*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod` (Generated and stored in your local .env).
+*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod`
 
 ### 2. Configure Cloud Scheduler
 1.  Go to **Google Cloud Console** > **Cloud Scheduler**.
 2.  Create a new job:
-    *   **Name**: `perp-liquidation-sweep`
     *   **Frequency**: `* * * * *` (Every minute)
     *   **URL**: `https://cruzmarket.fun/api/cron/liquidate`
-    *   **HTTP Method**: `GET`
-    *   **Auth Header**: `Add Auth Header` > `Bearer Token`.
-    *   **Token**: Use your `CRON_SECRET` value.
+    *   **Auth Header**: `Bearer Token` > `cruz_market_sweep_auth_72819304_prod`
 
 ---
 
 ## 🚀 Critical Production Deployment (Vercel)
 
-If your bot stops working after you close FireStudio, it is because your webhook is still pointing to the temporary studio URL. Follow these steps to fix it permanently:
+If your bot stops working after you close FireStudio, it is because your webhook is still pointing to the temporary studio URL. 
 
 ### 1. Set Environment Variables
 Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and add:
@@ -43,12 +60,6 @@ Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and a
 
 ### 2. Redeploy
 You **must** trigger a new deployment on Vercel after adding variables for them to take effect.
-
-### 3. Finalize Webhook (Crucial)
-1.  Open your **LIVE site** in a browser: `https://cruzmarket.fun`.
-2.  Log in as Admin and go to `/admin`.
-3.  Go to the **Telegram** tab.
-4.  Ensure the URL is your live domain and click **"Set Webhook"**.
 
 ---
 
