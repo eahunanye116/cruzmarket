@@ -13,7 +13,7 @@ To ensure leveraged positions are liquidated in real-time even when no one is us
 
 ### 1. Set Security Secret
 In your **Vercel/App Hosting Dashboard**, add a new environment variable:
-*   `CRON_SECRET`: Choose a long random string (e.g., `xyz_arena_secret_123`).
+*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod` (Generated and stored in your local .env).
 
 ### 2. Configure Cloud Scheduler
 1.  Go to **Google Cloud Console** > **Cloud Scheduler**.
@@ -39,6 +39,7 @@ Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and a
 *   `NOWPAYMENTS_API_KEY`: `299PEWX-X9C4349-NF28N7G-A2FFNYH`
 *   `NOWPAYMENTS_IPN_SECRET`: Your IPN Secret from NowPayments Dashboard > Settings.
 *   `NEXT_PUBLIC_APP_URL`: Set to `https://cruzmarket.fun`.
+*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod`
 
 ### 2. Redeploy
 You **must** trigger a new deployment on Vercel after adding variables for them to take effect.
