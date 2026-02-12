@@ -1,28 +1,41 @@
+
 'use client';
 
-import { useCollection, useFirestore } from '@/firebase';
-import { collection, collectionGroup, query, where, orderBy } from 'firebase/firestore';
-import { PerpPosition, Ticker } from '@/lib/types';
+import { useCollection, useFirestore, useDoc } from '@/firebase';
+import { collection, collectionGroup, query, where, orderBy, doc } from 'firebase/firestore';
+import { PerpPosition, Ticker, PlatformStats } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMemo, useState } from 'react';
-import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw, Info } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw, Info, Activity, ActivityIcon, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { checkAndLiquidatePosition, sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; 
+import { formatDistanceToNow } from 'date-fns';
 
 export function PerpAuditManagement() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [liquidatingId, setLiquidatingId] = useState<string | null>(null);
     const [isSweeping, setIsSweeping] = useState(false);
+    const [now, setNow] = useState(new Date());
 
-    // 1. Fetch all open perpetual positions
+    // Update 'now' every minute for status timers
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // 1. Fetch system health (Platform Stats Heartbeat)
+    const statsRef = firestore ? doc(firestore, 'stats', 'platform') : null;
+    const { data: platformStats } = useDoc<PlatformStats>(statsRef);
+
+    // 2. Fetch all open perpetual positions
     const posQuery = firestore ? query(
         collectionGroup(firestore, 'perpPositions'), 
         where('status', '==', 'open'),
@@ -30,7 +43,7 @@ export function PerpAuditManagement() {
     ) : null;
     const { data: positions, loading: posLoading } = useCollection<PerpPosition>(posQuery);
 
-    // 2. Tickers for price calculation (if any)
+    // 3. Tickers for price calculation (if any)
     const { data: tickers } = useCollection<Ticker>(firestore ? collection(firestore, 'tickers') : null);
 
     const houseExposure = useMemo(() => {
@@ -45,6 +58,18 @@ export function PerpAuditManagement() {
         if (!positions) return 0;
         return positions.reduce((acc, p) => acc + (p.collateral * p.leverage), 0);
     }, [positions]);
+
+    const cronHealth = useMemo(() => {
+        if (!platformStats?.lastPerpSweepAt) return { status: 'UNKNOWN', color: 'text-muted-foreground', icon: Activity };
+        
+        const lastSweep = platformStats.lastPerpSweepAt.toDate();
+        const diffMs = now.getTime() - lastSweep.getTime();
+        const diffMins = diffMs / 60000;
+
+        if (diffMins < 2) return { status: 'HEALTHY', color: 'text-accent', icon: CheckCircle2, sub: 'Sweeper active' };
+        if (diffMins < 10) return { status: 'DELAYED', color: 'text-yellow-500', icon: AlertTriangle, sub: 'Check cron trigger' };
+        return { status: 'OFFLINE', color: 'text-destructive', icon: Zap, sub: 'Sweep stopped' };
+    }, [platformStats, now]);
 
     const handleManualLiquidate = async (userId: string, posId: string) => {
         setLiquidatingId(posId);
@@ -71,7 +96,31 @@ export function PerpAuditManagement() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 w-full">
+                    {/* System Health Heartbeat Card */}
+                    <Card className="border-border">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">System Pulse</CardDescription>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Info className="h-3 w-3 text-muted-foreground cursor-pointer" />
+                                    </PopoverTrigger>
+                                    <PopoverContent className="max-w-[200px]">
+                                        <p className="text-xs">Verifies if the background liquidation cron job is currently running. Green means the system was swept within the last 2 minutes.</p>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className={cn("flex items-center gap-2 text-lg font-bold font-headline", cronHealth.color)}>
+                                <cronHealth.icon className="h-4 w-4" />
+                                {cronHealth.status}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                                {platformStats?.lastPerpSweepAt ? `Last Pulse: ${formatDistanceToNow(platformStats.lastPerpSweepAt.toDate(), { addSuffix: true })}` : 'No pulse detected.'}
+                            </p>
+                        </CardHeader>
+                    </Card>
+
                     <Card className="border-primary/20 bg-primary/5">
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
@@ -93,6 +142,7 @@ export function PerpAuditManagement() {
                             </p>
                         </CardHeader>
                     </Card>
+                    
                     <Card>
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">

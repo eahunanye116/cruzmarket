@@ -1,7 +1,8 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup, setDoc } from 'firebase/firestore';
 import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
 import { calculateLiquidationPrice, getLiveCryptoPrice, CONTRACT_MULTIPLIER, PIP_SPREAD } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
@@ -205,6 +206,12 @@ export async function closePerpPositionAction(userId: string, positionId: string
 export async function sweepAllLiquidationsAction() {
     const firestore = getFirestoreInstance();
     try {
+        // Record heartbeat Pulse
+        const statsRef = doc(firestore, 'stats', 'platform');
+        await setDoc(statsRef, { lastPerpSweepAt: serverTimestamp() }, { merge: true }).catch(err => {
+            console.error("[Sweep Heartbeat] Failed to record pulse:", err);
+        });
+
         const positionsQuery = query(
             collectionGroup(firestore, 'perpPositions'),
             where('status', '==', 'open')

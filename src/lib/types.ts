@@ -203,6 +203,7 @@ export type PlatformStats = {
   totalUserFees: number;
   totalAdminFees: number;
   totalTokensBurned: number;
+  lastPerpSweepAt?: Timestamp;
 };
 
 export type AppNotification = {
