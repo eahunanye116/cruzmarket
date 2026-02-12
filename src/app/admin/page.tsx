@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser } from '@/firebase';
 import { Ban } from 'lucide-react';
@@ -77,20 +76,20 @@ export default function AdminPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Desktop Tabs */}
         <div className="hidden xl:block">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7 xl:grid-cols-13">
-            <TabsTrigger value="tickers">Tickers</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="perp-markets">Perp Markets</TabsTrigger>
-            <TabsTrigger value="perp-audit">Perp Audit</TabsTrigger>
-            <TabsTrigger value="copy-audit">Copy Audit</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="support">Support</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="blog">Blog</TabsTrigger>
-            <TabsTrigger value="telegram">Telegram</TabsTrigger>
-            <TabsTrigger value="privacy">Privacy</TabsTrigger>
-            <TabsTrigger value="x">X</TabsTrigger>
+          <TabsList className="flex flex-wrap w-full h-auto bg-transparent border-b-2 rounded-none p-0 mb-6 gap-2">
+            <TabsTrigger value="tickers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Tickers</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Users</TabsTrigger>
+            <TabsTrigger value="perp-markets" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Perp Markets</TabsTrigger>
+            <TabsTrigger value="perp-audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Perp Audit</TabsTrigger>
+            <TabsTrigger value="copy-audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Copy Audit</TabsTrigger>
+            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Withdrawals</TabsTrigger>
+            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Payments</TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Support</TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Notifications</TabsTrigger>
+            <TabsTrigger value="blog" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Blog</TabsTrigger>
+            <TabsTrigger value="telegram" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Telegram</TabsTrigger>
+            <TabsTrigger value="privacy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Privacy</TabsTrigger>
+            <TabsTrigger value="x" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">X</TabsTrigger>
           </TabsList>
         </div>
 

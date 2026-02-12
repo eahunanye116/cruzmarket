@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useCollection, useFirestore, useDoc } from '@/firebase';
@@ -9,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMemo, useState, useEffect } from 'react';
-import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw, Info, Activity, ActivityIcon, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, TrendingUp, ArrowRight, Loader2, RefreshCcw, Info, Activity, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { checkAndLiquidatePosition, sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
