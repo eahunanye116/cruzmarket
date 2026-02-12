@@ -7,68 +7,44 @@ CruzMarket isn't just another trading platform—it's a high-octane arena where 
 
 ---
 
-## 🔥 Professional Perpetual Worker (Cloud Run)
+## 🔥 Professional Perpetual Worker (Optional)
 
-For high-leverage perpetual trading (400x), standard 1-minute cron jobs are too slow. We provide a dedicated worker script that runs every 10 seconds.
+For high-leverage perpetual trading (400x), standard 1-minute cron jobs might be slow. If you want 10-second updates, you can run the dedicated worker script on a server:
 
-### 1. Requirements
-Ensure your `FIREBASE_SERVICE_ACCOUNT` (or API Key credentials) and `CRON_SECRET` are set in the environment where the worker runs.
-
-### 2. Local/VPS Run
-To run the worker manually on a server:
+### 1. Local/VPS Run
 ```bash
 npm run worker:liquidate
 ```
 
-### 3. Production (Google Cloud Run)
-Deployment flow for a persistent background worker:
-
-1.  **Build Image**:
-    ```bash
-    docker build -t gcr.io/[PROJECT_ID]/perp-worker .
-    ```
-2.  **Push to Registry**:
-    ```bash
-    docker push gcr.io/[PROJECT_ID]/perp-worker
-    ```
-3.  **Deploy to Cloud Run**:
-    *   **Service Name**: `perp-worker`
-    *   **CPU Allocation**: Set to **"CPU is always allocated"** (Crucial for the `setInterval` loop to stay active).
-    *   **Min Instances**: 1 (Ensures the worker never scales to zero).
-    *   **Env Variables**: Add all `.env` secrets (`NEXT_PUBLIC_FIREBASE_API_KEY`, etc.).
+### 2. Google Cloud Run
+Deploy using the provided `Dockerfile`. Set CPU to **"Always Allocated"** to keep the 10-second loop active.
 
 ---
 
-## 🛠 Backup Cron Setup (Google Cloud Scheduler)
+## 🛠 Standard Cron Setup (Google Cloud Scheduler)
 
-Use this as a fallback if your primary worker is offline.
+Use this for reliable, hands-off platform maintenance.
 
-### 1. Set Security Secret
-In your **Vercel/App Hosting Dashboard**, add a new environment variable:
-*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod`
-
-### 2. Configure Cloud Scheduler
+### 1. Configure Cloud Scheduler
 1.  Go to **Google Cloud Console** > **Cloud Scheduler**.
 2.  Create a new job:
     *   **Frequency**: `* * * * *` (Every minute)
-    *   **URL**: `https://cruzmarket.fun/api/cron/liquidate`
-    *   **Auth Header**: `Bearer Token` > `cruz_market_sweep_auth_72819304_prod`
+    *   **URL**: `https://cruzmarket.fun/api/system/sweep-auth-72819304-prod`
+    *   **HTTP Method**: `GET`
+    *   **Auth Header**: None (Endpoint is secured via obscure naming)
 
 ---
 
 ## 🚀 Critical Production Deployment (Vercel)
 
-If your bot stops working after you close FireStudio, it is because your webhook is still pointing to the temporary studio URL. 
+If your bot stops working after you close FireStudio, ensure your variables are set in Vercel:
 
 ### 1. Set Environment Variables
-Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and add:
 *   `TELEGRAM_BOT_TOKEN`: Your token from @BotFather.
 *   `PAYSTACK_SECRET_KEY`: Your secret key from Paystack.
 *   `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`: Your public key from Paystack.
 *   `NOWPAYMENTS_API_KEY`: Your key from NowPayments.
-*   `NOWPAYMENTS_IPN_SECRET`: Your IPN Secret from NowPayments Dashboard > Settings.
 *   `NEXT_PUBLIC_APP_URL`: Set to `https://cruzmarket.fun`.
-*   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod`
 
 ### 2. Redeploy
 You **must** trigger a new deployment on Vercel after adding variables for them to take effect.
