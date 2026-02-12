@@ -7,6 +7,26 @@ CruzMarket isn't just another trading platform—it's a high-octane arena where 
 
 ---
 
+## 🛠 Production Worker Setup (Google Cloud Scheduler)
+
+To ensure leveraged positions are liquidated in real-time even when no one is using the site, you must configure a **Cloud Scheduler** job.
+
+### 1. Set Security Secret
+In your **Vercel/App Hosting Dashboard**, add a new environment variable:
+*   `CRON_SECRET`: Choose a long random string (e.g., `xyz_arena_secret_123`).
+
+### 2. Configure Cloud Scheduler
+1.  Go to **Google Cloud Console** > **Cloud Scheduler**.
+2.  Create a new job:
+    *   **Name**: `perp-liquidation-sweep`
+    *   **Frequency**: `* * * * *` (Every minute)
+    *   **URL**: `https://cruzmarket.fun/api/cron/liquidate`
+    *   **HTTP Method**: `GET`
+    *   **Auth Header**: `Add Auth Header` > `Bearer Token`.
+    *   **Token**: Use your `CRON_SECRET` value.
+
+---
+
 ## 🚀 Critical Production Deployment (Vercel)
 
 If your bot stops working after you close FireStudio, it is because your webhook is still pointing to the temporary studio URL. Follow these steps to fix it permanently:

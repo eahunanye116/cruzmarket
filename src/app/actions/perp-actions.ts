@@ -156,7 +156,7 @@ export async function closePerpPositionAction(userId: string, positionId: string
     }
 }
 
-export async function checkAndLiquidatePosition(userId: string, positionId: string) {
+export async function checkAndLiquidatePosition(userId: string, positionId: string, currentPriceUsd?: number) {
     const firestore = getFirestoreInstance();
     try {
         const positionRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
@@ -165,11 +165,12 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
         const posData = posSnap.data() as PerpPosition;
         if (posData.status !== 'open') return { success: false, error: 'Position not active' };
 
-        const usdPrice = await getLiveCryptoPrice(posData.tickerId);
+        // Use provided price (for workers) or fetch fresh (for manual UI actions)
+        const priceToUse = currentPriceUsd ?? await getLiveCryptoPrice(posData.tickerId);
 
         let isLiquidatable = false;
-        if (posData.direction === 'LONG' && usdPrice <= posData.liquidationPrice) isLiquidatable = true;
-        if (posData.direction === 'SHORT' && usdPrice >= posData.liquidationPrice) isLiquidatable = true;
+        if (posData.direction === 'LONG' && priceToUse <= posData.liquidationPrice) isLiquidatable = true;
+        if (posData.direction === 'SHORT' && priceToUse >= posData.liquidationPrice) isLiquidatable = true;
 
         if (isLiquidatable) {
             await runTransaction(firestore, async (transaction) => {
@@ -180,7 +181,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
                 transaction.update(pRef, { 
                     status: 'liquidated', 
                     closedAt: serverTimestamp(),
-                    exitPrice: usdPrice,
+                    exitPrice: priceToUse,
                     realizedPnL: -posData.collateral 
                 });
             });
@@ -189,6 +190,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
         }
         return { success: true, liquidated: false };
     } catch (e: any) {
+        console.error(`[Liquidation] Failed for pos ${positionId}:`, e.message);
         return { success: false, error: e.message };
     }
 }
@@ -196,6 +198,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
 export async function sweepAllLiquidationsAction() {
     const firestore = getFirestoreInstance();
     try {
+        // Platform-wide scan for open leveraged positions
         const positionsQuery = query(
             collectionGroup(firestore, 'perpPositions'),
             where('status', '==', 'open')
@@ -204,36 +207,45 @@ export async function sweepAllLiquidationsAction() {
         
         if (snapshot.empty) return { success: true, message: 'No open positions.' };
 
+        // 1. Get unique pairs to minimize oracle hits
         const uniquePairs = Array.from(new Set(snapshot.docs.map(d => d.data().tickerId)));
         const prices: Record<string, number> = {};
 
-        for (const pair of uniquePairs) {
+        // 2. Fetch all required prices in parallel
+        await Promise.all(uniquePairs.map(async (pair) => {
             try {
                 prices[pair] = await getLiveCryptoPrice(pair);
             } catch (e) {
-                console.error(`Failed to get price for ${pair}`);
+                console.error(`[Sweep] Failed price fetch for ${pair}`);
             }
-        }
+        }));
 
         let liquidatedCount = 0;
-        for (const posDoc of snapshot.docs) {
+        
+        // 3. Process all liquidations in parallel
+        const liquidationTasks = snapshot.docs.map(async (posDoc) => {
             const pos = posDoc.data() as PerpPosition;
             const currentPriceUsd = prices[pos.tickerId];
-            if (!currentPriceUsd) continue;
+            if (!currentPriceUsd) return;
 
             let isBreached = false;
             if (pos.direction === 'LONG' && currentPriceUsd <= pos.liquidationPrice) isBreached = true;
             if (pos.direction === 'SHORT' && currentPriceUsd >= pos.liquidationPrice) isBreached = true;
 
             if (isBreached) {
-                await checkAndLiquidatePosition(pos.userId, posDoc.id);
-                liquidatedCount++;
+                const res = await checkAndLiquidatePosition(pos.userId, posDoc.id, currentPriceUsd);
+                if (res.success && res.liquidated) {
+                    liquidatedCount++;
+                }
             }
-        }
+        });
+
+        await Promise.all(liquidationTasks);
 
         revalidatePath('/admin');
         return { success: true, message: `Audit complete. ${liquidatedCount} positions liquidated.` };
     } catch (error: any) {
+        console.error('[Sweep] Critical Failure:', error);
         return { success: false, error: error.message };
     }
 }
