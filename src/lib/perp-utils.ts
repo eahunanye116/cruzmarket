@@ -14,31 +14,46 @@ export const MAINTENANCE_MARGIN_RATE = 0.0005; // 0.05% of position value requir
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
+ * Uses multiple fallback endpoints to bypass cloud provider IP restrictions.
  * Returns USD price.
  */
 export async function getLiveCryptoPrice(pair: string): Promise<number> {
-    try {
-        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`, {
-            next: { revalidate: 0 },
-            cache: 'no-store'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Oracle rejected request for symbol: ${pair}`);
-        }
+    const endpoints = [
+        'https://api.binance.com',
+        'https://api1.binance.com',
+        'https://api2.binance.com',
+        'https://api3.binance.com'
+    ];
 
-        const data = await response.json();
-        const price = parseFloat(data.price);
-        
-        if (isNaN(price)) {
-            throw new Error(`Invalid price returned for ${pair}`);
+    const cleanPair = pair.toUpperCase().trim();
+    let lastError = null;
+
+    for (const baseUrl of endpoints) {
+        try {
+            const url = `${baseUrl}/api/v3/ticker/price?symbol=${cleanPair}`;
+            const response = await fetch(url, {
+                next: { revalidate: 0 },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(3000) // 3s timeout per attempt
+            });
+            
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            const price = parseFloat(data.price);
+            
+            if (!isNaN(price) && price > 0) {
+                return price;
+            }
+        } catch (error: any) {
+            lastError = error.message;
+            console.warn(`[Oracle] Failed attempt at ${baseUrl}:`, lastError);
+            continue;
         }
-        
-        return price;
-    } catch (error: any) {
-        console.error("ORACLE_FETCH_ERROR:", error.message);
-        throw new Error("Market data unavailable. Please try again in a few seconds.");
     }
+
+    console.error(`[Oracle] Critical: All endpoints failed for ${cleanPair}. Last error: ${lastError}`);
+    throw new Error("Arena connectivity issues. The market oracle is currently unreachable from this region.");
 }
 
 /**
