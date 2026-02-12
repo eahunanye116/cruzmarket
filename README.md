@@ -7,37 +7,18 @@ CruzMarket isn't just another trading platform—it's a high-octane arena where 
 
 ---
 
-## 🔥 Professional Perpetual Worker (Optional)
+## 🛠 Standard System Maintenance
 
-For high-leverage perpetual trading (400x), standard 1-minute cron jobs might be slow. If you want 10-second updates, you can run the dedicated worker script on a server:
+Reliable, hands-off platform maintenance via scheduled jobs.
 
-### 1. Local/VPS Run
-```bash
-npm run worker:liquidate
-```
-
-### 2. Google Cloud Run
-Deploy using the provided `Dockerfile`. Set CPU to **"Always Allocated"** to keep the 10-second loop active.
-
----
-
-## 🛠 Standard Cron Setup (Google Cloud Scheduler)
-
-Use this for reliable, hands-off platform maintenance.
-
-### 1. Configure Cloud Scheduler
-1.  Go to **Google Cloud Console** > **Cloud Scheduler**.
-2.  Create a new job:
-    *   **Frequency**: `* * * * *` (Every minute)
-    *   **URL**: `https://cruzmarket.fun/api/system/sweep-auth-72819304-prod`
-    *   **HTTP Method**: `GET`
-    *   **Auth Header**: None (Endpoint is secured via obscure naming)
+### 1. Configure System Sweeper (Optional)
+If specific periodic tasks are needed, use a scheduler to trigger designated endpoints.
 
 ---
 
 ## 🚀 Critical Production Deployment (Vercel)
 
-If your bot stops working after you close FireStudio, ensure your variables are set in Vercel:
+Ensure your environment variables are correctly set in Vercel for full functionality:
 
 ### 1. Set Environment Variables
 *   `TELEGRAM_BOT_TOKEN`: Your token from @BotFather.

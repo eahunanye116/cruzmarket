@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, Zap, TrendingUp } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   DropdownMenu,
@@ -69,7 +69,7 @@ export function BottomNav() {
             <button
               className={cn(
                 'flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors outline-none',
-                ['/perps', '/transactions', '/blog'].includes(pathname)
+                ['/transactions', '/blog'].includes(pathname)
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-primary'
               )}
@@ -79,11 +79,6 @@ export function BottomNav() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 mb-4 border-2 shadow-hard-md">
-            <DropdownMenuItem asChild>
-              <Link href="/perps" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
-                <Zap className="h-4 w-4 text-primary" /> Leverage Perps
-              </Link>
-            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/transactions" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
                 <History className="h-4 w-4 text-primary" /> My Wallet
