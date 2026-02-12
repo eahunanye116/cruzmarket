@@ -8,8 +8,10 @@ import { sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
  * Schedule: Every minute (* * * * *)
  * 
  * SECURITY: Requires a 'CRON_SECRET' environment variable and a Bearer token.
+ * SUPPORTED METHODS: GET, POST
  */
-export async function GET(req: NextRequest) {
+
+async function handleSweep(req: NextRequest) {
     const authHeader = req.headers.get('authorization');
     const secret = process.env.CRON_SECRET;
 
@@ -41,6 +43,14 @@ export async function GET(req: NextRequest) {
             error: error.message 
         }, { status: 500 });
     }
+}
+
+export async function GET(req: NextRequest) {
+    return handleSweep(req);
+}
+
+export async function POST(req: NextRequest) {
+    return handleSweep(req);
 }
 
 // Ensure Vercel/NextJS doesn't cache this request

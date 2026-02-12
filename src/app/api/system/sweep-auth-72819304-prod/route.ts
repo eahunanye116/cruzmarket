@@ -8,8 +8,10 @@ import { sweepAllLiquidationsAction } from '@/app/actions/perp-actions';
  * Schedule: Every minute (* * * * *)
  * 
  * SECURITY: Secured via an obscure URL path.
+ * SUPPORTED METHODS: GET, POST
  */
-export async function GET(req: NextRequest) {
+
+async function handleSweep() {
     try {
         console.log('[Cron] Starting Global Liquidation Sweep via Obscure Route...');
         const result = await sweepAllLiquidationsAction();
@@ -33,6 +35,14 @@ export async function GET(req: NextRequest) {
             error: error.message 
         }, { status: 500 });
     }
+}
+
+export async function GET(req: NextRequest) {
+    return handleSweep();
+}
+
+export async function POST(req: NextRequest) {
+    return handleSweep();
 }
 
 // Ensure Vercel/NextJS doesn't cache this request
