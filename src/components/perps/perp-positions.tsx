@@ -13,10 +13,9 @@ import { closePerpPositionAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/use-currency';
-import { getLiveCryptoPrice, CONTRACT_MULTIPLIER, calculatePnL } from '@/lib/perp-utils';
+import { getLiveCryptoPrice, calculatePnL } from '@/lib/perp-utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
-import { Progress } from '@/components/ui/progress';
 
 export function PerpPositions() {
     const user = useUser();
@@ -146,7 +145,7 @@ export function PerpPositions() {
                                             <TableHead className="pl-6">Market</TableHead>
                                             <TableHead>Lev</TableHead>
                                             <TableHead>Net PnL</TableHead>
-                                            <TableHead>Risk / Liq</TableHead>
+                                            <TableHead>Liquidation</TableHead>
                                             <TableHead className="text-right pr-6">Action</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -160,10 +159,6 @@ export function PerpPositions() {
                                             const priceDiffUsd = pos.direction === 'LONG' ? (currentPriceUsd - pos.entryPrice) : (pos.entryPrice - currentPriceUsd);
                                             const pnlPercent = (priceDiffUsd / pos.entryPrice) * pos.leverage * 100;
                                             const isProfit = realizedPnlUsd >= 0;
-
-                                            const totalDistance = Math.abs(pos.liquidationPrice - pos.entryPrice) || 1;
-                                            const currentDistance = Math.abs(pos.liquidationPrice - currentPriceUsd);
-                                            const riskFactor = Math.max(0, Math.min(100, (1 - (currentDistance / totalDistance)) * 100));
 
                                             return (
                                                 <TableRow key={pos.id} className="hover:bg-muted/5 border-b-2">
@@ -186,28 +181,20 @@ export function PerpPositions() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="flex flex-col gap-1 w-24">
-                                                            <div className="flex justify-between items-center text-[9px] font-bold">
-                                                                <span className="text-muted-foreground">RISK</span>
-                                                                <span className={cn(riskFactor > 80 ? "text-destructive" : riskFactor > 50 ? "text-yellow-500" : "text-accent")}>
-                                                                    {riskFactor.toFixed(0)}%
-                                                                </span>
-                                                            </div>
-                                                            <Progress value={riskFactor} className="h-1" />
-                                                            <span className="text-[9px] text-muted-foreground font-mono">Liq: {displayPrice(pos.liquidationPrice)}</span>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Liquidation Price</span>
+                                                            <span className="text-xs font-mono font-bold text-destructive">{displayPrice(pos.liquidationPrice)}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right pr-6">
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="outline" 
-                                                            className="h-8 border-2 font-bold px-3"
+                                                        <button 
                                                             onClick={() => handleClose(pos.id)}
                                                             disabled={closingId === pos.id}
+                                                            className="inline-flex items-center justify-center rounded-md text-xs font-bold h-8 px-3 border-2 border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
                                                         >
                                                             {closingId === pos.id ? <Loader2 className="animate-spin h-3 w-3" /> : <XCircle className="h-3 w-3 mr-1.5" />}
                                                             Close
-                                                        </Button>
+                                                        </button>
                                                     </TableCell>
                                                 </TableRow>
                                             );
