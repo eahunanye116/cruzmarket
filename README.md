@@ -12,7 +12,7 @@ CruzMarket isn't just another trading platform—it's a high-octane arena where 
 For high-leverage perpetual trading (400x), standard 1-minute cron jobs are too slow. We provide a dedicated worker script that runs every 10 seconds.
 
 ### 1. Requirements
-Ensure your `NEXT_PUBLIC_FIREBASE_API_KEY` and other credentials are set in the environment where the worker runs.
+Ensure your `FIREBASE_SERVICE_ACCOUNT` (or API Key credentials) and `CRON_SECRET` are set in the environment where the worker runs.
 
 ### 2. Local/VPS Run
 To run the worker manually on a server:
@@ -21,9 +21,21 @@ npm run worker:liquidate
 ```
 
 ### 3. Production (Google Cloud Run)
-1.  **Dockerize**: Create a Dockerfile that installs dependencies and runs `npm run worker:liquidate`.
-2.  **Deploy**: Deploy to **Google Cloud Run** as a "Service".
-3.  **Config**: Ensure "Always Allocate CPU" is enabled so the `setInterval` loop stays active.
+Deployment flow for a persistent background worker:
+
+1.  **Build Image**:
+    ```bash
+    docker build -t gcr.io/[PROJECT_ID]/perp-worker .
+    ```
+2.  **Push to Registry**:
+    ```bash
+    docker push gcr.io/[PROJECT_ID]/perp-worker
+    ```
+3.  **Deploy to Cloud Run**:
+    *   **Service Name**: `perp-worker`
+    *   **CPU Allocation**: Set to **"CPU is always allocated"** (Crucial for the `setInterval` loop to stay active).
+    *   **Min Instances**: 1 (Ensures the worker never scales to zero).
+    *   **Env Variables**: Add all `.env` secrets (`NEXT_PUBLIC_FIREBASE_API_KEY`, etc.).
 
 ---
 
@@ -53,7 +65,7 @@ Go to your **Vercel Dashboard** > **Settings** > **Environment Variables** and a
 *   `TELEGRAM_BOT_TOKEN`: Your token from @BotFather.
 *   `PAYSTACK_SECRET_KEY`: Your secret key from Paystack.
 *   `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`: Your public key from Paystack.
-*   `NOWPAYMENTS_API_KEY`: `299PEWX-X9C4349-NF28N7G-A2FFNYH`
+*   `NOWPAYMENTS_API_KEY`: Your key from NowPayments.
 *   `NOWPAYMENTS_IPN_SECRET`: Your IPN Secret from NowPayments Dashboard > Settings.
 *   `NEXT_PUBLIC_APP_URL`: Set to `https://cruzmarket.fun`.
 *   `CRON_SECRET`: `cruz_market_sweep_auth_72819304_prod`
