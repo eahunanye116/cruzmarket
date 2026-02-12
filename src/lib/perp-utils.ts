@@ -3,17 +3,18 @@
  * 
  * EXCHANGE STANDARDS:
  * - 1 Lot = 0.01 Units of underlying asset.
- * - $100.00 price movement = $1.00 Profit/Loss per Lot.
+ * - $100.00 USD price movement = $1.00 USD Profit/Loss per Lot.
  * - Multiplier = 0.01.
- * - Spread = 110 Pips ($1.10 cost per lot on entry).
+ * - Spread = 110 Pips ($1.10 USD cost per lot on entry).
  */
 
 export const CONTRACT_MULTIPLIER = 0.01; // 1 Lot = 0.01 units
 export const PIP_SPREAD = 110; // 110 Pips ($1.10 USD per Lot)
-export const MAINTENANCE_MARGIN_RATE = 0.0005; // 0.05% of position value required (Supports up to 1000x)
+export const MAINTENANCE_MARGIN_RATE = 0.0005; // 0.05% of position value required
 
 /**
  * Fetches the current price for a crypto pair from the Binance Oracle.
+ * Returns USD price.
  */
 export async function getLiveCryptoPrice(pair: string): Promise<number> {
     try {
@@ -41,54 +42,42 @@ export async function getLiveCryptoPrice(pair: string): Promise<number> {
 }
 
 /**
- * Standardized Profit/Loss Calculation.
- * PnL = (Current Price - Entry Price) * Lots * Multiplier
+ * Standardized Profit/Loss Calculation in USD.
+ * PnL = (Mark Price - Entry Price) * Lots * Multiplier
  */
 export function calculatePnL(
     direction: 'LONG' | 'SHORT',
-    entryPrice: number,
-    currentPrice: number,
+    entryPriceUsd: number,
+    currentPriceUsd: number,
     lots: number
 ): number {
-    const diff = direction === 'LONG' ? currentPrice - entryPrice : entryPrice - currentPrice;
+    const diff = direction === 'LONG' 
+        ? currentPriceUsd - entryPriceUsd 
+        : entryPriceUsd - currentPriceUsd;
     return diff * lots * CONTRACT_MULTIPLIER;
 }
 
 /**
- * Applies the market-making spread (110 Pips).
- */
-export function getSpreadAdjustedPrice(price: number, direction: 'LONG' | 'SHORT', isClosing: boolean = false): number {
-    // Spread is 110 Pips ($1.10 USD). 
-    const spreadValue = PIP_SPREAD; 
-    
-    if (direction === 'LONG') {
-        return isClosing ? price - (spreadValue / 2) : price + spreadValue;
-    } else {
-        return isClosing ? price + (spreadValue / 2) : price - spreadValue;
-    }
-}
-
-/**
  * Calculates the liquidation price based on maintenance margin.
- * Position is liquidated when Equity (Margin + PnL) < Maintenance Margin.
+ * Operates entirely in USD.
  */
 export function calculateLiquidationPrice(
     direction: 'LONG' | 'SHORT',
-    entryPrice: number,
+    entryPriceUsd: number,
     leverage: number,
     lots: number
 ): number {
-    const positionValue = entryPrice * lots * CONTRACT_MULTIPLIER;
-    const margin = positionValue / leverage;
-    const mm = positionValue * MAINTENANCE_MARGIN_RATE;
+    const positionValueUsd = entryPriceUsd * lots * CONTRACT_MULTIPLIER;
+    const marginUsd = positionValueUsd / leverage;
+    const mmUsd = positionValueUsd * MAINTENANCE_MARGIN_RATE;
     
     // Max loss allowed before MM breach = margin - mm
-    const maxLoss = margin - mm;
-    const priceMoveAllowed = maxLoss / (lots * CONTRACT_MULTIPLIER);
+    const maxLossUsd = marginUsd - mmUsd;
+    const priceMoveAllowed = maxLossUsd / (lots * CONTRACT_MULTIPLIER);
 
     if (direction === 'LONG') {
-        return Math.max(0, entryPrice - priceMoveAllowed);
+        return Math.max(0, entryPriceUsd - priceMoveAllowed);
     } else {
-        return entryPrice + priceMoveAllowed;
+        return entryPriceUsd + priceMoveAllowed;
     }
 }

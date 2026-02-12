@@ -3,7 +3,7 @@
 import { getFirestoreInstance } from '@/firebase/server';
 import { doc, collection, runTransaction, serverTimestamp, increment, DocumentReference, getDoc, getDocs, query, where, collectionGroup } from 'firebase/firestore';
 import type { UserProfile, PerpPosition, PerpMarket } from '@/lib/types';
-import { calculateLiquidationPrice, getSpreadAdjustedPrice, getLiveCryptoPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
+import { calculateLiquidationPrice, getLiveCryptoPrice, CONTRACT_MULTIPLIER, PIP_SPREAD } from '@/lib/perp-utils';
 import { revalidatePath } from 'next/cache';
 import { getLatestUsdNgnRate } from './wallet-actions';
 
@@ -15,7 +15,6 @@ export async function openPerpPositionAction(
     direction: 'LONG' | 'SHORT'
 ) {
     const firestore = getFirestoreInstance();
-    // Maximum leverage supported by the engine - UPDATED to 400x
     const effectiveLeverage = Math.min(leverage, 400);
     
     try {
@@ -29,21 +28,19 @@ export async function openPerpPositionAction(
             getLatestUsdNgnRate()
         ]);
         
-        const currentPriceNgn = usdPrice * ngnRate;
+        // APPLY SPREAD (USD points)
+        // 110 Pips means you enter $110 away from the mark price
+        const entryPriceUsd = direction === 'LONG' ? usdPrice + PIP_SPREAD : usdPrice - PIP_SPREAD;
         
-        // Convert USD Spread to NGN (110 Pips)
-        const spreadNgn = 110 * ngnRate; 
-        const entryPriceNgn = direction === 'LONG' ? currentPriceNgn + spreadNgn : currentPriceNgn - spreadNgn;
-        
-        const positionValueNgn = entryPriceNgn * lots * CONTRACT_MULTIPLIER;
-        const requiredMarginNgn = positionValueNgn / effectiveLeverage;
+        // Math is done in USD then converted to NGN for balance
+        const positionValueUsd = entryPriceUsd * lots * CONTRACT_MULTIPLIER;
+        const requiredMarginNgn = (positionValueUsd * ngnRate) / effectiveLeverage;
         
         // Fee is 0.1% of contract value
-        const feeNgn = positionValueNgn * 0.001;
+        const feeNgn = (positionValueUsd * ngnRate) * 0.001;
         const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-        // CRITICAL: NaN/Finite Guard to prevent Firestore corruption
-        if (!Number.isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn) || !Number.isFinite(entryPriceNgn)) {
+        if (!Number.isFinite(totalRequiredNgn) || isNaN(totalRequiredNgn) || !Number.isFinite(entryPriceUsd)) {
             throw new Error("Market pricing error. Please wait for oracle sync.");
         }
 
@@ -59,12 +56,13 @@ export async function openPerpPositionAction(
                 throw new Error(`Insufficient balance. Required: ₦${totalRequiredNgn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
             }
 
-            const liqPriceNgn = calculateLiquidationPrice(direction, entryPriceNgn, effectiveLeverage, lots);
+            const liqPriceUsd = calculateLiquidationPrice(direction, entryPriceUsd, effectiveLeverage, lots);
             
+            // Liquidation check based on Mark Price (current oracle)
             let initialStatus: PerpPosition['status'] = 'open';
             const isImmediatelyLiquidated = direction === 'LONG' 
-                ? currentPriceNgn <= liqPriceNgn 
-                : currentPriceNgn >= liqPriceNgn;
+                ? usdPrice <= liqPriceUsd 
+                : usdPrice >= liqPriceUsd;
 
             if (isImmediatelyLiquidated) {
                 initialStatus = 'liquidated';
@@ -79,13 +77,13 @@ export async function openPerpPositionAction(
                 direction,
                 leverage: effectiveLeverage,
                 lots,
-                collateral: requiredMarginNgn,
-                entryPrice: entryPriceNgn,
-                entryValue: positionValueNgn,
-                liquidationPrice: liqPriceNgn,
+                collateral: requiredMarginNgn, // Locked NGN
+                entryPrice: entryPriceUsd,    // Stored in USD
+                entryValue: positionValueUsd * ngnRate, 
+                liquidationPrice: liqPriceUsd, // Stored in USD
                 status: initialStatus,
                 createdAt: serverTimestamp() as any,
-                exitPrice: isImmediatelyLiquidated ? currentPriceNgn : null,
+                exitPrice: isImmediatelyLiquidated ? usdPrice : null,
                 realizedPnL: isImmediatelyLiquidated ? -requiredMarginNgn : null,
                 closedAt: isImmediatelyLiquidated ? serverTimestamp() as any : null
             };
@@ -118,26 +116,22 @@ export async function closePerpPositionAction(userId: string, positionId: string
             getLiveCryptoPrice(posData.tickerId),
             getLatestUsdNgnRate()
         ]);
-        const currentPriceNgn = usdPrice * ngnRate;
 
-        // Apply Closing Spread (Half of 110 Pips in NGN)
-        const spreadNgn = 55 * ngnRate;
-        const exitPriceNgn = posData.direction === 'LONG' ? currentPriceNgn - spreadNgn : currentPriceNgn + spreadNgn;
+        // When closing, we give the user the Mark Price (no extra closing spread for now to keep it simple)
+        // PnL = (Exit - Entry) * Lots * Multiplier
+        const priceDiffUsd = posData.direction === 'LONG' 
+            ? usdPrice - posData.entryPrice 
+            : posData.entryPrice - usdPrice;
+        
+        const realizedPnlNgn = (priceDiffUsd * posData.lots * CONTRACT_MULTIPLIER) * ngnRate;
+        const totalToReturn = Math.max(0, posData.collateral + realizedPnlNgn);
+
+        if (!Number.isFinite(totalToReturn) || isNaN(totalToReturn)) throw new Error("Closure price invalid.");
 
         const result = await runTransaction(firestore, async (transaction) => {
             const pRef = doc(firestore, `users/${userId}/perpPositions`, positionId);
             const pDoc = await transaction.get(pRef);
             if (!pDoc.exists() || pDoc.data().status !== 'open') throw new Error('Position invalid.');
-
-            const priceDiffNgn = posData.direction === 'LONG' 
-                ? exitPriceNgn - posData.entryPrice 
-                : posData.entryPrice - exitPriceNgn;
-            
-            const realizedPnlNgn = priceDiffNgn * posData.lots * CONTRACT_MULTIPLIER;
-            const totalToReturn = Math.max(0, posData.collateral + realizedPnlNgn);
-
-            // NAN GUARD
-            if (!Number.isFinite(totalToReturn) || isNaN(totalToReturn)) throw new Error("Closure price invalid.");
 
             const userRef = doc(firestore, 'users', userId);
             transaction.update(userRef, { 
@@ -148,7 +142,7 @@ export async function closePerpPositionAction(userId: string, positionId: string
             transaction.update(pRef, {
                 status: 'closed',
                 closedAt: serverTimestamp(),
-                exitPrice: exitPriceNgn,
+                exitPrice: usdPrice,
                 realizedPnL: realizedPnlNgn
             });
 
@@ -171,15 +165,11 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
         const posData = posSnap.data() as PerpPosition;
         if (posData.status !== 'open') return { success: false, error: 'Position not active' };
 
-        const [usdPrice, ngnRate] = await Promise.all([
-            getLiveCryptoPrice(posData.tickerId),
-            getLatestUsdNgnRate()
-        ]);
-        const currentPriceNgn = usdPrice * ngnRate;
+        const usdPrice = await getLiveCryptoPrice(posData.tickerId);
 
         let isLiquidatable = false;
-        if (posData.direction === 'LONG' && currentPriceNgn <= posData.liquidationPrice) isLiquidatable = true;
-        if (posData.direction === 'SHORT' && currentPriceNgn >= posData.liquidationPrice) isLiquidatable = true;
+        if (posData.direction === 'LONG' && usdPrice <= posData.liquidationPrice) isLiquidatable = true;
+        if (posData.direction === 'SHORT' && usdPrice >= posData.liquidationPrice) isLiquidatable = true;
 
         if (isLiquidatable) {
             await runTransaction(firestore, async (transaction) => {
@@ -190,7 +180,7 @@ export async function checkAndLiquidatePosition(userId: string, positionId: stri
                 transaction.update(pRef, { 
                     status: 'liquidated', 
                     closedAt: serverTimestamp(),
-                    exitPrice: currentPriceNgn,
+                    exitPrice: usdPrice,
                     realizedPnL: -posData.collateral 
                 });
             });
@@ -215,13 +205,11 @@ export async function sweepAllLiquidationsAction() {
         if (snapshot.empty) return { success: true, message: 'No open positions.' };
 
         const uniquePairs = Array.from(new Set(snapshot.docs.map(d => d.data().tickerId)));
-        const ngnRate = await getLatestUsdNgnRate();
         const prices: Record<string, number> = {};
 
         for (const pair of uniquePairs) {
             try {
-                const usd = await getLiveCryptoPrice(pair);
-                prices[pair] = usd * ngnRate;
+                prices[pair] = await getLiveCryptoPrice(pair);
             } catch (e) {
                 console.error(`Failed to get price for ${pair}`);
             }
@@ -230,12 +218,12 @@ export async function sweepAllLiquidationsAction() {
         let liquidatedCount = 0;
         for (const posDoc of snapshot.docs) {
             const pos = posDoc.data() as PerpPosition;
-            const currentPrice = prices[pos.tickerId];
-            if (!currentPrice) continue;
+            const currentPriceUsd = prices[pos.tickerId];
+            if (!currentPriceUsd) continue;
 
             let isBreached = false;
-            if (pos.direction === 'LONG' && currentPrice <= pos.liquidationPrice) isBreached = true;
-            if (pos.direction === 'SHORT' && currentPrice >= pos.liquidationPrice) isBreached = true;
+            if (pos.direction === 'LONG' && currentPriceUsd <= pos.liquidationPrice) isBreached = true;
+            if (pos.direction === 'SHORT' && currentPriceUsd >= pos.liquidationPrice) isBreached = true;
 
             if (isBreached) {
                 await checkAndLiquidatePosition(pos.userId, posDoc.id);

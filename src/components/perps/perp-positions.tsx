@@ -13,7 +13,7 @@ import { closePerpPositionAction } from '@/app/actions/perp-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/use-currency';
-import { getLiveCryptoPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
+import { getLiveCryptoPrice, CONTRACT_MULTIPLIER, calculatePnL } from '@/lib/perp-utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDistanceToNow } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
@@ -22,16 +22,14 @@ export function PerpPositions() {
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { formatAmount, exchangeRate } = useCurrency();
+    const { formatAmount, exchangeRate, currency } = useCurrency();
     
     const [closingId, setClosingId] = useState<string | null>(null);
     const [openPositionsRaw, setOpenPositionsRaw] = useState<PerpPosition[]>([]);
     const [historyPositionsRaw, setHistoryPositionsRaw] = useState<PerpPosition[]>([]);
     const [loading, setLoading] = useState(true);
-    const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+    const [livePricesUsd, setLivePricesUsd] = useState<Record<string, number>>({});
 
-    // Fetch Open Positions - Avoiding orderBy on serverTimestamp fields in real-time listeners
-    // to prevent Firestore SDK internal assertion failures.
     useEffect(() => {
         if (!user || !firestore) {
             setLoading(false);
@@ -48,7 +46,6 @@ export function PerpPositions() {
         return () => unsub();
     }, [user, firestore]);
 
-    // Fetch Trade History
     useEffect(() => {
         if (!user || !firestore) return;
         const q = query(
@@ -62,7 +59,6 @@ export function PerpPositions() {
         return () => unsub();
     }, [user, firestore]);
 
-    // Memory-based sorting to avoid Firestore SDK cache conflicts
     const openPositions = useMemo(() => {
         return [...openPositionsRaw].sort((a, b) => {
             const timeA = a.createdAt?.toMillis?.() || 0;
@@ -79,7 +75,6 @@ export function PerpPositions() {
         });
     }, [historyPositionsRaw]);
 
-    // Live Price engine for open positions
     useEffect(() => {
         if (openPositions.length === 0) return;
         
@@ -89,17 +84,16 @@ export function PerpPositions() {
             
             for (const pairId of uniquePairs) {
                 try {
-                    const usd = await getLiveCryptoPrice(pairId);
-                    prices[pairId] = usd * exchangeRate;
+                    prices[pairId] = await getLiveCryptoPrice(pairId);
                 } catch (e) {}
             }
-            setLivePrices(prices);
+            setLivePricesUsd(prices);
         };
 
         updatePrices();
         const interval = setInterval(updatePrices, 5000);
         return () => clearInterval(interval);
-    }, [openPositions, exchangeRate]);
+    }, [openPositions]);
 
     const handleClose = async (posId: string) => {
         if (!user) return;
@@ -114,6 +108,11 @@ export function PerpPositions() {
     };
 
     if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+
+    const displayPrice = (usd: number) => {
+        if (currency === 'NGN') return `₦${(usd * exchangeRate).toLocaleString()}`;
+        return `$${usd.toLocaleString()}`;
+    };
 
     return (
         <Card className="border-2 overflow-hidden bg-card/50 backdrop-blur-sm">
@@ -153,18 +152,17 @@ export function PerpPositions() {
                                     </TableHeader>
                                     <TableBody>
                                         {openPositions.map(pos => {
-                                            const currentPrice = livePrices[pos.tickerId] ?? pos.entryPrice;
-                                            const priceDiff = pos.direction === 'LONG' 
-                                                ? currentPrice - pos.entryPrice 
-                                                : pos.entryPrice - currentPrice;
+                                            const currentPriceUsd = livePricesUsd[pos.tickerId] ?? pos.entryPrice;
+                                            const realizedPnlUsd = calculatePnL(pos.direction, pos.entryPrice, currentPriceUsd, pos.lots);
+                                            const realizedPnlNgn = realizedPnlUsd * exchangeRate;
                                             
-                                            const realizedPnl = priceDiff * pos.lots * CONTRACT_MULTIPLIER;
-                                            const pnlPercent = (priceDiff / pos.entryPrice) * pos.leverage * 100;
-                                            const isProfit = realizedPnl >= 0;
+                                            // PnL % = (Price Change / Entry) * Leverage
+                                            const priceDiffUsd = pos.direction === 'LONG' ? (currentPriceUsd - pos.entryPrice) : (pos.entryPrice - currentPriceUsd);
+                                            const pnlPercent = (priceDiffUsd / pos.entryPrice) * pos.leverage * 100;
+                                            const isProfit = realizedPnlUsd >= 0;
 
-                                            // Calculate risk factor
                                             const totalDistance = Math.abs(pos.liquidationPrice - pos.entryPrice) || 1;
-                                            const currentDistance = Math.abs(pos.liquidationPrice - currentPrice);
+                                            const currentDistance = Math.abs(pos.liquidationPrice - currentPriceUsd);
                                             const riskFactor = Math.max(0, Math.min(100, (1 - (currentDistance / totalDistance)) * 100));
 
                                             return (
@@ -177,13 +175,13 @@ export function PerpPositions() {
                                                                     {pos.direction}
                                                                 </Badge>
                                                             </div>
-                                                            <span className="text-[10px] text-muted-foreground font-mono">Entry: {formatAmount(pos.entryPrice)}</span>
+                                                            <span className="text-[10px] text-muted-foreground font-mono">Entry: {displayPrice(pos.entryPrice)}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="font-mono text-xs font-bold text-muted-foreground">{pos.leverage}x</TableCell>
                                                     <TableCell>
                                                         <div className={cn("flex flex-col", isProfit ? "text-accent" : "text-destructive")}>
-                                                            <span className="font-bold text-sm">{formatAmount(realizedPnl, { signDisplay: 'always' })}</span>
+                                                            <span className="font-bold text-sm">{formatAmount(realizedPnlNgn, { signDisplay: 'always' })}</span>
                                                             <span className="text-[10px] font-bold">{pnlPercent.toFixed(2)}%</span>
                                                         </div>
                                                     </TableCell>
@@ -196,7 +194,7 @@ export function PerpPositions() {
                                                                 </span>
                                                             </div>
                                                             <Progress value={riskFactor} className="h-1" />
-                                                            <span className="text-[9px] text-muted-foreground font-mono">Liq: {formatAmount(pos.liquidationPrice)}</span>
+                                                            <span className="text-[9px] text-muted-foreground font-mono">Liq: {displayPrice(pos.liquidationPrice)}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right pr-6">
@@ -235,7 +233,7 @@ export function PerpPositions() {
                                     <TableHeader>
                                         <TableRow className="bg-muted/10">
                                             <TableHead className="pl-6">Market</TableHead>
-                                            <TableHead>Execution</TableHead>
+                                            <TableHead>Execution (USD)</TableHead>
                                             <TableHead>Outcome</TableHead>
                                             <TableHead>Profit / Loss</TableHead>
                                             <TableHead className="text-right pr-6">Closed At</TableHead>
@@ -263,12 +261,12 @@ export function PerpPositions() {
                                                         <div className="flex flex-col text-[10px] font-mono space-y-0.5">
                                                             <div className="flex items-center gap-1">
                                                                 <span className="text-muted-foreground w-10">ENTRY:</span>
-                                                                <span className="font-bold">{formatAmount(pos.entryPrice)}</span>
+                                                                <span className="font-bold">${pos.entryPrice.toLocaleString()}</span>
                                                             </div>
                                                             {pos.exitPrice && (
                                                                 <div className="flex items-center gap-1">
                                                                     <span className="text-muted-foreground w-10">EXIT:</span>
-                                                                    <span className="text-foreground font-bold">{formatAmount(pos.exitPrice)}</span>
+                                                                    <span className="text-foreground font-bold">${pos.exitPrice.toLocaleString()}</span>
                                                                 </div>
                                                             )}
                                                         </div>

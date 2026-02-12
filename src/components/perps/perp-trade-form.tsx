@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, TrendingUp, TrendingDown, ShieldAlert, Wallet, Info } from 'lucide-react';
 import { openPerpPositionAction } from '@/app/actions/perp-actions';
 import { doc } from 'firebase/firestore';
-import { calculateLiquidationPrice, CONTRACT_MULTIPLIER } from '@/lib/perp-utils';
+import { calculateLiquidationPrice, CONTRACT_MULTIPLIER, PIP_SPREAD } from '@/lib/perp-utils';
 import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +21,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
     const user = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { formatAmount, exchangeRate } = useCurrency();
+    const { formatAmount, exchangeRate, currency } = useCurrency();
 
     const userProfileRef = user ? doc(firestore, 'users', user.uid) : null;
     const { data: profile } = useDoc<UserProfile>(userProfileRef);
@@ -33,20 +33,21 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
 
     const lots = parseFloat(lotsInput) || 0;
     
-    // Spread calculation in NGN
-    const spreadNgn = 110 * exchangeRate;
-    const estimatedEntryPrice = direction === 'LONG' ? pair.price + spreadNgn : pair.price - spreadNgn;
+    // Spread calculation in USD (points)
+    // entry price is Mark +/- 110 points
+    const oraclePriceUsd = pair.price / exchangeRate; 
+    const entryPriceUsd = direction === 'LONG' ? oraclePriceUsd + PIP_SPREAD : oraclePriceUsd - PIP_SPREAD;
 
-    // EXCHANGE STANDARD: Position Value = Price * Lots * 0.01
-    const positionValueNgn = estimatedEntryPrice * lots * CONTRACT_MULTIPLIER;
-    const requiredMarginNgn = positionValueNgn / leverage;
-    const feeNgn = positionValueNgn * 0.001; // 0.1% Execution Fee
+    // Position Value in NGN
+    const positionValueUsd = entryPriceUsd * lots * CONTRACT_MULTIPLIER;
+    const requiredMarginNgn = (positionValueUsd * exchangeRate) / leverage;
+    const feeNgn = (positionValueUsd * exchangeRate) * 0.001; 
     const totalRequiredNgn = requiredMarginNgn + feeNgn;
 
-    const liqPrice = useMemo(() => {
-        if (!estimatedEntryPrice || lots <= 0) return 0;
-        return calculateLiquidationPrice(direction, estimatedEntryPrice, leverage, lots);
-    }, [direction, estimatedEntryPrice, leverage, lots]);
+    const liqPriceUsd = useMemo(() => {
+        if (!entryPriceUsd || lots <= 0) return 0;
+        return calculateLiquidationPrice(direction, entryPriceUsd, leverage, lots);
+    }, [direction, entryPriceUsd, leverage, lots]);
 
     const handleTrade = async () => {
         if (!user) {
@@ -77,6 +78,9 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
         }
         setIsSubmitting(false);
     };
+
+    const displayEntry = currency === 'NGN' ? `₦${(entryPriceUsd * exchangeRate).toLocaleString()}` : `$${entryPriceUsd.toLocaleString()}`;
+    const displayLiq = currency === 'NGN' ? `₦${(liqPriceUsd * exchangeRate).toLocaleString()}` : `$${liqPriceUsd.toLocaleString()}`;
 
     return (
         <Card className="border-2 shadow-hard-lg overflow-hidden bg-card/50 backdrop-blur-sm">
@@ -123,7 +127,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                 <div className="p-3 rounded-lg bg-muted/20 border-2 border-dashed space-y-3">
                     <div className="flex justify-between items-center text-[10px]">
                         <span className="text-muted-foreground uppercase font-bold">Est. Entry Price</span>
-                        <span className="font-mono font-bold">{formatAmount(estimatedEntryPrice)}</span>
+                        <span className="font-mono font-bold text-foreground">{displayEntry}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold">Required Margin</span>
@@ -134,7 +138,7 @@ export function PerpTradeForm({ pair }: { pair: { id: string, name: string, symb
                             <ShieldAlert className="h-3 w-3" />
                             <span className="text-[10px] font-bold uppercase">Liq. Price</span>
                         </div>
-                        <span className="font-bold text-xs">{formatAmount(liqPrice)}</span>
+                        <span className="font-bold text-xs">{displayLiq}</span>
                     </div>
                 </div>
             </CardContent>
