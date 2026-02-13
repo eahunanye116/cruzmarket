@@ -5,7 +5,7 @@ import { processDeposit } from '@/lib/wallet';
 import { getFirestoreInstance } from '@/firebase/server';
 import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import type { UserProfile, WithdrawalRequest } from '@/lib/types';
+import type { UserProfile, WithdrawalRequest, Activity } from '@/lib/types';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -216,8 +216,9 @@ export async function requestWithdrawalAction(payload: WithdrawalRequestPayload)
         const currentRate = await getLatestUsdNgnRate();
         const amountInNgn = payload.withdrawalType === 'crypto' ? payload.amount * currentRate : payload.amount;
 
+        // ONLY CHECK REAL BALANCE
         if (userProfile.balance < amountInNgn) {
-            throw new Error('Insufficient balance.');
+            throw new Error('Insufficient withdrawable balance. Bonus funds cannot be withdrawn.');
         }
 
         const requestsRef = collection(firestore, 'withdrawalRequests');
@@ -370,7 +371,8 @@ export async function transferFundsAction(senderId: string, recipientId: string,
             const senderData = senderDoc.data() as UserProfile;
             const recipientData = recipientDoc.data() as UserProfile;
 
-            if (senderData.balance < amount) throw new Error("Insufficient balance.");
+            // ONLY TRANSFER FROM REAL BALANCE
+            if (senderData.balance < amount) throw new Error("Insufficient withdrawable balance. Bonus funds cannot be transferred.");
 
             transaction.update(senderRef, { balance: senderData.balance - amount });
             transaction.update(recipientRef, { balance: recipientData.balance + amount });
@@ -403,5 +405,60 @@ export async function transferFundsAction(senderId: string, recipientId: string,
     } catch (error: any) {
         console.error('Transfer failed:', error);
         return { success: false, error: error.message };
+    }
+}
+
+/**
+ * ADMIN UTILITY: Reconciles a single user's balance.
+ * Calculates what their balance SHOULD be based on ledger activities.
+ * Any excess is moved to bonusBalance.
+ */
+export async function reconcileUserBalanceAction(userId: string) {
+    const firestore = getFirestoreInstance();
+    try {
+        const userRef = doc(firestore, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) return { success: false, error: 'User not found' };
+        
+        const userData = userSnap.data() as UserProfile;
+        
+        // Fetch all activities for this user
+        const activitiesQuery = query(collection(firestore, 'activities'), where('userId', '==', userId));
+        const activitiesSnap = await getDocs(activitiesQuery);
+        const activities = activitiesSnap.docs.map(d => d.data() as Activity);
+
+        let totalDeposits = 0;
+        let totalRealizedPnl = 0;
+        let totalTransfersIn = 0;
+        let totalTransfersOut = 0;
+        let totalWithdrawals = 0;
+
+        activities.forEach(act => {
+            if (act.type === 'DEPOSIT') totalDeposits += act.value;
+            if (act.type === 'SELL' || act.type === 'COPY_SELL') totalRealizedPnl += (act.realizedPnl || 0);
+            if (act.type === 'TRANSFER_RECEIVED') totalTransfersIn += act.value;
+            if (act.type === 'TRANSFER_SENT') totalTransfersOut += act.value;
+            if (act.type === 'WITHDRAWAL') totalWithdrawals += act.value;
+        });
+
+        // Current Real Balance = Deposits + Profit + Transfers In - Transfers Out - Withdrawals
+        // Note: Buy costs are covered by the bonus logic or principal, but net profit is what matters.
+        // Actually, a simpler way: Real Balance is the sum of all cash-in activities minus cash-out.
+        // But if they were gifted $1000 and it's not in activities, they have $1000 too much.
+        
+        const calculatedRealBalance = totalDeposits + totalRealizedPnl + totalTransfersIn - totalTransfersOut - totalWithdrawals;
+        const currentTotal = userData.balance + (userData.bonusBalance || 0);
+        
+        const finalRealBalance = Math.max(0, calculatedRealBalance);
+        const finalBonusBalance = Math.max(0, currentTotal - finalRealBalance);
+
+        await updateDoc(userRef, {
+            balance: finalRealBalance,
+            bonusBalance: finalBonusBalance
+        });
+
+        return { success: true, real: finalRealBalance, bonus: finalBonusBalance };
+    } catch (e: any) {
+        return { success: false, error: e.message };
     }
 }

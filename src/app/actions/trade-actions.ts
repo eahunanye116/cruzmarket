@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -41,13 +42,10 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
  */
 async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
     const firestore = getFirestoreInstance();
-    const auditLogs: any[] = [];
     
     try {
         console.log(`[CopyTrading] Initiating fan-out for source ${sourceUid} on ${tickerId}...`);
         
-        // FIND FOLLOWERS
-        // NOTE: This query requires a Collection Group index on 'copyTargets' for fields 'targetUid' and 'isActive'.
         const q = query(
             collectionGroup(firestore, 'copyTargets'),
             where('targetUid', '==', sourceUid),
@@ -112,7 +110,6 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
 
         const results = await Promise.allSettled(tradePromises);
         
-        // Log the final audit summary to Firestore for visibility
         await addDoc(collection(firestore, 'copyTradeAudit'), {
             sourceUid,
             tickerId,
@@ -125,7 +122,6 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
         console.log(`[CopyTrading] Fan-out complete for ${sourceUid}. Audit log recorded.`);
     } catch (error: any) {
         console.error("[CopyTrading] GLOBAL FAN-OUT FAILURE:", error);
-        // Record global failure
         await addDoc(collection(firestore, 'copyTradeAudit'), {
             sourceUid,
             tickerId,
@@ -154,7 +150,13 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const tickerDoc = await transaction.get(tickerRef as DocumentReference<Ticker>);
             
             if (!userDoc.exists()) throw new Error('User not found.');
-            if (userDoc.data().balance < ngnAmount) throw new Error('Insufficient balance.');
+            
+            const userData = userDoc.data();
+            const bonusBalance = userData.bonusBalance || 0;
+            const mainBalance = userData.balance || 0;
+            const totalAvailable = mainBalance + bonusBalance;
+
+            if (totalAvailable < ngnAmount) throw new Error('Insufficient balance.');
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
             
             const tickerData = tickerDoc.data();
@@ -170,8 +172,13 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
+            // SPEND LOGIC: Bonus first, then main
+            const spendFromBonus = Math.min(bonusBalance, ngnAmount);
+            const spendFromMain = ngnAmount - spendFromBonus;
+
             transaction.update(userRef, { 
-                balance: userDoc.data().balance - ngnAmount,
+                balance: mainBalance - spendFromMain,
+                bonusBalance: bonusBalance - spendFromBonus,
                 totalTradingVolume: increment(ngnAmount)
             });
 
@@ -230,9 +237,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             return { success: true, tokensOut, tickerName: tickerData.name, fee };
         });
 
-        // ONLY trigger fan-out if this is a manual trade (to avoid infinite loops)
         if (!isCopyTrade) {
-            // In production, we MUST wait for the fan-out to ensure reliability in NextJS server environment
             await triggerCopyTrades(userId, resolvedId, 'BUY');
         }
 
@@ -296,6 +301,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const finalPrice = newMarketCap / newSupply;
             const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
+            // SALES ALWAYS GO TO MAIN BALANCE
             transaction.update(userRef, { 
                 balance: userDoc.data().balance + ngnToUser,
                 totalRealizedPnl: increment(realizedPnl),
@@ -357,7 +363,6 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             return { success: true, tickerName: tickerData.name, ngnToUser, fee };
         });
 
-        // ONLY trigger fan-out if this is a manual trade
         if (!isCopyTrade) {
             await triggerCopyTrades(userId, resolvedId, 'SELL', totalHeldAmountBefore, tokenAmountToSell);
         }
@@ -403,12 +408,19 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
             const userDoc = await transaction.get(userRef as DocumentReference<UserProfile>);
 
             if (!userDoc.exists()) throw new Error('User profile not found.');
-            if (userDoc.data().balance < totalCost) {
+            const userData = userDoc.data();
+            const totalAvailable = (userData.balance || 0) + (userData.bonusBalance || 0);
+
+            if (totalAvailable < totalCost) {
                 throw new Error(`Insufficient balance. You need ₦${totalCost.toLocaleString()}.`);
             }
 
+            const spendFromBonus = Math.min(userData.bonusBalance || 0, totalCost);
+            const spendFromMain = totalCost - spendFromBonus;
+
             transaction.update(userRef, { 
-                balance: userDoc.data().balance - totalCost,
+                balance: (userData.balance || 0) - spendFromMain,
+                bonusBalance: (userData.bonusBalance || 0) - spendFromBonus,
                 totalTradingVolume: increment(initialBuyNgn)
             });
 

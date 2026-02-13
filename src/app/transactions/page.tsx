@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -9,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, UserPlus } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, Gift } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -545,31 +546,33 @@ export default function WalletPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
              <Card className="flex flex-col justify-center">
                 <CardHeader>
-                    <CardTitle>Total Balance</CardTitle>
+                    <CardTitle>Total Wealth</CardTitle>
                     <CardDescription>Available for trading.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {profileLoading ? <Skeleton className="h-10 w-48" /> : (
                         <div className="space-y-4">
-                            <p className="text-4xl font-bold font-headline text-primary">{formatAmount(userProfile?.balance ?? 0)}</p>
+                            <p className="text-4xl font-bold font-headline text-primary">{formatAmount((userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0))}</p>
                             
-                            <div className="flex items-center justify-between p-2 rounded bg-accent/5 border border-accent/20">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="p-2 rounded bg-muted/50 border">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Withdrawable</p>
+                                    <p className="text-sm font-bold">{formatAmount(userProfile?.balance ?? 0)}</p>
+                                </div>
+                                <div className="p-2 rounded bg-accent/5 border border-accent/20">
+                                    <p className="text-[10px] uppercase font-bold text-accent flex items-center gap-1"><Gift className="h-2 w-2" /> Bonus</p>
+                                    <p className="text-sm font-bold text-accent">{formatAmount(userProfile?.bonusBalance || 0)}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-2 rounded bg-muted/30 border">
                                 <div>
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Real-time Exchange Rate</p>
-                                    <p className="text-sm font-bold text-accent">1 USD = ₦{usdNgnRate?.toLocaleString() ?? '...'}</p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Exchange Rate</p>
+                                    <p className="text-xs font-bold">1 USD = ₦{usdNgnRate?.toLocaleString() ?? '...'}</p>
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={refreshExchangeRate} disabled={isRefreshingRate}>
-                                    <RefreshCcw className={cn("h-4 w-4", isRefreshingRate && "animate-spin")} />
+                                    <RefreshCcw className={cn("h-3 w-3", isRefreshingRate && "animate-spin")} />
                                 </Button>
-                            </div>
-                            <div className="pt-2">
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground">My User ID (UID)</p>
-                                <div className="flex items-center justify-between bg-muted p-2 rounded mt-1">
-                                    <code className="text-xs font-mono truncate max-w-[180px]">{user?.uid}</code>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(user?.uid || ''); toast({ title: 'UID Copied' }); }}>
-                                        <Copy className="h-3 w-3" />
-                                    </Button>
-                                </div>
                             </div>
                         </div>
                     )}

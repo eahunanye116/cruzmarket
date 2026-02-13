@@ -127,6 +127,7 @@ export type UserProfile = {
   displayName: string;
   photoURL?: string;
   balance: number;
+  bonusBalance?: number; // Trading-only funds
   totalRealizedPnl?: number;
   totalTradingVolume?: number;
   telegramChatId?: string;
