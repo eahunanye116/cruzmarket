@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import {
@@ -10,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Image from 'next/image';
-import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, Gift } from 'lucide-react';
+import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, Gift, User as UserIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
@@ -424,8 +423,7 @@ export default function WalletPage() {
   const { groupedTransactions, walletActivities } = useMemo(() => {
     if (!activitiesData || !tickers) return { groupedTransactions: [], walletActivities: [] };
     
-    const sortedActivities = [...activitiesData].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-    const enriched = sortedActivities.map(act => ({
+    const enriched = activitiesData.map(act => ({
         ...act,
         ticker: tickers.find(t => t.id === act.tickerId)
     }));
@@ -554,6 +552,21 @@ export default function WalletPage() {
                         <div className="space-y-4">
                             <p className="text-4xl font-bold font-headline text-primary">{formatAmount((userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0))}</p>
                             
+                            <div className="flex items-center justify-between p-2 rounded bg-muted/30 border border-dashed border-muted-foreground/30 mb-2">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><UserIcon className="h-2 w-2" /> My User ID (UID)</p>
+                                    <p className="text-[10px] font-mono truncate text-foreground">{user?.uid}</p>
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 shrink-0 hover:bg-primary/10" 
+                                    onClick={() => { navigator.clipboard.writeText(user?.uid || ''); toast({ title: 'UID Copied' }); }}
+                                >
+                                    <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="p-2 rounded bg-muted/50 border">
                                     <p className="text-[10px] uppercase font-bold text-muted-foreground">Withdrawable</p>
