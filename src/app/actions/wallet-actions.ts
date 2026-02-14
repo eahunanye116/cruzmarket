@@ -452,13 +452,15 @@ export async function reconcileUserBalanceAction(userId: string) {
             if (act.type === 'TRANSFER_RECEIVED') totalTransfersIn += act.value;
             if (act.type === 'TRANSFER_SENT' || act.type === 'TRANSFER_SENT_BONUS') totalTransfersOut += act.value;
             if (act.type === 'WITHDRAWAL') totalWithdrawals += act.value;
+            if (act.type === 'CREATE') totalRealizedPnl -= act.value; // Creation fee is a loss
         });
 
         // Current Real Balance = Deposits + Profit + Transfers In - Transfers Out - Withdrawals
         const calculatedRealBalance = totalDeposits + totalRealizedPnl + totalTransfersIn - totalTransfersOut - totalWithdrawals;
         const currentTotal = (userData.balance || 0) + (userData.bonusBalance || 0);
         
-        const finalRealBalance = Math.max(0, calculatedRealBalance);
+        // Final real balance cannot exceed current total cash on hand, or the ledger sum.
+        const finalRealBalance = Math.max(0, Math.min(currentTotal, calculatedRealBalance));
         const finalBonusBalance = Math.max(0, currentTotal - finalRealBalance);
 
         await updateDoc(userRef, {

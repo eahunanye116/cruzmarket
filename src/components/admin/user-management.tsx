@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -94,7 +95,6 @@ export function UserManagement() {
     } else {
         toast({ variant: 'destructive', title: 'Error', description: res.error });
     }
-    revalidatePath('/admin');
     setReconcilingId(null);
   };
 
