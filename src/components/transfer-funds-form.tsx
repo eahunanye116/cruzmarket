@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,12 +11,16 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getUserProfileByUid, transferFundsAction } from '@/app/actions/wallet-actions';
-import { Loader2, Send, User, AlertCircle } from 'lucide-react';
+import { Loader2, Send, User, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
+const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 const transferSchema = z.object({
   recipientId: z.string().min(5, "Invalid User ID format."),
   amount: z.coerce.number().positive("Amount must be greater than zero."),
+  walletType: z.enum(['main', 'bonus']).default('main'),
 });
 
 export function TransferFundsForm({ balance }: { balance: number }) {
@@ -27,9 +32,11 @@ export function TransferFundsForm({ balance }: { balance: number }) {
   const [recipientName, setRecipientName] = useState<string | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
+  const isAdmin = user?.uid === ADMIN_UID;
+
   const form = useForm<z.infer<typeof transferSchema>>({
     resolver: zodResolver(transferSchema),
-    defaultValues: { recipientId: '', amount: undefined },
+    defaultValues: { recipientId: '', amount: undefined, walletType: 'main' },
   });
 
   const recipientId = form.watch('recipientId');
@@ -64,7 +71,6 @@ export function TransferFundsForm({ balance }: { balance: number }) {
   const onSubmit = async (values: z.infer<typeof transferSchema>) => {
     if (!user) return;
     
-    // Always convert the input amount to NGN for the internal balance logic
     const amountInNgn = convertToNgn(values.amount);
     
     if (amountInNgn > balance) {
@@ -79,15 +85,15 @@ export function TransferFundsForm({ balance }: { balance: number }) {
     }
 
     setIsSubmitting(true);
-    const result = await transferFundsAction(user.uid, cleanId, amountInNgn);
+    const result = await transferFundsAction(user.uid, cleanId, amountInNgn, values.walletType === 'bonus');
     setIsSubmitting(false);
 
     if (result.success) {
       toast({ 
-        title: 'Transfer Successful', 
+        title: values.walletType === 'bonus' ? 'Bonus Gift Sent' : 'Transfer Successful', 
         description: `${formatAmount(amountInNgn)} sent to ${recipientName || 'user'}.` 
       });
-      form.reset({ recipientId: '', amount: undefined });
+      form.reset({ recipientId: '', amount: undefined, walletType: 'main' });
       setRecipientName(null);
       setLookupError(null);
     } else {
@@ -142,6 +148,44 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           )}
         />
 
+        {isAdmin && (
+          <FormField
+            control={form.control}
+            name="walletType"
+            render={({ field }) => (
+              <FormItem className="space-y-3 p-3 border-2 border-primary/20 bg-primary/5 rounded-lg">
+                <FormLabel className="text-xs font-bold flex items-center gap-2">
+                  <ShieldAlert className="h-3 w-3" /> Wallet Destination (Admin Only)
+                </FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex gap-4"
+                  >
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="main" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Main Wallet</FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="bonus" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Bonus Wallet</FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormDescription className="text-[10px] text-primary/70">
+                  Main funds are withdrawable. Bonus funds are trading-only.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="amount"
@@ -164,7 +208,7 @@ export function TransferFundsForm({ balance }: { balance: number }) {
           {isSubmitting ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
           ) : (
-            <><Send className="mr-2 h-4 w-4" /> Transfer {symbol}</>
+            <><Send className="mr-2 h-4 w-4" /> Send {symbol}</>
           )}
         </Button>
       </form>

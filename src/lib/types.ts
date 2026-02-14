@@ -39,7 +39,7 @@ export type EnrichedPortfolioHolding = PortfolioHolding & {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'COPY_BUY' | 'COPY_SELL' | 'PERP_OPEN' | 'PERP_CLOSE' | 'PERP_LIQUIDATE';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'TRANSFER_SENT_BONUS' | 'TRANSFER_RECEIVED_BONUS' | 'COPY_BUY' | 'COPY_SELL' | 'PERP_OPEN' | 'PERP_CLOSE' | 'PERP_LIQUIDATE';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;

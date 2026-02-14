@@ -3,7 +3,7 @@
 
 import { processDeposit } from '@/lib/wallet';
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, runTransaction, getDoc, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import type { UserProfile, WithdrawalRequest, Activity } from '@/lib/types';
 
@@ -349,7 +349,7 @@ export async function getUserProfileByUid(uid: string) {
     }
 }
 
-export async function transferFundsAction(senderId: string, recipientId: string, amount: number) {
+export async function transferFundsAction(senderId: string, recipientId: string, amount: number, toBonus: boolean = false) {
     if (!senderId || !recipientId) return { success: false, error: "Authentication or Recipient ID missing." };
     if (senderId === recipientId) return { success: false, error: "You cannot transfer to yourself." };
     if (amount <= 0) return { success: false, error: "Invalid amount." };
@@ -375,12 +375,25 @@ export async function transferFundsAction(senderId: string, recipientId: string,
             if (senderData.balance < amount) throw new Error("Insufficient withdrawable balance. Bonus funds cannot be transferred.");
 
             transaction.update(senderRef, { balance: senderData.balance - amount });
-            transaction.update(recipientRef, { balance: recipientData.balance + amount });
+            
+            if (toBonus) {
+                transaction.update(recipientRef, { 
+                    bonusBalance: (recipientData.bonusBalance || 0) + amount 
+                });
+            } else {
+                transaction.update(recipientRef, { 
+                    balance: recipientData.balance + amount 
+                });
+            }
+
+            // Activity types
+            const typeSent = toBonus ? 'TRANSFER_SENT_BONUS' : 'TRANSFER_SENT';
+            const typeReceived = toBonus ? 'TRANSFER_RECEIVED_BONUS' : 'TRANSFER_RECEIVED';
 
             // Log activity for sender
             const senderActivityRef = doc(collection(firestore, 'activities'));
             transaction.set(senderActivityRef, {
-                type: 'TRANSFER_SENT',
+                type: typeSent,
                 value: amount,
                 userId: senderId,
                 recipientId: recipientId.trim(),
@@ -391,7 +404,7 @@ export async function transferFundsAction(senderId: string, recipientId: string,
             // Log activity for recipient
             const recipientActivityRef = doc(collection(firestore, 'activities'));
             transaction.set(recipientActivityRef, {
-                type: 'TRANSFER_RECEIVED',
+                type: typeReceived,
                 value: amount,
                 userId: recipientId.trim(),
                 senderId: senderId,
@@ -401,7 +414,7 @@ export async function transferFundsAction(senderId: string, recipientId: string,
         });
 
         revalidatePath('/transactions');
-        return { success: true, message: 'Transfer successful.' };
+        return { success: true, message: toBonus ? 'Bonus gift successful.' : 'Transfer successful.' };
     } catch (error: any) {
         console.error('Transfer failed:', error);
         return { success: false, error: error.message };
@@ -437,17 +450,13 @@ export async function reconcileUserBalanceAction(userId: string) {
             if (act.type === 'DEPOSIT') totalDeposits += act.value;
             if (act.type === 'SELL' || act.type === 'COPY_SELL') totalRealizedPnl += (act.realizedPnl || 0);
             if (act.type === 'TRANSFER_RECEIVED') totalTransfersIn += act.value;
-            if (act.type === 'TRANSFER_SENT') totalTransfersOut += act.value;
+            if (act.type === 'TRANSFER_SENT' || act.type === 'TRANSFER_SENT_BONUS') totalTransfersOut += act.value;
             if (act.type === 'WITHDRAWAL') totalWithdrawals += act.value;
         });
 
         // Current Real Balance = Deposits + Profit + Transfers In - Transfers Out - Withdrawals
-        // Note: Buy costs are covered by the bonus logic or principal, but net profit is what matters.
-        // Actually, a simpler way: Real Balance is the sum of all cash-in activities minus cash-out.
-        // But if they were gifted $1000 and it's not in activities, they have $1000 too much.
-        
         const calculatedRealBalance = totalDeposits + totalRealizedPnl + totalTransfersIn - totalTransfersOut - totalWithdrawals;
-        const currentTotal = userData.balance + (userData.bonusBalance || 0);
+        const currentTotal = (userData.balance || 0) + (userData.bonusBalance || 0);
         
         const finalRealBalance = Math.max(0, calculatedRealBalance);
         const finalBonusBalance = Math.max(0, currentTotal - finalRealBalance);
