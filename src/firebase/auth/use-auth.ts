@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -11,11 +12,20 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getFirestore, getDoc } from 'firebase/firestore';
 
-
 type AuthResult = {
   userCredential?: UserCredential;
   error?: FirebaseError;
 }
+
+const fetchUserIP = async () => {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const data = await res.json();
+    return data.ip;
+  } catch (e) {
+    return null;
+  }
+};
 
 export function useAuth() {
   const auth = getAuth();
@@ -32,21 +42,25 @@ export function useAuth() {
       
       // Check if profile already exists to prevent accidental balance wipe
       const existingDoc = await getDoc(userProfileRef);
+      const ip = await fetchUserIP();
       
       if (!existingDoc.exists()) {
-        const newUserProfile = {
+        const newUserProfile: any = {
           email: user.email,
           displayName: displayName,
           photoURL: user.photoURL,
           balance: 0,
         };
+        if (ip) newUserProfile.lastIP = ip;
         await setDoc(userProfileRef, newUserProfile);
       } else {
         // Just update display name/email if doc exists
-        await setDoc(userProfileRef, {
+        const updateData: any = {
           email: user.email,
           displayName: displayName,
-        }, { merge: true });
+        };
+        if (ip) updateData.lastIP = ip;
+        await setDoc(userProfileRef, updateData, { merge: true });
       }
 
       return { userCredential };
@@ -58,6 +72,13 @@ export function useAuth() {
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      const ip = await fetchUserIP();
+      if (ip) {
+        await setDoc(doc(firestore, 'users', user.uid), { lastIP: ip }, { merge: true });
+      }
+      
       return { userCredential };
     } catch (error) {
       return { error: error as FirebaseError };

@@ -136,6 +136,7 @@ export type UserProfile = {
     expiresAt: Timestamp;
   };
   botSession?: BotSession | null;
+  lastIP?: string;
 };
 
 export type PlatformSettings = {

@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser } from '@/firebase';
 import { Ban } from 'lucide-react';
@@ -14,6 +15,7 @@ import { SupportManagement } from '@/components/admin/support-management';
 import { TelegramManagement } from '@/components/admin/telegram-management';
 import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
 import { PaymentManagement } from '@/components/admin/payment-management';
+import { FraudManagement } from '@/components/admin/fraud-management';
 import { useState } from 'react';
 import {
   Select,
@@ -77,6 +79,7 @@ export default function AdminPage() {
           <TabsList className="flex flex-wrap w-full h-auto bg-transparent border-b-2 rounded-none p-0 mb-6 gap-2">
             <TabsTrigger value="tickers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Tickers</TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Users</TabsTrigger>
+            <TabsTrigger value="fraud" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground border-2 border-transparent px-4 py-2">Fraud</TabsTrigger>
             <TabsTrigger value="copy-audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Withdrawals</TabsTrigger>
             <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Payments</TabsTrigger>
@@ -98,6 +101,7 @@ export default function AdminPage() {
             <SelectContent>
               <SelectItem value="tickers">Tickers</SelectItem>
               <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="fraud">Fraud Detection</SelectItem>
               <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
               <SelectItem value="payments">Payments</SelectItem>
@@ -116,6 +120,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
+        </TabsContent>
+        <TabsContent value="fraud" className="mt-6">
+          <FraudManagement />
         </TabsContent>
         <TabsContent value="copy-audit" className="mt-6">
           <CopyAuditManagement />
