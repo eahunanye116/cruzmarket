@@ -136,31 +136,39 @@ export default function TokenTransactionHistoryPage() {
                 </div>
             </CardHeader>
             
-            <div className="grid md:grid-cols-4 gap-4 mb-8">
-                <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Realized P/L</CardTitle></CardHeader>
-                    <CardContent>
-                        <p className={cn("text-xl font-bold", summary.realizedPnl > 0 ? "text-accent" : summary.realizedPnl < 0 ? "text-destructive" : "text-foreground")}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+                <Card className="shadow-hard-sm">
+                    <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Realized P/L</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                        <p className={cn("text-lg sm:text-xl font-bold", summary.realizedPnl > 0 ? "text-accent" : summary.realizedPnl < 0 ? "text-destructive" : "text-foreground")}>
                            {summary.realizedPnl.toLocaleString('en-US', { style: 'currency', currency: 'NGN', signDisplay: 'auto', notation: 'compact' })}
                         </p>
                     </CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Fees Paid</CardTitle></CardHeader>
-                    <CardContent>
-                        <p className="text-xl font-bold text-destructive/80">₦{summary.totalFees.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                 <Card className="shadow-hard-sm">
+                    <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Fees Paid</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                        <p className="text-lg sm:text-xl font-bold text-destructive/80">₦{summary.totalFees.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Buy Volume</CardTitle></CardHeader>
-                    <CardContent>
-                        <p className="text-xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
+                 <Card className="shadow-hard-sm">
+                    <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Buy Volume</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                        <p className="text-lg sm:text-xl font-bold">{summary.totalBuy.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-muted-foreground">Sell Volume</CardTitle></CardHeader>
-                    <CardContent>
-                        <p className="text-xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
+                <Card className="shadow-hard-sm">
+                    <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Sell Volume</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                        <p className="text-lg sm:text-xl font-bold">{summary.totalSell.toLocaleString('en-US', { style: 'currency', currency: 'NGN', notation: 'compact' })}</p>
                     </CardContent>
                 </Card>
             </div>
