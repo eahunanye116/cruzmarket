@@ -107,6 +107,12 @@ const COINS = [
 function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }) {
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
+    const [reference, setReference] = useState('');
+
+    useEffect(() => {
+        // Generate reference only on client to avoid hydration mismatch
+        setReference(new Date().getTime().toString());
+    }, []);
 
     const form = useForm<z.infer<typeof depositSchema>>({
         resolver: zodResolver(depositSchema),
@@ -115,7 +121,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
     const amount = form.watch('amount');
 
     const paystackConfig = {
-        reference: new Date().getTime().toString(),
+        reference: reference,
         email: user.email!,
         amount: (amount || 0) * 100, 
         currency: 'NGN',
@@ -127,13 +133,14 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
 
     const initializePayment = usePaystackPayment(paystackConfig);
 
-    const onPaymentSuccess = useCallback(async (reference: any) => {
+    const onPaymentSuccess = useCallback(async (response: any) => {
         setIsProcessing(true);
         toast({ title: 'Processing Deposit...', description: 'Verifying transaction...' });
-        const result = await verifyPaystackDepositAction(reference.reference);
+        const result = await verifyPaystackDepositAction(response.reference);
         if (result.success) {
             toast({ title: 'Success!', description: result.message });
             form.reset();
+            setReference(new Date().getTime().toString()); // Cycle reference for next deposit
         } else {
             toast({ variant: 'destructive', title: 'Failed', description: result.error });
         }
@@ -147,6 +154,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
             toast({ variant: 'destructive', title: 'Error', description: 'Paystack public key is missing.' });
             return;
         }
+        if (!reference) return;
         initializePayment(onPaymentSuccess, onPaymentClose);
     };
 
@@ -166,7 +174,7 @@ function DepositForm({ user }: { user: NonNullable<ReturnType<typeof useUser>> }
                         </FormItem>
                     )}
                 />
-                <Button type="submit" className="w-full" disabled={isProcessing}>
+                <Button type="submit" className="w-full" disabled={isProcessing || !reference}>
                     {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Landmark className="mr-2" />}
                     Deposit ₦{amount ? amount.toLocaleString() : 0}
                 </Button>

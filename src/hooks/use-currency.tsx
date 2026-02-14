@@ -16,6 +16,7 @@ interface CurrencyContextType {
   convertFromNgn: (amountInNgn: number) => number;
   convertToNgn: (amountInCurrent: number) => number;
   isLoading: boolean;
+  isHydrated: boolean;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -24,8 +25,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrency] = useState<Currency>('NGN');
   const [exchangeRate, setExchangeRate] = useState<number>(1600);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    setIsHydrated(true);
     const saved = localStorage.getItem('app_currency') as Currency;
     if (saved && (saved === 'NGN' || saved === 'USD')) {
       setCurrency(saved);
@@ -100,7 +103,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         formatAmount, 
         convertFromNgn,
         convertToNgn,
-        isLoading 
+        isLoading,
+        isHydrated
     }}>
       {children}
     </CurrencyContext.Provider>

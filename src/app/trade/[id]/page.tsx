@@ -25,7 +25,7 @@ function isValidUrl(url: string | undefined | null): url is string {
 
 const TRANSACTION_FEE_PERCENTAGE = 0.002;
 
-export default function TradeDetailsPage({ params }: { params: { id: string } }) {
+export default function TradeDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const firestore = useFirestore();

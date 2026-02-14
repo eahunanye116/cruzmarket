@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useDoc, useFirestore } from '@/firebase';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Ban, Settings, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink } from 'lucide-react';
 import { generateTelegramLinkingCode, unlinkTelegramAction } from '@/app/actions/telegram-actions';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
@@ -22,9 +21,29 @@ export default function SettingsPage() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
+  const [isCodeValid, setIsCodeValid] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   
   // Explicitly use the correct bot username
   const botUsername = 'cruzmarketfunbot';
+
+  useEffect(() => {
+    if (profile?.telegramLinkingCode) {
+      const checkValidity = () => {
+        const expiry = profile.telegramLinkingCode!.expiresAt.toDate();
+        const now = new Date();
+        const diff = Math.round((expiry.getTime() - now.getTime()) / 1000 / 60);
+        setIsCodeValid(diff > 0);
+        setTimeRemaining(diff > 0 ? diff : null);
+      };
+      checkValidity();
+      const interval = setInterval(checkValidity, 30000);
+      return () => clearInterval(interval);
+    } else {
+      setIsCodeValid(false);
+      setTimeRemaining(null);
+    }
+  }, [profile]);
 
   if (!user) {
     return (
@@ -70,7 +89,6 @@ export default function SettingsPage() {
 
   const isLinked = !!profile?.telegramChatId;
   const activeCode = profile?.telegramLinkingCode;
-  const isCodeValid = activeCode && activeCode.expiresAt.toDate() > new Date();
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-2xl">
@@ -125,18 +143,20 @@ export default function SettingsPage() {
                 <div className="space-y-4 p-6 border-2 border-dashed rounded-lg text-center bg-muted/30">
                   <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">Your Secure Linking Code</p>
                   <p className="text-2xl sm:text-3xl font-mono font-bold tracking-tighter text-primary break-all">
-                    {activeCode.code}
+                    {activeCode?.code}
                   </p>
-                  <p className="text-xs text-muted-foreground">Expires in {Math.round((activeCode.expiresAt.toDate().getTime() - Date.now()) / 1000 / 60)} minutes</p>
+                  {timeRemaining !== null && (
+                    <p className="text-xs text-muted-foreground">Expires in {timeRemaining} minutes</p>
+                  )}
                   
                   <div className="flex flex-col gap-2 pt-2">
                     <Button asChild className="w-full bg-[#229ED9] hover:bg-[#229ED9]/90">
-                      <a href={`https://t.me/${botUsername}?start=${activeCode.code}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://t.me/${botUsername}?start=${activeCode?.code}`} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="mr-2 h-4 w-4" /> Open Telegram Bot
                       </a>
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                      Or send `/start {activeCode.code}` to @{botUsername}
+                      Or send `/start {activeCode?.code}` to @{botUsername}
                     </p>
                   </div>
                 </div>

@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useMemo, useState, useEffect } from 'react';
 import { doc } from 'firebase/firestore';
 import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -20,7 +20,7 @@ const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 function UserBalance() {
   const user = useUser();
   const firestore = useFirestore();
-  const { formatAmount } = useCurrency();
+  const { formatAmount, isHydrated } = useCurrency();
   
   const userProfileRef = useMemo(() => 
     (user && firestore) ? doc(firestore, 'users', user.uid) : null,
@@ -29,7 +29,7 @@ function UserBalance() {
   
   const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
 
-  if (loading) {
+  if (loading || !isHydrated) {
     return <Skeleton className="h-6 w-24" />;
   }
 
@@ -44,8 +44,10 @@ function UserBalance() {
 }
 
 function CurrencySwitcher() {
-    const { currency, setCurrency } = useCurrency();
+    const { currency, setCurrency, isHydrated } = useCurrency();
     
+    if (!isHydrated) return <div className="w-10 h-8" />;
+
     return (
         <Button 
             variant="outline" 

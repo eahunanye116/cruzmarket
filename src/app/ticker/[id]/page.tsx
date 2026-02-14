@@ -29,7 +29,7 @@ function isValidUrl(url: string | undefined | null): url is string {
     }
 }
 
-export default function TickerPage({ params }: { params: { id: string } }) {
+export default function TickerPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const firestore = useFirestore();
   const tickerDocRef = firestore ? doc(firestore, 'tickers', resolvedParams.id) : null;
