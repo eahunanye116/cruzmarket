@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -15,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User, History, Search, RefreshCw, Loader2, Gift } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History, Search, RefreshCw, Loader2, Gift, Users, Wallet, Landmark } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,6 +94,7 @@ export function UserManagement() {
     } else {
         toast({ variant: 'destructive', title: 'Error', description: res.error });
     }
+    revalidatePath('/admin');
     setReconcilingId(null);
   };
 
@@ -122,17 +122,38 @@ export function UserManagement() {
     <Card>
       <CardHeader>
         <CardTitle>Users & Financial Ledger</CardTitle>
-        <CardDescription className="space-y-1">
-          <p>Gifted funds are now automatically tracked in the <b>Bonus Wallet</b>.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t">
-            <div>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total House Obligations</p>
+        <CardDescription className="space-y-4">
+          <p>Monitor platform growth and collect financial insights across all user accounts.</p>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+            <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                    <Users className="h-3 w-3" /> Total Users
+                </p>
+                <p className="text-xl font-bold">{users?.length ?? 0}</p>
+            </div>
+            <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                    <Wallet className="h-3 w-3" /> House Liabilities
+                </p>
                 <p className="text-xl font-bold text-primary">{formatAmount(totalBalance)}</p>
             </div>
-            <div>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Fees Generated</p>
-                <p className="text-xl font-bold">{formatAmount(totalFees)}</p>
+            <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1 text-accent">
+                    <Landmark className="h-3 w-3" /> User Trade Fees
+                </p>
+                <p className="text-xl font-bold text-accent">{formatAmount(userFees)}</p>
             </div>
+            <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" /> Admin/Launch Fees
+                </p>
+                <p className="text-xl font-bold">{formatAmount(adminFees)}</p>
+            </div>
+          </div>
+          <div className="pt-2">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Gross Platform Revenue (All Time)</p>
+             <p className="text-2xl font-bold text-foreground">{formatAmount(totalFees)}</p>
           </div>
         </CardDescription>
       </CardHeader>
@@ -140,7 +161,7 @@ export function UserManagement() {
          <div className="mb-6 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-                placeholder="Search users..." 
+                placeholder="Search users by name or email..." 
                 className="pl-10" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
