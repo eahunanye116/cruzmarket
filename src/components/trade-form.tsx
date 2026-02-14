@@ -146,6 +146,8 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   if (!user) return <p className="text-sm text-muted-foreground text-center">Sign in to trade.</p>;
   if (profileLoading || holdingLoading) return <Skeleton className="h-96 w-full" />;
 
+  const totalTradingBalance = (userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0);
+
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -157,7 +159,7 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
         <TabsContent value="buy">
           <Form {...buyForm}>
             <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
-              <div className="text-right text-sm text-muted-foreground">Balance: {formatAmount(userProfile?.balance ?? 0)}</div>
+              <div className="text-right text-sm text-muted-foreground">Balance: {formatAmount(totalTradingBalance)}</div>
               <FormField control={buyForm.control} name="amount" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Amount to Spend ({symbol})</FormLabel>
