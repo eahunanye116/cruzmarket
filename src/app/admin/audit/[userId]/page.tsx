@@ -147,7 +147,7 @@ export default function UserAuditPage() {
             <CardDescription className="text-[10px] uppercase font-bold flex items-center gap-2">
               <Wallet className="h-3 w-3" /> Current Balance
             </CardDescription>
-            <CardTitle className="text-2xl text-primary">₦{profile.balance.toLocaleString()}</CardTitle>
+            <CardTitle className="text-2xl text-primary">₦{(profile.balance ?? 0).toLocaleString()}</CardTitle>
           </CardHeader>
         </Card>
         
