@@ -34,7 +34,7 @@ export default function Home() {
   ) : null;
   const { data: tickers, loading: tickersLoading } = useCollection<Ticker>(tickersQuery);
   
-  const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(8)) : null;
+  const activityQuery = firestore ? query(collection(firestore, 'activities'), orderBy('createdAt', 'desc'), limit(15)) : null;
   const { data: recentActivity, loading: activityLoading } = useCollection<Activity>(activityQuery);
   
   // Walkthrough logic
@@ -207,7 +207,9 @@ export default function Home() {
             </div>
           </div>
           <div className="lg:col-span-1">
-            {activityLoading ? <Skeleton className="h-96" /> : <ActivityFeed activities={recentActivity || []} />}
+            <div className="lg:sticky lg:top-20">
+              {activityLoading ? <Skeleton className="h-96" /> : <ActivityFeed activities={recentActivity || []} />}
+            </div>
           </div>
         </div>
       </div>
