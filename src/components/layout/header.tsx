@@ -33,12 +33,12 @@ function UserBalance() {
     return <Skeleton className="h-6 w-24" />;
   }
 
-  // Fallback to 0 if data is missing or profile hasn't loaded yet
-  const balance = userProfile?.balance ?? 0;
+  // Display the sum of both Main and Bonus wallets in the header
+  const totalBalance = (userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0);
 
   return (
     <div className="font-semibold text-primary">
-      {formatAmount(balance)}
+      {formatAmount(totalBalance)}
     </div>
   )
 }
