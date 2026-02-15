@@ -11,10 +11,11 @@ import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wallet, Gift } from 'lucide-react';
 
 const formSchema = z.object({
   balance: z.coerce.number().min(0, "Balance cannot be negative."),
+  bonusBalance: z.coerce.number().min(0, "Bonus balance cannot be negative."),
 });
 
 type EditUserDialogProps = {
@@ -29,14 +30,18 @@ export function EditUserDialog({ isOpen, setIsOpen, user }: EditUserDialogProps)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { balance: 0 },
+    defaultValues: { balance: 0, bonusBalance: 0 },
   });
 
   useEffect(() => {
     if (user) {
       // Ensure we don't pass NaN to the form
       const safeBalance = Number(user.balance) || 0;
-      form.reset({ balance: safeBalance });
+      const safeBonusBalance = Number(user.bonusBalance) || 0;
+      form.reset({ 
+        balance: safeBalance,
+        bonusBalance: safeBonusBalance
+      });
     }
   }, [user, form]);
 
@@ -44,8 +49,11 @@ export function EditUserDialog({ isOpen, setIsOpen, user }: EditUserDialogProps)
     if (!firestore || !user?.id) return;
     try {
       const userRef = doc(firestore, 'users', user.id);
-      await updateDoc(userRef, { balance: values.balance });
-      toast({ title: 'User Updated', description: `${user.email}'s balance has been updated.` });
+      await updateDoc(userRef, { 
+        balance: values.balance,
+        bonusBalance: values.bonusBalance
+      });
+      toast({ title: 'User Updated', description: `${user.email}'s balances have been updated.` });
       setIsOpen(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
@@ -60,25 +68,38 @@ export function EditUserDialog({ isOpen, setIsOpen, user }: EditUserDialogProps)
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
+          <DialogTitle>Edit User Balances</DialogTitle>
           <DialogDescription>
-            Modify the balance for {user.email}.
+            Modify the funds for {user.email}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
              <FormField control={form.control} name="balance" render={({ field }) => (
               <FormItem>
-                <FormLabel>Balance (₦)</FormLabel>
-                <FormControl><Input type="number" {...field} /></FormControl>
+                <FormLabel className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-primary" /> Withdrawable Balance (₦)
+                </FormLabel>
+                <FormControl><Input type="number" step="any" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+
+            <FormField control={form.control} name="bonusBalance" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-accent" /> Bonus Balance (₦)
+                </FormLabel>
+                <FormControl><Input type="number" step="any" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Balance
+                Save Balances
               </Button>
             </DialogFooter>
           </form>
