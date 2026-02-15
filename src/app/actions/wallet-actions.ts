@@ -397,7 +397,7 @@ export async function transferFundsAction(senderId: string, recipientId: string,
                 value: amount,
                 userId: senderId,
                 recipientId: recipientId.trim(),
-                recipientName: recipientData.displayName || recipientData.email,
+                recipientName: recipientData.displayName || recipientData.email || 'Trader',
                 createdAt: serverTimestamp(),
             });
 
@@ -408,7 +408,7 @@ export async function transferFundsAction(senderId: string, recipientId: string,
                 value: amount,
                 userId: recipientId.trim(),
                 senderId: senderId,
-                senderName: senderData.displayName || senderData.email,
+                senderName: senderData.displayName || senderData.email || 'Trader',
                 createdAt: serverTimestamp(),
             });
         });
