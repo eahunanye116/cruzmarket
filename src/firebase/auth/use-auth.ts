@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -7,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  sendPasswordResetEmail,
   UserCredential,
   FirebaseError
 } from 'firebase/auth';
@@ -93,5 +93,14 @@ export function useAuth() {
     }
   };
 
-  return { signUp, signIn, signOut };
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: FirebaseError }> => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error as FirebaseError };
+    }
+  };
+
+  return { signUp, signIn, signOut, resetPassword };
 }
