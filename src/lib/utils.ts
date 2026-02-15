@@ -21,38 +21,48 @@ export function escapeHtmlForTelegram(text: string | undefined | null): string {
 
 /**
  * Calculates the actual NGN value a user would receive if they sold a certain amount of tokens.
- * Accounts for the price impact along a bonding curve.
+ * Accounts for the price impact along an EXPONENTIAL bonding curve.
  */
 export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): number {
-  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0 || ticker.supply <= 0) {
+  if (!tokenAmount || tokenAmount <= 0 || !ticker || ticker.marketCap <= 0) {
     return 0;
   }
-  const k = ticker.marketCap * ticker.supply;
-  if (k <= 0) return 0;
-  const newSupply = ticker.supply + tokenAmount;
-  const newMarketCap = k / newSupply;
-  const ngnOut = ticker.marketCap - newMarketCap;
+  
+  const R0 = ticker.initialMarketCap || 100000;
+  const S_init = ticker.initialSupply || 1000000000;
+  
+  // R = R0 * e^(s / S_init)
+  // Current circulating tokens s:
+  const currentS = S_init * Math.log(ticker.marketCap / R0);
+  
+  // New circulating tokens after sell:
+  const newS = Math.max(0, currentS - tokenAmount);
+  
+  // New reserve:
+  const newR = R0 * Math.exp(newS / S_init);
+  
+  const ngnOut = ticker.marketCap - newR;
   return ngnOut > 0 ? ngnOut : 0;
 };
 
 /**
- * Calculates the percentage change in Market Price over the last 24 hours.
- * Note: Switched from Reserve (MC) to Price to align UI metrics with Profit.
+ * Calculates the percentage change in Market Value (Reserve) over the last 24 hours.
+ * Since we switched to an Exponential curve, Reserve change is exactly linear with Price change.
  */
 export function calculateMarketCapChange(ticker: Ticker | null | undefined): number | null {
-  if (!ticker?.chartData || ticker.chartData.length < 1 || !ticker.price || ticker.price <= 0) {
+  if (!ticker?.chartData || ticker.chartData.length < 1 || !ticker.marketCap || ticker.marketCap <= 0) {
     return null;
   }
-  const currentPrice = ticker.price;
+  const currentMC = ticker.marketCap;
   const sortedChartData = [...ticker.chartData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
   const twentyFourHoursAgo = sub(new Date(), { hours: 24 });
   
-  // Find the price 24h ago
-  const point24hAgo = sortedChartData.filter(p => new Date(p.time) <= twentyFourHoursAgo && p.price && p.price > 0).pop() || sortedChartData[0];
-  const pastPrice = point24hAgo?.price;
+  // Find the MC 24h ago
+  const point24hAgo = sortedChartData.filter(p => new Date(p.time) <= twentyFourHoursAgo && p.marketCap && p.marketCap > 0).pop() || sortedChartData[0];
+  const pastMC = point24hAgo?.marketCap || ticker.initialMarketCap;
   
-  if (pastPrice && pastPrice > 0) {
-    const change = ((currentPrice - pastPrice) / pastPrice) * 100;
+  if (pastMC && pastMC > 0) {
+    const change = ((currentMC - pastMC) / pastMC) * 100;
     return Math.abs(change) < 0.0001 ? 0 : change;
   }
   return null;

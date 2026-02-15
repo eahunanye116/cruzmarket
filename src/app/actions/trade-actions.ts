@@ -117,11 +117,23 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
             const ngnForCurve = ngnAmount - fee;
             
-            const k = tickerData.marketCap * tickerData.supply;
-            const newMarketCap = tickerData.marketCap + ngnForCurve;
-            const newSupply = k / newMarketCap;
-            const tokensOut = tickerData.supply - newSupply;
-            const finalPrice = newMarketCap / newSupply;
+            /**
+             * NEW EXPONENTIAL CURVE MATH:
+             * R = R0 * e^(s / S_init)
+             * s = S_init * ln(R / R0)
+             */
+            const R0 = tickerData.initialMarketCap || 100000;
+            const S_init = tickerData.initialSupply || 1000000000;
+            
+            const currentR = tickerData.marketCap;
+            const newR = currentR + ngnForCurve;
+            
+            // Calculate current tokens out (circulating)
+            const currentS = S_init * Math.log(currentR / R0);
+            const newS = S_init * Math.log(newR / R0);
+            const tokensOut = newS - currentS;
+            
+            const finalPrice = newR / S_init;
             const avgBuyPrice = ngnAmount / tokensOut;
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
@@ -153,9 +165,12 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const chartData = tickerData.chartData || [];
-            const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
-            const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
-            const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
+            
+            // Calculate change based on Market Cap (Reserve) now, as it's linear with Price
+            const pastDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
+            const pastMC = pastDataPoint?.marketCap || tickerData.initialMarketCap;
+            const priceChange24h = pastMC > 0 ? ((newR - pastMC) / pastMC) * 100 : 0;
+            
             const volume24h = (tickerData.volume24h || 0) + ngnAmount;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
@@ -163,13 +178,13 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 time: now.toISOString(),
                 price: finalPrice,
                 volume: ngnAmount,
-                marketCap: newMarketCap,
+                marketCap: newR,
             }].slice(-200);
 
             transaction.update(tickerRef, { 
                 price: finalPrice,
-                marketCap: newMarketCap,
-                supply: newSupply,
+                marketCap: newR,
+                supply: tickerData.supply - tokensOut, // Track remaining supply if needed
                 volume24h,
                 priceChange24h,
                 trendingScore,
@@ -231,17 +246,22 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             if (tokenAmountToSell > totalHeldAmountBefore + 0.000001) throw new Error("Insufficient tokens in portfolio.");
 
             const tickerData = tickerDoc.data();
-            const k = tickerData.marketCap * tickerData.supply;
-            const newSupply = tickerData.supply + tokenAmountToSell;
-            const newMarketCap = k / newSupply;
+            const R0 = tickerData.initialMarketCap || 100000;
+            const S_init = tickerData.initialSupply || 1000000000;
             
-            const ngnToGetBeforeFee = tickerData.marketCap - newMarketCap;
+            const currentR = tickerData.marketCap;
+            const currentS = S_init * Math.log(currentR / R0);
+            
+            const newS = currentS - tokenAmountToSell;
+            const newR = R0 * Math.exp(newS / S_init);
+            
+            const ngnToGetBeforeFee = currentR - newR;
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
 
             const costBasis = tokenAmountToSell * currentHolding.avgBuyPrice;
             const realizedPnl = ngnToUser - costBasis;
-            const finalPrice = newMarketCap / newSupply;
+            const finalPrice = newR / S_init;
             const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
             transaction.update(userRef, { 
@@ -260,9 +280,11 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const chartData = tickerData.chartData || [];
-            const price24hAgoDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
-            const price24hAgo = price24hAgoDataPoint?.price || tickerData.price;
-            const priceChange24h = price24hAgo > 0 ? ((finalPrice - price24hAgo) / price24hAgo) * 100 : 0;
+            
+            const pastDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
+            const pastMC = pastDataPoint?.marketCap || tickerData.initialMarketCap;
+            const priceChange24h = pastMC > 0 ? ((newR - pastMC) / pastMC) * 100 : 0;
+            
             const volume24h = (tickerData.volume24h || 0) + ngnToGetBeforeFee;
             const trendingScore = calculateTrendingScore(priceChange24h, volume24h);
 
@@ -270,13 +292,13 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 time: now.toISOString(),
                 price: finalPrice,
                 volume: ngnToGetBeforeFee,
-                marketCap: newMarketCap,
+                marketCap: newR,
             }].slice(-200);
 
             transaction.update(tickerRef, { 
                 price: finalPrice,
-                marketCap: newMarketCap,
-                supply: newSupply,
+                marketCap: newR,
+                supply: tickerData.supply + tokenAmountToSell,
                 volume24h,
                 priceChange24h,
                 trendingScore,
@@ -362,13 +384,15 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 totalTradingVolume: increment(initialBuyNgn)
             });
 
-            const k = initialMarketCap * input.supply;
+            // Exponential Curve Logic for Initial Buy
+            const R0 = initialMarketCap;
+            const S_init = input.supply;
             const ngnForCurve = initialBuyNgn - initialBuyFee;
-            const finalMarketCap = initialMarketCap + ngnForCurve;
-            const finalSupply = k / finalMarketCap;
-            const tokensOut = input.supply - finalSupply;
-            const finalPrice = finalMarketCap / finalSupply;
-            const initialPrice = initialMarketCap / input.supply;
+            const finalMarketCap = R0 + ngnForCurve;
+            
+            const tokensOut = S_init * Math.log(finalMarketCap / R0);
+            const finalPrice = finalMarketCap / S_init;
+            const initialPrice = R0 / S_init;
             const avgBuyPrice = initialBuyNgn / tokensOut;
 
             const newTickerRef = doc(collection(firestore, 'tickers'));
@@ -382,8 +406,9 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 description: input.description,
                 icon: input.icon,
                 coverImage: input.coverImage,
-                initialSupply: input.supply, // Store for Market Cap display math
-                supply: finalSupply,
+                initialSupply: S_init,
+                supply: S_init - tokensOut,
+                initialMarketCap: R0,
                 marketCap: finalMarketCap,
                 price: finalPrice,
                 tickerAddress,
@@ -394,7 +419,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 volume24h: initialBuyNgn,
                 isVerified: false,
                 chartData: [
-                    { time: now.toISOString(), price: initialPrice, volume: 0, marketCap: initialMarketCap },
+                    { time: now.toISOString(), price: initialPrice, volume: 0, marketCap: R0 },
                     { time: new Date(now.getTime() + 1).toISOString(), price: finalPrice, volume: initialBuyNgn, marketCap: finalMarketCap }
                 ]
             };

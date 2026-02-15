@@ -35,8 +35,8 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
     return `${sym}${val.toFixed(0)}`;
   };
 
-  // Standard Market Cap = Price * Total Supply
-  const totalMarketCapNgn = (ticker.price || 0) * (ticker.initialSupply || 1000000000);
+  // In our new model, "Market Cap" displayed is the Reserve Liquidity (money in the curve)
+  const displayMarketCap = ticker.marketCap;
 
   return (
     <Link href={`/ticker/${ticker.id}`} className="focus:outline-none rounded-lg group block h-full">
@@ -74,7 +74,7 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-xs pt-4 border-t">
-                <div className="text-left"><p className="text-muted-foreground">Mkt Cap</p><p className="font-semibold">{formatCompact(totalMarketCapNgn)}</p></div>
+                <div className="text-left"><p className="text-muted-foreground">Market Cap</p><p className="font-semibold">{formatCompact(displayMarketCap)}</p></div>
                 <div className="text-right"><p className="text-muted-foreground">Volume (24h)</p><p className="font-semibold">{formatCompact(ticker.volume24h || 0)}</p></div>
             </div>
         </CardContent>
