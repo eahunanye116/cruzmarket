@@ -38,14 +38,11 @@ async function resolveTickerId(firestore: any, inputId: string): Promise<string>
 
 /**
  * Trigger trades for all users copying the source user.
- * This is the high-reliability fan-out engine.
  */
 async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY' | 'SELL', sourceUserTotalHeldBefore?: number, sourceAmountSold?: number) {
     const firestore = getFirestoreInstance();
     
     try {
-        console.log(`[CopyTrading] Initiating fan-out for source ${sourceUid} on ${tickerId}...`);
-        
         const q = query(
             collectionGroup(firestore, 'copyTargets'),
             where('targetUid', '==', sourceUid),
@@ -54,13 +51,7 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
         );
         
         const snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-            console.log(`[CopyTrading] No active followers found for source ${sourceUid}.`);
-            return;
-        }
-
-        console.log(`[CopyTrading] Found ${snapshot.size} active followers. Executing trade replication...`);
+        if (snapshot.empty) return;
 
         const tradePromises = snapshot.docs.map(async (targetDoc) => {
             const settings = targetDoc.data() as CopyTarget;
@@ -70,15 +61,9 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
 
             try {
                 if (type === 'BUY') {
-                    const buyRes = await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
-                    if (buyRes.success) {
-                        return { followerId, status: 'success', type: 'BUY' };
-                    } else {
-                        return { followerId, status: 'failed', reason: buyRes.error };
-                    }
+                    await executeBuyAction(followerId, tickerId, settings.amountPerBuyNgn, true);
                 } else if (type === 'SELL' && sourceUserTotalHeldBefore && sourceAmountSold) {
                     const sellPercentage = sourceAmountSold / sourceUserTotalHeldBefore;
-                    
                     const followerPortfolioRef = collection(firestore, `users/${followerId}/portfolio`);
                     const holdingQ = query(followerPortfolioRef, where('tickerId', '==', tickerId));
                     const holdingSnap = await getDocs(holdingQ);
@@ -86,50 +71,19 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
                     if (!holdingSnap.empty) {
                         const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
                         const amountToSell = followerHolding.amount * sellPercentage;
-                        
                         if (amountToSell > 0.000001) {
-                            const sellRes = await executeSellAction(followerId, tickerId, amountToSell, true);
-                            if (sellRes.success) {
-                                return { followerId, status: 'success', type: 'SELL' };
-                            } else {
-                                return { followerId, status: 'failed', reason: sellRes.error };
-                            }
-                        } else {
-                            return { followerId, status: 'skipped', reason: 'dust-amount' };
+                            await executeSellAction(followerId, tickerId, amountToSell, true);
                         }
-                    } else {
-                        return { followerId, status: 'skipped', reason: 'no-holding' };
                     }
                 }
-                return { followerId, status: 'unknown' };
             } catch (err: any) {
-                console.error(`[CopyTrading] Critical error for follower ${followerId}:`, err);
-                return { followerId, status: 'error', message: err.message };
+                console.error(`[CopyTrading] Error for follower ${followerId}:`, err);
             }
         });
 
-        const results = await Promise.allSettled(tradePromises);
-        
-        await addDoc(collection(firestore, 'copyTradeAudit'), {
-            sourceUid,
-            tickerId,
-            type,
-            timestamp: serverTimestamp(),
-            followerCount: snapshot.size,
-            results: results.map((r: any) => r.status === 'fulfilled' ? r.value : { status: 'rejected', error: r.reason })
-        });
-
-        console.log(`[CopyTrading] Fan-out complete for ${sourceUid}. Audit log recorded.`);
+        await Promise.allSettled(tradePromises);
     } catch (error: any) {
         console.error("[CopyTrading] GLOBAL FAN-OUT FAILURE:", error);
-        await addDoc(collection(firestore, 'copyTradeAudit'), {
-            sourceUid,
-            tickerId,
-            type,
-            timestamp: serverTimestamp(),
-            status: 'critical_failure',
-            error: error.message
-        }).catch(() => {});
     }
 }
 
@@ -172,7 +126,6 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
-            // SPEND LOGIC: Bonus first, then main
             const spendFromBonus = Math.min(bonusBalance, ngnAmount);
             const spendFromMain = ngnAmount - spendFromBonus;
 
@@ -291,7 +244,6 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const finalPrice = newMarketCap / newSupply;
             const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
-            // SALES ALWAYS GO TO MAIN BALANCE
             transaction.update(userRef, { 
                 balance: (userDoc.data().balance || 0) + ngnToUser,
                 totalRealizedPnl: increment(realizedPnl),
@@ -430,6 +382,7 @@ export async function executeCreateTickerAction(input: CreateTickerInput) {
                 description: input.description,
                 icon: input.icon,
                 coverImage: input.coverImage,
+                initialSupply: input.supply, // Store for Market Cap display math
                 supply: finalSupply,
                 marketCap: finalMarketCap,
                 price: finalPrice,

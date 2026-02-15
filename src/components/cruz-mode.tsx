@@ -1,3 +1,4 @@
+
 'use client';
 import type { Ticker } from '@/lib/types';
 import Image from 'next/image';
@@ -23,6 +24,9 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
   const hasValidIcon = ticker.icon && isValidUrl(ticker.icon);
   const change24h = calculateMarketCapChange(ticker);
   const { formatAmount } = useCurrency();
+
+  // Standard Market Cap = Price * Total Supply
+  const totalMarketCapNgn = (ticker.price || 0) * (ticker.initialSupply || 1000000000);
 
   return (
     <section className="relative overflow-hidden rounded-lg border-2 border-primary/50 shadow-hard-lg p-6 abstract-bg">
@@ -74,7 +78,7 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
             </div>
              <div className="text-center">
                 <p className="font-bold">Market Cap</p>
-                <p className="font-semibold text-muted-foreground">{formatAmount(ticker.marketCap || 0, { maximumFractionDigits: 0 })}</p>
+                <p className="font-semibold text-muted-foreground">{formatAmount(totalMarketCapNgn, { maximumFractionDigits: 0 })}</p>
             </div>
         </div>
 

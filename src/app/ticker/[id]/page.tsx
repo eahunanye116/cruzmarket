@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -39,7 +40,6 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
 
   const activitiesQuery = useMemo(() => {
     if (!firestore || !resolvedParams.id) return null;
-    // OPTIMIZATION: Limit to 50 most recent activities to save quota
     return query(
       collection(firestore, 'activities'), 
       where('tickerId', '==', resolvedParams.id),
@@ -87,9 +87,10 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
   
   const tokenAge = ticker.createdAt ? formatDistanceToNow(ticker.createdAt.toDate(), { addSuffix: true }).replace('about ', '') : 'new';
   const volume24h = ticker.volume24h || 0;
+  const totalMarketCapNgn = (ticker.price || 0) * (ticker.initialSupply || 1000000000);
   
   const stats = [
-    { label: 'Market Cap', value: `₦${(ticker?.marketCap ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
+    { label: 'Market Cap', value: `₦${totalMarketCapNgn.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
     { label: '24h Volume', value: `₦${volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
   ];
   

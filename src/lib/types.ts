@@ -12,7 +12,8 @@ export type Ticker = {
   videoUrl?: string;
   price: number;
   supply: number;
-  marketCap: number; 
+  initialSupply: number; // Added to calculate actual Market Cap (Price * Total)
+  marketCap: number; // This represents the Reserve Balance (Liquidity)
   chartData: { time: string; price: number, volume: number, marketCap: number }[];
   recentActivity?: string;
   createdAt: Timestamp;
