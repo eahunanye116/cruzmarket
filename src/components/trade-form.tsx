@@ -18,11 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Ticker, PortfolioHolding, UserProfile } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowDown, Info } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, calculateReclaimableValue } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { cn, calculateReclaimableValue, calculateTokensForPurchase } from '@/lib/utils';
 import { executeBuyAction, executeSellAction } from '@/app/actions/trade-actions';
 import { useCurrency } from '@/hooks/use-currency';
 
@@ -83,18 +82,11 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   const ngnForCurve = ngnAmountToBuy - buyFeeNgn;
 
   const tokensToReceive = useMemo(() => {
-    if (!ngnForCurve || ngnForCurve <= 0) return 0;
-    const k = ticker.marketCap * ticker.supply;
-    const newMarketCap = ticker.marketCap + ngnForCurve;
-    return ticker.supply - (k / newMarketCap);
+    return calculateTokensForPurchase(ngnForCurve, ticker);
   }, [ngnForCurve, ticker]);
 
   const ngnToReceiveBeforeFee = useMemo(() => {
-    if (!tokenAmountToSell || tokenAmountToSell <= 0) return 0;
-    const k = ticker.marketCap * ticker.supply;
-    const newSupply = ticker.supply + tokenAmountToSell;
-    const usdOut = ticker.marketCap - (k / newSupply);
-    return Math.max(0, usdOut);
+    return calculateReclaimableValue(tokenAmountToSell, ticker);
   }, [tokenAmountToSell, ticker]);
   
   const sellFeeNgn = ngnToReceiveBeforeFee * TRANSACTION_FEE_PERCENTAGE;
@@ -126,7 +118,6 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
   async function onBuySubmit(values: z.infer<typeof buySchema>) {
     if (!user) return;
     setIsSubmitting(true);
-    // Always convert to NGN for the backend
     const amountInNgn = convertToNgn(values.amount);
     const result = await executeBuyAction(user.uid, ticker.id, amountInNgn);
     if (result.success) {

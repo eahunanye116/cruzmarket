@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { Ticker } from "./types";
@@ -32,18 +31,41 @@ export function calculateReclaimableValue(tokenAmount: number, ticker: Ticker): 
   const S_init = ticker.initialSupply || 1000000000;
   
   // R = R0 * e^(s / S_init)
-  // Current circulating tokens s:
+  // Current circulating tokens s (tokens already out of the curve):
   const currentS = S_init * Math.log(ticker.marketCap / R0);
   
   // New circulating tokens after sell:
   const newS = Math.max(0, currentS - tokenAmount);
   
-  // New reserve:
+  // New reserve (Liquidity remaining in curve):
   const newR = R0 * Math.exp(newS / S_init);
   
   const ngnOut = ticker.marketCap - newR;
   return ngnOut > 0 ? ngnOut : 0;
 };
+
+/**
+ * Calculates the amount of tokens a user will receive for a specific NGN purchase.
+ * Accounts for the price impact along an EXPONENTIAL bonding curve.
+ */
+export function calculateTokensForPurchase(ngnAmount: number, ticker: Ticker): number {
+  if (!ngnAmount || ngnAmount <= 0 || !ticker || ticker.marketCap <= 0) {
+    return 0;
+  }
+  const R0 = ticker.initialMarketCap || 100000;
+  const S_init = ticker.initialSupply || 1000000000;
+  
+  const currentR = ticker.marketCap;
+  const newR = currentR + ngnAmount;
+  
+  // Current circulating tokens s:
+  const currentS = S_init * Math.log(currentR / R0);
+  // New circulating tokens s:
+  const newS = S_init * Math.log(newR / R0);
+  
+  const tokensOut = newS - currentS;
+  return Math.max(0, tokensOut);
+}
 
 /**
  * Calculates the percentage change in Market Value (Reserve) over the last 24 hours.
