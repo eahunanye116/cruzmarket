@@ -1,9 +1,10 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, TrendingUp } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, TrendingUp, Sword } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   DropdownMenu,
@@ -14,9 +15,9 @@ import {
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
-  { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
+  { href: '/betting', label: 'Betting', icon: <Sword className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
-  { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-6 w-6" /> },
+  { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
 ];
 
 export function BottomNav() {
@@ -58,7 +59,7 @@ export function BottomNav() {
               )}
             >
               {item.icon}
-              {item.label}
+              <span className="text-[10px] mt-0.5">{item.label}</span>
             </Link>
           );
         })}
@@ -69,16 +70,21 @@ export function BottomNav() {
             <button
               className={cn(
                 'flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors outline-none',
-                ['/transactions', '/blog'].includes(pathname)
+                ['/transactions', '/blog', '/portfolio'].includes(pathname)
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-primary'
               )}
             >
               <MoreVertical className="h-6 w-6" />
-              More
+              <span className="text-[10px] mt-0.5">More</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 mb-4 border-2 shadow-hard-md">
+            <DropdownMenuItem asChild>
+              <Link href="/portfolio" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
+                <Wallet className="h-4 w-4 text-primary" /> My Portfolio
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/transactions" className="flex items-center gap-2 py-3 font-bold cursor-pointer">
                 <History className="h-4 w-4 text-primary" /> My Wallet

@@ -246,3 +246,29 @@ export type ChatMessage = {
   content: string;
   createdAt: Timestamp;
 };
+
+// --- Betting Types ---
+
+export type MatchOdds = {
+  home: number;
+  draw: number;
+  away: number;
+};
+
+export type BetMatch = {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  league: string;
+  startTime: Timestamp;
+  odds: MatchOdds;
+  sport: 'football' | 'basketball';
+};
+
+export type BetSelection = {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
+  outcome: '1' | 'X' | '2';
+  odds: number;
+};
