@@ -20,7 +20,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 // Must match the server action constant for accurate PnL preview
-const MARKET_LIQUIDITY_FACTOR = 1000000; 
+const MARKET_LIQUIDITY_FACTOR = 40000000; 
 
 export default function MarketDetailsPage() {
     const params = useParams();
