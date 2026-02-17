@@ -71,7 +71,13 @@ export async function getUpcomingMatches(): Promise<{ success: boolean; matches:
             }
         ];
 
-        return { success: true, matches: mockMatches };
+        // Convert Timestamps to plain numbers (milliseconds) for Next.js Server Action serialization
+        const serializedMatches = mockMatches.map(match => ({
+            ...match,
+            startTime: match.startTime instanceof Timestamp ? match.startTime.toMillis() : match.startTime
+        }));
+
+        return { success: true, matches: serializedMatches };
     } catch (error: any) {
         return { success: false, matches: [] };
     }

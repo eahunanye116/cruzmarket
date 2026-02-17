@@ -260,7 +260,7 @@ export type BetMatch = {
   homeTeam: string;
   awayTeam: string;
   league: string;
-  startTime: Timestamp;
+  startTime: any; // Using any to support both Timestamp and number for serializability
   odds: MatchOdds;
   sport: 'football' | 'basketball';
 };

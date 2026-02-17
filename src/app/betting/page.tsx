@@ -82,7 +82,7 @@ export default function BettingPage() {
                                 <Card key={match.id} className="overflow-hidden border-2 transition-all hover:border-primary/40">
                                     <div className="bg-muted/30 px-4 py-2 border-b text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex justify-between">
                                         <span>{match.league}</span>
-                                        <span>{format(match.startTime.toDate(), 'PPP p')}</span>
+                                        <span>{format(new Date(match.startTime), 'PPP p')}</span>
                                     </div>
                                     <CardContent className="p-4 sm:p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
