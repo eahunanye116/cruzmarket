@@ -262,7 +262,7 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
               <CardContent>
                 <TradeForm ticker={ticker} />
               </CardContent>
-            </div>
+            </Card>
           </div>
         </div>
       </div>
