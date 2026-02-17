@@ -1,7 +1,5 @@
-
 'use client';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Copy, Check, ArrowDownRight, ArrowUpRight, CircleCheckBig } from 'lucide-react';
 import { useDoc, useCollection, useFirestore } from '@/firebase';
@@ -11,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { use, useMemo, useState } from 'react';
 import { cn, calculateMarketCapChange } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatDistanceToNow, sub } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { TradeForm } from '@/components/trade-form';
 import { TickerTransactions } from '@/components/ticker-transactions';
 import { TokenAnalysis } from '@/components/token-analysis';
@@ -103,11 +101,10 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
       <Card className="overflow-hidden mb-8">
         <div className="relative h-48 w-full">
               {hasValidCover ? (
-                <Image
+                <img
                     src={ticker.coverImage}
                     alt={`${ticker.name} cover image`}
-                    fill
-                    className="object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
                 />
               ) : (
                 <div className="absolute inset-0 bg-muted"></div>
@@ -117,7 +114,7 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
           <CardHeader className="relative -mt-16 sm:-mt-20 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:gap-6">
                 {hasValidIcon ? (
-                    <Image
+                    <img
                         src={ticker.icon}
                         alt={`${ticker.name} icon`}
                         width={100}
@@ -265,7 +262,7 @@ export default function TickerPage({ params }: { params: Promise<{ id: string }>
               <CardContent>
                 <TradeForm ticker={ticker} />
               </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
       </div>

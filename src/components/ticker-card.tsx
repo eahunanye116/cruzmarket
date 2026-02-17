@@ -1,8 +1,6 @@
-
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Ticker } from '@/lib/types';
 import { TickerSparkline } from './ticker-sparkline';
@@ -44,7 +42,14 @@ export function TickerCard({ ticker }: { ticker: Ticker }) {
         <CardContent className="p-4 flex flex-col flex-grow space-y-4">
             <div className="flex items-start gap-4">
                 {hasValidIcon ? (
-                    <Image src={ticker.icon} alt={ticker.name} width={40} height={40} className="rounded-none border-2 aspect-square object-cover" />
+                    <img 
+                        src={ticker.icon} 
+                        alt={ticker.name} 
+                        width={40} 
+                        height={40} 
+                        className="rounded-none border-2 aspect-square object-cover" 
+                        loading="lazy"
+                    />
                 ) : (
                     <div className="h-10 w-10 border-2 bg-muted"></div>
                 )}

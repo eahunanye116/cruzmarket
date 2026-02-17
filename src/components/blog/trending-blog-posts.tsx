@@ -1,8 +1,7 @@
 'use client';
 import { BlogPost } from '@/lib/types';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Star } from 'lucide-react';
 
@@ -23,8 +22,12 @@ export function TrendingBlogPosts({ posts }: { posts: BlogPost[] }) {
                         <Card className="h-full flex flex-row lg:flex-col overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
                             {/* Image container */}
                             <div className="relative w-1/3 lg:w-full flex-shrink-0">
-                                <div className="w-full aspect-square lg:aspect-video">
-                                     <Image src={featuredPost.coverImage} alt={featuredPost.title} fill className="object-cover" priority sizes="(max-width: 1023px) 33vw, 50vw"/>
+                                <div className="w-full aspect-square lg:aspect-video relative">
+                                     <img 
+                                        src={featuredPost.coverImage} 
+                                        alt={featuredPost.title} 
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                     />
                                      <div className="absolute top-2 left-2 lg:top-4 lg:left-4">
                                         <Badge>
                                             <Star className="h-3 w-3 mr-1.5 fill-current" />
@@ -50,7 +53,12 @@ export function TrendingBlogPosts({ posts }: { posts: BlogPost[] }) {
                            <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
                                 <Card className="h-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
                                     <div className="relative w-full aspect-video">
-                                         <Image src={post.coverImage} alt={post.title} fill className="object-cover" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
+                                         <img 
+                                            src={post.coverImage} 
+                                            alt={post.title} 
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            loading="lazy"
+                                         />
                                     </div>
                                     <div className="p-4 flex-grow flex flex-col justify-center">
                                         <h4 className="font-bold font-headline leading-tight">{post.title}</h4>

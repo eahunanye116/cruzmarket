@@ -8,7 +8,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Ban, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -192,12 +191,13 @@ export default function PortfolioPage() {
                   <TableCell>
                     <div className="flex items-center gap-4">
                       {hasValidIcon ? (
-                        <Image
+                        <img
                           src={holding.ticker.icon}
                           alt={holding.ticker.name}
                           width={32}
                           height={32}
                           className="rounded-none border-2 aspect-square object-cover"
+                          loading="lazy"
                         />
                       ) : (
                          <div className="h-8 w-8 rounded-none border-2 aspect-square bg-muted" />

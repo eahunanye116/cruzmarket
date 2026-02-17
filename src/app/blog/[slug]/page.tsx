@@ -1,10 +1,8 @@
-
 import 'server-only';
 import { getFirestoreInstance } from "@/firebase/server";
 import { BlogPost } from "@/lib/types";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { notFound } from "next/navigation";
-import Image from 'next/image';
 import { format } from "date-fns";
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -116,13 +114,10 @@ export default async function BlogPostPage({ params }: Props) {
             </header>
 
             <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden border-2 mb-12 shadow-hard-md">
-                <Image
+                <img
                     src={post.coverImage}
                     alt={post.title}
-                    fill
-                    className="object-cover"
-                    priority
-                    sizes="(max-width: 1024px) 100vw, 896px"
+                    className="absolute inset-0 w-full h-full object-cover"
                 />
             </div>
 

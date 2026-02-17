@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
@@ -23,7 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
-import Image from 'next/image';
 import { EditTickerDialog } from './edit-ticker-dialog';
 import { Switch } from '../ui/switch';
 import { cn } from '@/lib/utils';
@@ -124,7 +122,14 @@ export function TickerManagement() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                          {isValidUrl(ticker.icon) ? (
-                            <Image src={ticker.icon} alt={ticker.name} width={32} height={32} className="rounded-none border aspect-square object-cover" />
+                            <img 
+                                src={ticker.icon} 
+                                alt={ticker.name} 
+                                width={32} 
+                                height={32} 
+                                className="rounded-none border aspect-square object-cover" 
+                                loading="lazy"
+                            />
                         ) : (
                             <div className="h-8 w-8 rounded-none border aspect-square bg-muted" />
                         )}

@@ -11,8 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, Edit, Save, X, Coins, Info, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, PlusCircle, Trash2, Edit, Save, Coins, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import {
@@ -186,7 +185,7 @@ export function PerpMarketManagement() {
                                     <TableRow key={market.id}>
                                         <TableCell className="pl-6">
                                             <div className="flex items-center gap-3">
-                                                <Image src={market.icon} alt={market.name} width={24} height={24} className="rounded-full aspect-square object-cover" />
+                                                <img src={market.icon} alt={market.name} width={24} height={24} className="rounded-full aspect-square object-cover" loading="lazy" />
                                                 <span className="font-bold">{market.name}</span>
                                             </div>
                                         </TableCell>

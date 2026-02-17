@@ -8,14 +8,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import Image from 'next/image';
 import { Ban, Landmark, Loader2, Search, ArrowRight, Wallet, History, Send, CheckCircle2, AlertCircle, Trash2, ExternalLink, Bitcoin, Coins, Copy, ShoppingBag, Clock, ShieldCheck, RefreshCcw, Gift, User as UserIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Activity, Ticker, UserProfile, WithdrawalRequest } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -381,7 +380,7 @@ const ITEMS_PER_PAGE = 7;
 export default function WalletPage() {
   const user = useUser();
   const firestore = useFirestore();
-  const { formatAmount, symbol } = useCurrency();
+  const { formatAmount } = useCurrency();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -718,7 +717,23 @@ export default function WalletPage() {
                 <TableBody>
                     {filteredAssets.slice(0, visibleAssets).map((asset) => (
                         <TableRow key={asset.tickerId}>
-                            <TableCell><div className="flex items-center gap-4">{isValidUrl(asset.tickerIcon) ? <Image src={asset.tickerIcon} alt={asset.tickerName} width={32} height={32} className="rounded-none border-2 aspect-square object-cover" /> : <div className="h-8 w-8 border-2 bg-muted" />}<p className="font-medium">{asset.tickerName}</p></div></TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-4">
+                                    {isValidUrl(asset.tickerIcon) ? (
+                                        <img 
+                                            src={asset.tickerIcon} 
+                                            alt={asset.tickerName} 
+                                            width={32} 
+                                            height={32} 
+                                            className="rounded-none border-2 aspect-square object-cover" 
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div className="h-8 w-8 border-2 bg-muted" />
+                                    )}
+                                    <p className="font-medium">{asset.tickerName}</p>
+                                </div>
+                            </TableCell>
                             <TableCell>{asset.tradeCount}</TableCell>
                             <TableCell className={cn("font-medium", asset.realizedPnl > 0 ? "text-accent" : asset.realizedPnl < 0 ? "text-destructive" : "text-muted-foreground")}>{formatAmount(asset.realizedPnl, { signDisplay: 'auto' })}</TableCell>
                             <TableCell className="text-muted-foreground text-xs">{formatDistanceToNow(asset.lastActivity, { addSuffix: true })}</TableCell>

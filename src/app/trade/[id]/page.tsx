@@ -6,7 +6,6 @@ import { notFound } from 'next/navigation';
 import { use, useState, useEffect, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import Image from 'next/image';
 import { cn, calculateReclaimableValue } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Calendar, Hash, CircleDollarSign, Banknote, Briefcase, Wallet, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
@@ -139,12 +138,12 @@ export default function TradeDetailsPage({ params }: { params: Promise<{ id: str
   const tickerHeader = (
     <CardHeader className="flex-row items-center gap-4 space-y-0">
         {hasValidIcon ? (
-            <Image
-            src={ticker.icon}
-            alt={ticker.name}
-            width={48}
-            height={48}
-            className="rounded-none border-2 aspect-square object-cover"
+            <img
+                src={ticker.icon}
+                alt={ticker.name}
+                width={48}
+                height={48}
+                className="rounded-none border-2 aspect-square object-cover"
             />
         ) : (
             <div className="h-12 w-12 rounded-none border-2 aspect-square bg-muted" />

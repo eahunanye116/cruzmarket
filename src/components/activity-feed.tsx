@@ -1,10 +1,9 @@
-import Image from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Activity } from '@/lib/types';
 import { Sparkles, Minus, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 function isValidUrl(url: string) {
     try {
@@ -85,12 +84,13 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
                 <li key={activity.id} className="flex items-center gap-4">
                   <div className="flex-shrink-0">
                     {hasValidIcon ? (
-                      <Image
+                      <img
                         src={activity.tickerIcon!}
                         alt={activity.tickerName || 'Activity'}
                         width={40}
                         height={40}
                         className="rounded-none border-2 aspect-square object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="h-10 w-10 border-2 bg-muted"></div>

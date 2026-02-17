@@ -1,7 +1,5 @@
-
 'use client';
 import type { Ticker } from '@/lib/types';
-import Image from 'next/image';
 import { Button } from './ui/button';
 import { ArrowDownRight, ArrowUpRight, CircleCheckBig, Info } from 'lucide-react';
 import Link from 'next/link';
@@ -46,9 +44,15 @@ export function CruzMode({ ticker }: { ticker: Ticker }) {
         
         <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
             {hasValidIcon ? (
-                <Image src={ticker.icon} alt={ticker.name} width={100} height={100} className="rounded-none border-4 border-background aspect-square object-cover" />
+                <img 
+                    src={ticker.icon} 
+                    alt={ticker.name} 
+                    width={100} 
+                    height={100} 
+                    className="rounded-none border-4 border-background aspect-square object-cover bg-background" 
+                />
             ) : (
-                <div className="h-[100px] w-[100px] rounded-none border-4 border-background bg-muted"></div>
+                <div className="h-[100px] w-[100px] rounded-none border-4 border-background bg-background bg-muted"></div>
             )}
             <div className="text-left">
                  <div className="flex items-center gap-2">

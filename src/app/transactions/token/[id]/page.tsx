@@ -6,7 +6,6 @@ import { doc, collection, query, where } from 'firebase/firestore';
 import { Activity, Ticker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Minus, Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -123,7 +122,14 @@ export default function TokenTransactionHistoryPage() {
             <CardHeader className="px-0">
                 <div className="flex items-center gap-4">
                     {isValidUrl(ticker.icon) && (
-                        <Image src={ticker.icon} alt={ticker.name} width={64} height={64} className="rounded-none border-2"/>
+                        <img 
+                            src={ticker.icon} 
+                            alt={ticker.name} 
+                            width={64} 
+                            height={64} 
+                            className="rounded-none border-2"
+                            loading="lazy"
+                        />
                     )}
                     <div>
                         <CardTitle className="text-3xl font-headline">Trade History for ${ticker.name}</CardTitle>

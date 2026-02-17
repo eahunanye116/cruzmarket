@@ -3,8 +3,7 @@ import { useCollection, useFirestore } from '@/firebase';
 import { BlogPost } from '@/lib/types';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import Image from 'next/image';
+import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { TrendingBlogPosts } from '@/components/blog/trending-blog-posts';
@@ -14,16 +13,13 @@ function BlogPostCard({ post }: { post: BlogPost }) {
         <Link href={`/blog/${post.slug}`} className="group block h-full">
             <Card className="flex flex-col h-full overflow-hidden transition-all duration-300 group-hover:shadow-hard-lg group-hover:-translate-y-1 group-hover:-translate-x-1">
                 {/* Image container */}
-                <div className="relative w-full">
-                    <div className="w-full aspect-video">
-                        <Image
-                            src={post.coverImage}
-                            alt={post.title}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        />
-                    </div>
+                <div className="relative w-full aspect-video">
+                    <img
+                        src={post.coverImage}
+                        alt={post.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                    />
                 </div>
 
                 {/* Content container */}
