@@ -19,6 +19,9 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
+// Must match the server action constant for accurate PnL preview
+const MARKET_LIQUIDITY_FACTOR = 1000000; 
+
 export default function MarketDetailsPage() {
     const params = useParams();
     const marketId = params.id as string;
@@ -304,6 +307,3 @@ export default function MarketDetailsPage() {
         </div>
     );
 }
-
-// Re-export constants needed for UI logic
-const MARKET_LIQUIDITY_FACTOR = 50000; 

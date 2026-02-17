@@ -7,7 +7,8 @@ import { revalidatePath } from 'next/cache';
 import type { PredictionMarket, MarketPosition, UserProfile } from '@/lib/types';
 
 // The "Thickness" of the market. Higher = more money needed to move the price.
-const MARKET_LIQUIDITY_FACTOR = 50000; 
+// Increased to 1,000,000 to handle 100k+ trades with reasonable slippage.
+const MARKET_LIQUIDITY_FACTOR = 1000000; 
 
 export async function createMarketAction(payload: {
     question: string;
