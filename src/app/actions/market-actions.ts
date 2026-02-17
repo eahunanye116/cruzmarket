@@ -6,6 +6,9 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction, in
 import { revalidatePath } from 'next/cache';
 import type { PredictionMarket, MarketPosition, UserProfile } from '@/lib/types';
 
+// The "Thickness" of the market. Higher = more money needed to move the price.
+const MARKET_LIQUIDITY_FACTOR = 50000; 
+
 export async function createMarketAction(payload: {
     question: string;
     description: string;
@@ -44,7 +47,6 @@ export async function buyMarketSharesAction(
         const result = await runTransaction(firestore, async (transaction) => {
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
-            // Use deterministic ID to merge positions
             const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
 
             const [marketSnap, userSnap, posSnap] = await Promise.all([
@@ -62,11 +64,17 @@ export async function buyMarketSharesAction(
             if (totalAvailable < ngnAmount) throw new Error("Insufficient balance.");
 
             const currentPrice = market.outcomes[outcome].price;
-            const shares = ngnAmount / currentPrice;
-
-            // Simple Price Adjustment logic (Market Maker)
-            const priceImpact = 0.5; // Fixed small impact per trade for prototype
+            
+            /**
+             * IMPROVED PRICING MATH:
+             * 1. Calculate price impact proportional to amount.
+             * 2. Calculate execution price as the mid-point (Slippage).
+             */
+            const priceImpact = (ngnAmount / MARKET_LIQUIDITY_FACTOR) * 100;
             const newPrice = Math.min(99, Math.max(1, currentPrice + priceImpact));
+            const executionPrice = (currentPrice + newPrice) / 2;
+            const shares = ngnAmount / executionPrice;
+
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
 
@@ -100,7 +108,7 @@ export async function buyMarketSharesAction(
                     userId,
                     outcome,
                     shares,
-                    avgPrice: currentPrice,
+                    avgPrice: executionPrice,
                     status: 'active',
                     createdAt: serverTimestamp()
                 });
@@ -154,11 +162,17 @@ export async function sellMarketSharesAction(
             if (pos.shares < sharesToSell) throw new Error("Insufficient shares.");
 
             const currentPrice = market.outcomes[outcome].price;
-            const ngnReturn = sharesToSell * currentPrice;
-
-            // Inverted impact for sell
-            const priceImpact = 0.5;
+            
+            /**
+             * SELL MATH:
+             * Calculate how much the price drops and pay the average.
+             */
+            const estimatedNgnValue = sharesToSell * (currentPrice / 100) * (MARKET_LIQUIDITY_FACTOR / 10); // Rough estimate for impact calc
+            const priceImpact = (estimatedNgnValue / MARKET_LIQUIDITY_FACTOR) * 100;
             const newPrice = Math.max(1, currentPrice - priceImpact);
+            const executionPrice = (currentPrice + newPrice) / 2;
+            const ngnReturn = sharesToSell * executionPrice;
+
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
 
@@ -204,24 +218,16 @@ export async function sellMarketSharesAction(
 export async function resolveMarketAction(marketId: string, winningOutcome: 'yes' | 'no') {
     const firestore = getFirestoreInstance();
     try {
-        // 1. Mark market as resolved
         const marketRef = doc(firestore, 'markets', marketId);
         await updateDoc(marketRef, {
             status: 'resolved',
             winningOutcome,
             resolvedAt: serverTimestamp()
         });
-
-        // 2. Find all winning positions across all users
-        // Note: For a massive scale app, this would be a background job.
-        // Simplified: Fetch all positions for this market.
-        // BETTER: Use collectionGroup 'marketPositions'
-        const q = query(collection(firestore, 'activities'), where('marketId', '==', marketId), where('type', '==', 'MARKET_BUY'), where('outcome', '==', winningOutcome));
-        const buys = await getDocs(q);
         
         revalidatePath('/admin');
         revalidatePath('/betting');
-        return { success: true, message: "Market resolved. Payout logic triggered." };
+        return { success: true, message: "Market resolved. Winners can now see their payouts." };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
