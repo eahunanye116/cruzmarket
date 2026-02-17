@@ -2,7 +2,7 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction, increment, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction, increment, getDocs, query, where, writeBatch, setDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import type { PredictionMarket, MarketPosition, UserProfile } from '@/lib/types';
 
@@ -44,11 +44,13 @@ export async function buyMarketSharesAction(
         const result = await runTransaction(firestore, async (transaction) => {
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
-            const posRef = doc(collection(firestore, `users/${userId}/marketPositions`));
+            // Use deterministic ID to merge positions
+            const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
 
-            const [marketSnap, userSnap] = await Promise.all([
+            const [marketSnap, userSnap, posSnap] = await Promise.all([
                 transaction.get(marketRef),
-                transaction.get(userRef)
+                transaction.get(userRef),
+                transaction.get(posRef)
             ]);
 
             if (!marketSnap.exists()) throw new Error("Market not found.");
@@ -84,15 +86,25 @@ export async function buyMarketSharesAction(
                 volume: increment(ngnAmount)
             });
 
-            transaction.set(posRef, {
-                marketId,
-                userId,
-                outcome,
-                shares,
-                avgPrice: currentPrice,
-                status: 'active',
-                createdAt: serverTimestamp()
-            });
+            if (posSnap.exists()) {
+                const existingPos = posSnap.data() as MarketPosition;
+                const totalShares = existingPos.shares + shares;
+                const totalCost = (existingPos.avgPrice * existingPos.shares) + ngnAmount;
+                transaction.update(posRef, {
+                    shares: totalShares,
+                    avgPrice: totalCost / totalShares
+                });
+            } else {
+                transaction.set(posRef, {
+                    marketId,
+                    userId,
+                    outcome,
+                    shares,
+                    avgPrice: currentPrice,
+                    status: 'active',
+                    createdAt: serverTimestamp()
+                });
+            }
 
             transaction.set(doc(collection(firestore, 'activities')), {
                 type: 'MARKET_BUY',
@@ -104,6 +116,81 @@ export async function buyMarketSharesAction(
             });
 
             return { shares };
+        });
+
+        revalidatePath('/betting');
+        revalidatePath(`/betting/${marketId}`);
+        return { success: true, ...result };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function sellMarketSharesAction(
+    userId: string,
+    marketId: string,
+    outcome: 'yes' | 'no',
+    sharesToSell: number
+) {
+    const firestore = getFirestoreInstance();
+    try {
+        const result = await runTransaction(firestore, async (transaction) => {
+            const marketRef = doc(firestore, 'markets', marketId);
+            const userRef = doc(firestore, 'users', userId);
+            const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
+
+            const [marketSnap, userSnap, posSnap] = await Promise.all([
+                transaction.get(marketRef),
+                transaction.get(userRef),
+                transaction.get(posRef)
+            ]);
+
+            if (!marketSnap.exists()) throw new Error("Market not found.");
+            const market = marketSnap.data() as PredictionMarket;
+            if (market.status !== 'open') throw new Error("Market is closed.");
+
+            if (!posSnap.exists()) throw new Error("You don't have any shares to sell.");
+            const pos = posSnap.data() as MarketPosition;
+            if (pos.shares < sharesToSell) throw new Error("Insufficient shares.");
+
+            const currentPrice = market.outcomes[outcome].price;
+            const ngnReturn = sharesToSell * currentPrice;
+
+            // Inverted impact for sell
+            const priceImpact = 0.5;
+            const newPrice = Math.max(1, currentPrice - priceImpact);
+            const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
+            const oppPrice = 100 - newPrice;
+
+            transaction.update(userRef, {
+                balance: increment(ngnReturn)
+            });
+
+            transaction.update(marketRef, {
+                [`outcomes.${outcome}.price`]: newPrice,
+                [`outcomes.${outcome}.totalShares`]: increment(-sharesToSell),
+                [`outcomes.${oppOutcome}.price`]: oppPrice,
+                volume: increment(ngnReturn)
+            });
+
+            if (pos.shares === sharesToSell) {
+                transaction.delete(posRef);
+            } else {
+                transaction.update(posRef, {
+                    shares: increment(-sharesToSell)
+                });
+            }
+
+            transaction.set(doc(collection(firestore, 'activities')), {
+                type: 'MARKET_SELL',
+                value: ngnReturn,
+                userId,
+                marketId,
+                outcome,
+                createdAt: serverTimestamp()
+            });
+
+            return { ngnReturn };
         });
 
         revalidatePath('/betting');
@@ -127,22 +214,10 @@ export async function resolveMarketAction(marketId: string, winningOutcome: 'yes
 
         // 2. Find all winning positions across all users
         // Note: For a massive scale app, this would be a background job.
-        const positionsQuery = query(
-            collection(firestore, 'marketPositions'), // Assuming collectionGroup or just scanning
-            where('marketId', '==', marketId),
-            where('outcome', '==', winningOutcome),
-            where('status', '==', 'active')
-        );
-        
-        // In this implementation, we'll use collectionGroup for positions if indexed, 
-        // but for now, we'll assume positions are in user subcollections and needs a batch payout.
         // Simplified: Fetch all positions for this market.
         // BETTER: Use collectionGroup 'marketPositions'
         const q = query(collection(firestore, 'activities'), where('marketId', '==', marketId), where('type', '==', 'MARKET_BUY'), where('outcome', '==', winningOutcome));
         const buys = await getDocs(q);
-        
-        // This is a complex operation. In a prototype, we'll mark the market as resolved.
-        // Payouts should ideally happen via a batch.
         
         revalidatePath('/admin');
         revalidatePath('/betting');

@@ -1,18 +1,18 @@
 
 'use client';
 
-import { useDoc, useFirestore, useUser } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { useParams, notFound } from 'next/navigation';
-import { PredictionMarket, UserProfile } from '@/lib/types';
+import { PredictionMarket, UserProfile, MarketPosition } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet, CircleDollarSign, TrendingDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { buyMarketSharesAction } from '@/app/actions/market-actions';
+import { buyMarketSharesAction, sellMarketSharesAction } from '@/app/actions/market-actions';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,9 +32,16 @@ export default function MarketDetailsPage() {
     const userRef = user && firestore ? doc(firestore, 'users', user.uid) : null;
     const { data: profile } = useDoc<UserProfile>(userRef);
 
+    const positionsQuery = (user && firestore) ? query(
+        collection(firestore, `users/${user.uid}/marketPositions`),
+        where('marketId', '==', marketId)
+    ) : null;
+    const { data: positions, loading: positionsLoading } = useCollection<MarketPosition>(positionsQuery);
+
     const [buyOutcome, setBuyOutcome] = useState<'yes' | 'no' | null>(null);
     const [amountInput, setAmountInput] = useState<string>('1000');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [sellingId, setSellingId] = useState<string | null>(null);
 
     const handleBuy = async () => {
         if (!user || !buyOutcome || !market) return;
@@ -55,6 +62,18 @@ export default function MarketDetailsPage() {
             toast({ variant: 'destructive', title: "Order Failed", description: result.error });
         }
         setIsSubmitting(false);
+    };
+
+    const handleSell = async (pos: MarketPosition) => {
+        if (!user || !market) return;
+        setSellingId(pos.id);
+        const result = await sellMarketSharesAction(user.uid, market.id, pos.outcome, pos.shares);
+        if (result.success) {
+            toast({ title: "Shares Sold", description: `You received ₦${result.ngnReturn?.toLocaleString()}.` });
+        } else {
+            toast({ variant: 'destructive', title: "Sell Failed", description: result.error });
+        }
+        setSellingId(null);
     };
 
     if (loading) return <div className="container mx-auto py-12 p-4"><Skeleton className="h-96 w-full" /></div>;
@@ -111,6 +130,61 @@ export default function MarketDetailsPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {positions && positions.length > 0 && (
+                        <Card className="border-2 border-primary/20">
+                            <CardHeader className="bg-primary/5 py-4">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <CircleDollarSign className="h-5 w-5 text-primary" /> My Positions
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="divide-y-2">
+                                    {positions.map((pos) => {
+                                        const mPrice = market.outcomes[pos.outcome].price;
+                                        const currentValue = pos.shares * mPrice;
+                                        const costBasis = pos.shares * pos.avgPrice;
+                                        const pnl = currentValue - costBasis;
+                                        const pnlPercent = (pnl / costBasis) * 100;
+
+                                        return (
+                                            <div key={pos.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <div className="flex items-center gap-4">
+                                                    <Badge variant={pos.outcome === 'yes' ? 'default' : 'destructive'} className="h-8 px-3 text-sm font-bold uppercase">
+                                                        {pos.outcome}
+                                                    </Badge>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-muted-foreground uppercase">Shares Owned</p>
+                                                        <p className="text-lg font-bold">{pos.shares.toFixed(2)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-8 items-center">
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Unrealized P/L</p>
+                                                        <div className={cn("flex items-center justify-end font-bold text-lg", pnl >= 0 ? "text-accent" : "text-destructive")}>
+                                                            {pnl >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+                                                            ₦{Math.abs(pnl).toLocaleString()} ({pnlPercent.toFixed(1)}%)
+                                                        </div>
+                                                    </div>
+                                                    {market.status === 'open' && (
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            onClick={() => handleSell(pos)}
+                                                            disabled={sellingId === pos.id}
+                                                            className="h-10 px-4 font-bold border-2"
+                                                        >
+                                                            {sellingId === pos.id ? <Loader2 className="animate-spin h-4 w-4" /> : 'SELL'}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {market.status === 'resolved' && (
                         <Card className="border-accent/50 bg-accent/5">
