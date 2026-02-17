@@ -1,23 +1,24 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useState, useEffect } from 'react';
+import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
-import { PredictionMarket } from '@/lib/types';
+import { PredictionMarket, MarketSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink, Settings2, Info, Save } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { createMarketAction, resolveMarketAction } from '@/app/actions/market-actions';
+import { createMarketAction, resolveMarketAction, updateMarketSettingsAction } from '@/app/actions/market-actions';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { Skeleton } from '../ui/skeleton';
 
 export function MarketManagement() {
     const firestore = useFirestore();
@@ -26,9 +27,13 @@ export function MarketManagement() {
     const marketsQuery = firestore ? query(collection(firestore, 'markets'), orderBy('createdAt', 'desc')) : null;
     const { data: markets, loading } = useCollection<PredictionMarket>(marketsQuery);
 
+    const settingsRef = firestore ? doc(firestore, 'settings', 'markets') : null;
+    const { data: settings, loading: settingsLoading } = useDoc<MarketSettings>(settingsRef);
+
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isResolvingId, setIsResolvingId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     // Form State
     const [question, setQuestion] = useState('');
@@ -36,6 +41,15 @@ export function MarketManagement() {
     const [category, setCategory] = useState('Politics');
     const [endsAt, setEndsAt] = useState('');
     const [image, setImage] = useState('');
+
+    // Settings State
+    const [liquidityInput, setLiquidityInput] = useState<string>('40000000');
+
+    useEffect(() => {
+        if (settings) {
+            setLiquidityInput(settings.liquidityFactor.toString());
+        }
+    }, [settings]);
 
     const handleCreateMarket = async () => {
         if (!question || !endsAt) return;
@@ -72,81 +86,139 @@ export function MarketManagement() {
         toast({ title: "Market Deleted" });
     };
 
+    const handleSaveSettings = async () => {
+        const val = Number(liquidityInput);
+        if (isNaN(val) || val <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid value' });
+            return;
+        }
+        setIsSavingSettings(true);
+        const result = await updateMarketSettingsAction(val);
+        if (result.success) {
+            toast({ title: 'Settings Saved' });
+        } else {
+            toast({ variant: 'destructive', title: 'Save Failed', description: result.error });
+        }
+        setIsSavingSettings(false);
+    };
+
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <Vote className="h-5 w-5 text-primary" /> Prediction Markets
-                            </CardTitle>
-                            <CardDescription>Launch and resolve outcome-based markets.</CardDescription>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Vote className="h-5 w-5 text-primary" /> Prediction Markets
+                                </CardTitle>
+                                <CardDescription>Launch and resolve outcome-based markets.</CardDescription>
+                            </div>
+                            <Button onClick={() => setIsCreateOpen(true)}><PlusCircle className="mr-2" /> New Market</Button>
                         </div>
-                        <Button onClick={() => setIsCreateOpen(true)}><PlusCircle className="mr-2" /> New Market</Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="border rounded-lg overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Question</TableHead>
-                                    <TableHead>Ends</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-12"><Loader2 className="animate-spin mx-auto h-8 w-8" /></TableCell></TableRow>
-                                ) : markets?.map(m => (
-                                    <TableRow key={m.id}>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-sm line-clamp-1">{m.question}</span>
-                                                <span className="text-[10px] text-muted-foreground uppercase">{m.category}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-xs">{format(m.endsAt.toDate(), 'PP')}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={m.status === 'open' ? 'default' : 'secondary'}>{m.status.toUpperCase()}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" asChild><Link href={`/betting/${m.id}`}><ExternalLink className="h-4 w-4"/></Link></Button>
-                                                {m.status === 'open' && (
-                                                    <>
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="outline" 
-                                                            className="text-accent border-accent/20"
-                                                            onClick={() => handleResolve(m.id, 'yes')}
-                                                            disabled={!!isResolvingId}
-                                                        >
-                                                            {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'Yes'}
-                                                        </Button>
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="outline" 
-                                                            className="text-destructive border-destructive/20"
-                                                            onClick={() => handleResolve(m.id, 'no')}
-                                                            disabled={!!isResolvingId}
-                                                        >
-                                                            {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'No'}
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
-                                            </div>
-                                        </TableCell>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="border rounded-lg overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Question</TableHead>
+                                        <TableHead>Ends</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {loading ? (
+                                        <TableRow><TableCell colSpan={4} className="text-center py-12"><Loader2 className="animate-spin mx-auto h-8 w-8" /></TableCell></TableRow>
+                                    ) : markets?.map(m => (
+                                        <TableRow key={m.id}>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-sm line-clamp-1">{m.question}</span>
+                                                    <span className="text-[10px] text-muted-foreground uppercase">{m.category}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-xs">{format(m.endsAt.toDate(), 'PP')}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={m.status === 'open' ? 'default' : 'secondary'}>{m.status.toUpperCase()}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="ghost" size="icon" asChild><Link href={`/betting/${m.id}`}><ExternalLink className="h-4 w-4"/></Link></Button>
+                                                    {m.status === 'open' && (
+                                                        <>
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="outline" 
+                                                                className="text-accent border-accent/20"
+                                                                onClick={() => handleResolve(m.id, 'yes')}
+                                                                disabled={!!isResolvingId}
+                                                            >
+                                                                {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'Yes'}
+                                                            </Button>
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="outline" 
+                                                                className="text-destructive border-destructive/20"
+                                                                onClick={() => handleResolve(m.id, 'no')}
+                                                                disabled={!!isResolvingId}
+                                                            >
+                                                                {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'No'}
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Settings2 className="h-5 w-5 text-accent" /> Global Settings
+                        </CardTitle>
+                        <CardDescription>Configure market engine parameters.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {settingsLoading ? (
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        Market Liquidity Factor
+                                        <Info className="h-3 w-3 text-muted-foreground" title="Higher = More depth (less slippage)" />
+                                    </Label>
+                                    <Input 
+                                        type="number" 
+                                        value={liquidityInput} 
+                                        onChange={e => setLiquidityInput(e.target.value)} 
+                                        className="font-mono font-bold"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                        Controls how much the price moves per trade. 
+                                        Recommended: <b>40,000,000</b> for deep markets.
+                                    </p>
+                                </div>
+                                <Button className="w-full" onClick={handleSaveSettings} disabled={isSavingSettings}>
+                                    {isSavingSettings ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Save Config
+                                </Button>
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogContent className="sm:max-w-md">

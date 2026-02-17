@@ -4,7 +4,7 @@
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
 import { useParams, notFound } from 'next/navigation';
-import { PredictionMarket, UserProfile, MarketPosition } from '@/lib/types';
+import { PredictionMarket, UserProfile, MarketPosition, MarketSettings } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,6 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-// Must match the server action constant for accurate PnL preview
-const MARKET_LIQUIDITY_FACTOR = 40000000; 
-
 export default function MarketDetailsPage() {
     const params = useParams();
     const marketId = params.id as string;
@@ -31,6 +28,10 @@ export default function MarketDetailsPage() {
 
     const marketRef = firestore ? doc(firestore, 'markets', marketId) : null;
     const { data: market, loading } = useDoc<PredictionMarket>(marketRef);
+
+    const settingsRef = firestore ? doc(firestore, 'settings', 'markets') : null;
+    const { data: settings } = useDoc<MarketSettings>(settingsRef);
+    const liquidityFactor = settings?.liquidityFactor || 40000000;
 
     const userRef = user && firestore ? doc(firestore, 'users', user.uid) : null;
     const { data: profile } = useDoc<UserProfile>(userRef);
@@ -146,12 +147,7 @@ export default function MarketDetailsPage() {
                                 <div className="divide-y-2">
                                     {positions.map((pos) => {
                                         const mPrice = market.outcomes[pos.outcome].price;
-                                        
-                                        /**
-                                         * REALISTIC PnL CALCULATION:
-                                         * What you WOULD get if you sold right now (adjusted for slippage).
-                                         */
-                                        const estNgnReturn = (pos.shares * mPrice) / (1 + (50 * pos.shares / MARKET_LIQUIDITY_FACTOR));
+                                        const estNgnReturn = (pos.shares * mPrice) / (1 + (50 * pos.shares / liquidityFactor));
                                         const costBasis = pos.shares * pos.avgPrice;
                                         const pnl = estNgnReturn - costBasis;
                                         const pnlPercent = (pnl / costBasis) * 100;

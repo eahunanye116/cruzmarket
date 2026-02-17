@@ -87,6 +87,10 @@ export type MarketPosition = {
     status: 'active' | 'paid_out';
 }
 
+export type MarketSettings = {
+  liquidityFactor: number;
+}
+
 export type UserProfile = {
   id?: string;
   email: string;

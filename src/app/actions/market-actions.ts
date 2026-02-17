@@ -2,13 +2,24 @@
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction, increment, getDocs, query, where, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction, increment, getDoc, setDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import type { PredictionMarket, MarketPosition, UserProfile } from '@/lib/types';
+import type { PredictionMarket, MarketPosition, UserProfile, MarketSettings } from '@/lib/types';
 
-// The "Thickness" of the market. Higher = more money needed to move the price.
-// Increased to 40,000,000 to ensure 1M+ trades have minimal slippage (< 5% loss).
-const MARKET_LIQUIDITY_FACTOR = 40000000; 
+// Default "Thickness" if not found in DB
+const DEFAULT_LIQUIDITY_FACTOR = 40000000; 
+
+export async function updateMarketSettingsAction(liquidityFactor: number) {
+    const firestore = getFirestoreInstance();
+    try {
+        await setDoc(doc(firestore, 'settings', 'markets'), { liquidityFactor }, { merge: true });
+        revalidatePath('/admin');
+        revalidatePath('/betting');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
 
 export async function createMarketAction(payload: {
     question: string;
@@ -49,16 +60,20 @@ export async function buyMarketSharesAction(
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
             const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
+            const settingsRef = doc(firestore, 'settings', 'markets');
 
-            const [marketSnap, userSnap, posSnap] = await Promise.all([
+            const [marketSnap, userSnap, posSnap, settingsSnap] = await Promise.all([
                 transaction.get(marketRef),
                 transaction.get(userRef),
-                transaction.get(posRef)
+                transaction.get(posRef),
+                transaction.get(settingsRef)
             ]);
 
             if (!marketSnap.exists()) throw new Error("Market not found.");
             const market = marketSnap.data() as PredictionMarket;
             if (market.status !== 'open') throw new Error("Market is closed.");
+
+            const liquidityFactor = settingsSnap.exists() ? (settingsSnap.data().liquidityFactor || DEFAULT_LIQUIDITY_FACTOR) : DEFAULT_LIQUIDITY_FACTOR;
 
             const userData = userSnap.data() as UserProfile;
             const totalAvailable = (userData.balance || 0) + (userData.bonusBalance || 0);
@@ -66,12 +81,7 @@ export async function buyMarketSharesAction(
 
             const currentPrice = market.outcomes[outcome].price;
             
-            /**
-             * IMPROVED PRICING MATH (Linear Slippage):
-             * 1. Calculate price impact proportional to amount.
-             * 2. Execution price is the mid-point between start and end prices.
-             */
-            const priceImpact = (ngnAmount / MARKET_LIQUIDITY_FACTOR) * 100;
+            const priceImpact = (ngnAmount / liquidityFactor) * 100;
             const newPrice = Math.min(99, Math.max(1, currentPrice + priceImpact));
             const executionPrice = (currentPrice + newPrice) / 2;
             const shares = ngnAmount / executionPrice;
@@ -140,22 +150,23 @@ export async function sellMarketSharesAction(
     marketId: string,
     outcome: 'yes' | 'no',
     sharesToSell: number,
-    positionId?: string // Preferred lookup method
+    positionId?: string 
 ) {
     const firestore = getFirestoreInstance();
     try {
         const result = await runTransaction(firestore, async (transaction) => {
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
+            const settingsRef = doc(firestore, 'settings', 'markets');
             
-            // Try to find the position by ID or composite key
             const posId = positionId || `${marketId}_${outcome}`;
             const posRef = doc(firestore, `users/${userId}/marketPositions`, posId);
 
-            const [marketSnap, userSnap, posSnap] = await Promise.all([
+            const [marketSnap, userSnap, posSnap, settingsSnap] = await Promise.all([
                 transaction.get(marketRef),
                 transaction.get(userRef),
-                transaction.get(posRef)
+                transaction.get(posRef),
+                transaction.get(settingsRef)
             ]);
 
             if (!marketSnap.exists()) throw new Error("Market not found.");
@@ -166,17 +177,12 @@ export async function sellMarketSharesAction(
             const pos = posSnap.data() as MarketPosition;
             if (pos.shares < sharesToSell - 0.000001) throw new Error("Insufficient shares.");
 
+            const liquidityFactor = settingsSnap.exists() ? (settingsSnap.data().liquidityFactor || DEFAULT_LIQUIDITY_FACTOR) : DEFAULT_LIQUIDITY_FACTOR;
+
             const currentPrice = market.outcomes[outcome].price;
             
-            /**
-             * SELL MATH:
-             * Solve for Investment (I) where:
-             * Shares = I / ( (P_start + (P_start + (I/Liq)*100)) / 2 )
-             * Yields: I = (Shares * P_start) / (1 + (50 * Shares / Liquidity))
-             * (Where I is negative since we are taking money OUT)
-             */
-            const ngnReturn = (sharesToSell * currentPrice) / (1 + (50 * sharesToSell / MARKET_LIQUIDITY_FACTOR));
-            const priceImpact = (ngnReturn / MARKET_LIQUIDITY_FACTOR) * 100;
+            const ngnReturn = (sharesToSell * currentPrice) / (1 + (50 * sharesToSell / liquidityFactor));
+            const priceImpact = (ngnReturn / liquidityFactor) * 100;
             const newPrice = Math.max(1, currentPrice - priceImpact);
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
