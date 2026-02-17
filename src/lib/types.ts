@@ -33,7 +33,7 @@ export type PortfolioHolding = {
 
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'TRANSFER_SENT_BONUS' | 'TRANSFER_RECEIVED_BONUS' | 'COPY_BUY' | 'COPY_SELL' | 'MARKET_BUY' | 'MARKET_PAYOUT';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'TRANSFER_SENT_BONUS' | 'TRANSFER_RECEIVED_BONUS' | 'COPY_BUY' | 'COPY_SELL' | 'MARKET_BUY' | 'MARKET_SELL' | 'MARKET_PAYOUT';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
@@ -164,6 +164,8 @@ export type PlatformStats = {
   totalFeesGenerated: number;
   totalUserFees: number;
   totalAdminFees: number;
+  totalMarketFees: number;
+  totalMarketVolume: number;
   totalTokensBurned: number;
 };
 

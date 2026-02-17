@@ -4,13 +4,13 @@
 import { useState, useEffect } from 'react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
-import { PredictionMarket, MarketSettings } from '@/lib/types';
+import { PredictionMarket, MarketSettings, PlatformStats } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink, Settings2, Info, Save } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink, Settings2, Info, Save, TrendingUp, Landmark } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -19,16 +19,21 @@ import { createMarketAction, resolveMarketAction, updateMarketSettingsAction } f
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
+import { useCurrency } from '@/hooks/use-currency';
 
 export function MarketManagement() {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { formatAmount } = useCurrency();
     
     const marketsQuery = firestore ? query(collection(firestore, 'markets'), orderBy('createdAt', 'desc')) : null;
     const { data: markets, loading } = useCollection<PredictionMarket>(marketsQuery);
 
     const settingsRef = firestore ? doc(firestore, 'settings', 'markets') : null;
     const { data: settings, loading: settingsLoading } = useDoc<MarketSettings>(settingsRef);
+
+    const statsRef = firestore ? doc(firestore, 'stats', 'platform') : null;
+    const { data: platformStats, loading: statsLoading } = useDoc<PlatformStats>(statsRef);
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isResolvingId, setIsResolvingId] = useState<string | null>(null);
@@ -104,6 +109,48 @@ export function MarketManagement() {
 
     return (
         <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="border-accent/20 bg-accent/5">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Landmark className="h-4 w-4 text-accent" /> Market Revenue
+                        </CardTitle>
+                        <CardDescription>Fees from arena trades.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {statsLoading ? <Skeleton className="h-8 w-24" /> : (
+                            <p className="text-2xl font-bold font-headline">{formatAmount(platformStats?.totalMarketFees || 0)}</p>
+                        )}
+                    </CardContent>
+                </Card>
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" /> Market Volume
+                        </CardTitle>
+                        <CardDescription>Gross arena trading volume.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {statsLoading ? <Skeleton className="h-8 w-24" /> : (
+                            <p className="text-2xl font-bold font-headline">{formatAmount(platformStats?.totalMarketVolume || 0)}</p>
+                        )}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+                            <Settings2 className="h-4 w-4" /> Pool Depth
+                        </CardTitle>
+                        <CardDescription>Current liquidity factor.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {settingsLoading ? <Skeleton className="h-8 w-24" /> : (
+                            <p className="text-2xl font-bold font-headline">{Number(settings?.liquidityFactor || 40000000).toLocaleString()}</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-2">
                     <CardHeader>

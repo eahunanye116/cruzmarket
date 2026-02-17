@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, Trash2, User, History, Search, RefreshCw, Loader2, Gift, Users, Wallet, Landmark } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, User, History, Search, RefreshCw, Loader2, Gift, Users, Wallet, Landmark, Vote } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +68,7 @@ export function UserManagement() {
   const totalFees = Number(platformStats?.totalFeesGenerated) || 0;
   const userFees = Number(platformStats?.totalUserFees) || 0;
   const adminFees = Number(platformStats?.totalAdminFees) || 0;
+  const marketFees = Number(platformStats?.totalMarketFees) || 0;
   
   const loading = usersLoading || statsLoading;
 
@@ -140,20 +141,26 @@ export function UserManagement() {
             </div>
             <div className="space-y-1">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1 text-accent">
-                    <Landmark className="h-3 w-3" /> User Trade Fees
+                    <Landmark className="h-3 w-3" /> Ticker Trade Fees
                 </p>
                 <p className="text-xl font-bold text-accent">{formatAmount(userFees)}</p>
             </div>
             <div className="space-y-1">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                    <RefreshCw className="h-3 w-3" /> Admin/Launch Fees
+                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1 text-accent">
+                    <Vote className="h-3 w-3" /> Arena Market Fees
                 </p>
-                <p className="text-xl font-bold">{formatAmount(adminFees)}</p>
+                <p className="text-xl font-bold text-accent">{formatAmount(marketFees)}</p>
             </div>
           </div>
-          <div className="pt-2">
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Gross Platform Revenue (All Time)</p>
-             <p className="text-2xl font-bold text-foreground">{formatAmount(totalFees)}</p>
+          <div className="pt-2 flex justify-between items-end">
+             <div>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Gross Platform Revenue (All Time)</p>
+                <p className="text-2xl font-bold text-foreground">{formatAmount(totalFees)}</p>
+             </div>
+             <div className="text-right">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Admin/Launch Fees</p>
+                <p className="text-sm font-bold opacity-70">{formatAmount(adminFees)}</p>
+             </div>
           </div>
         </CardDescription>
       </CardHeader>

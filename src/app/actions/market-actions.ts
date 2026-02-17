@@ -8,6 +8,7 @@ import type { PredictionMarket, MarketPosition, UserProfile, MarketSettings } fr
 
 // Default "Thickness" if not found in DB
 const DEFAULT_LIQUIDITY_FACTOR = 40000000; 
+const MARKET_FEE_PERCENTAGE = 0.01; // 1% Fee
 
 export async function updateMarketSettingsAction(liquidityFactor: number) {
     const firestore = getFirestoreInstance();
@@ -61,6 +62,7 @@ export async function buyMarketSharesAction(
             const userRef = doc(firestore, 'users', userId);
             const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
             const settingsRef = doc(firestore, 'settings', 'markets');
+            const statsRef = doc(firestore, 'stats', 'platform');
 
             const [marketSnap, userSnap, posSnap, settingsSnap] = await Promise.all([
                 transaction.get(marketRef),
@@ -79,12 +81,16 @@ export async function buyMarketSharesAction(
             const totalAvailable = (userData.balance || 0) + (userData.bonusBalance || 0);
             if (totalAvailable < ngnAmount) throw new Error("Insufficient balance.");
 
+            // Calculate Fee
+            const fee = ngnAmount * MARKET_FEE_PERCENTAGE;
+            const ngnForCurve = ngnAmount - fee;
+
             const currentPrice = market.outcomes[outcome].price;
             
-            const priceImpact = (ngnAmount / liquidityFactor) * 100;
+            const priceImpact = (ngnForCurve / liquidityFactor) * 100;
             const newPrice = Math.min(99, Math.max(1, currentPrice + priceImpact));
             const executionPrice = (currentPrice + newPrice) / 2;
-            const shares = ngnAmount / executionPrice;
+            const shares = ngnForCurve / executionPrice;
 
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
@@ -102,13 +108,20 @@ export async function buyMarketSharesAction(
                 [`outcomes.${outcome}.price`]: newPrice,
                 [`outcomes.${outcome}.totalShares`]: increment(shares),
                 [`outcomes.${oppOutcome}.price`]: oppPrice,
-                volume: increment(ngnAmount)
+                volume: increment(ngnForCurve)
+            });
+
+            // Update Global Stats
+            transaction.update(statsRef, {
+                totalFeesGenerated: increment(fee),
+                totalMarketFees: increment(fee),
+                totalMarketVolume: increment(ngnForCurve)
             });
 
             if (posSnap.exists()) {
                 const existingPos = posSnap.data() as MarketPosition;
                 const totalShares = existingPos.shares + shares;
-                const totalCost = (existingPos.avgPrice * existingPos.shares) + ngnAmount;
+                const totalCost = (existingPos.avgPrice * existingPos.shares) + ngnForCurve;
                 transaction.update(posRef, {
                     shares: totalShares,
                     avgPrice: totalCost / totalShares
@@ -128,6 +141,7 @@ export async function buyMarketSharesAction(
             transaction.set(doc(collection(firestore, 'activities')), {
                 type: 'MARKET_BUY',
                 value: ngnAmount,
+                fee: fee,
                 userId,
                 marketId,
                 outcome,
@@ -158,6 +172,7 @@ export async function sellMarketSharesAction(
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
             const settingsRef = doc(firestore, 'settings', 'markets');
+            const statsRef = doc(firestore, 'stats', 'platform');
             
             const posId = positionId || `${marketId}_${outcome}`;
             const posRef = doc(firestore, `users/${userId}/marketPositions`, posId);
@@ -181,21 +196,31 @@ export async function sellMarketSharesAction(
 
             const currentPrice = market.outcomes[outcome].price;
             
-            const ngnReturn = (sharesToSell * currentPrice) / (1 + (50 * sharesToSell / liquidityFactor));
-            const priceImpact = (ngnReturn / liquidityFactor) * 100;
+            const ngnReturnBeforeFee = (sharesToSell * currentPrice) / (1 + (50 * sharesToSell / liquidityFactor));
+            const fee = ngnReturnBeforeFee * MARKET_FEE_PERCENTAGE;
+            const ngnToUser = ngnReturnBeforeFee - fee;
+
+            const priceImpact = (ngnReturnBeforeFee / liquidityFactor) * 100;
             const newPrice = Math.max(1, currentPrice - priceImpact);
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
 
             transaction.update(userRef, {
-                balance: increment(ngnReturn)
+                balance: increment(ngnToUser)
             });
 
             transaction.update(marketRef, {
                 [`outcomes.${outcome}.price`]: newPrice,
                 [`outcomes.${outcome}.totalShares`]: increment(-sharesToSell),
                 [`outcomes.${oppOutcome}.price`]: oppPrice,
-                volume: increment(ngnReturn)
+                volume: increment(ngnReturnBeforeFee)
+            });
+
+            // Update Global Stats
+            transaction.update(statsRef, {
+                totalFeesGenerated: increment(fee),
+                totalMarketFees: increment(fee),
+                totalMarketVolume: increment(ngnReturnBeforeFee)
             });
 
             const remainingShares = pos.shares - sharesToSell;
@@ -209,14 +234,15 @@ export async function sellMarketSharesAction(
 
             transaction.set(doc(collection(firestore, 'activities')), {
                 type: 'MARKET_SELL',
-                value: ngnReturn,
+                value: ngnReturnBeforeFee,
+                fee: fee,
                 userId,
                 marketId,
                 outcome,
                 createdAt: serverTimestamp()
             });
 
-            return { ngnReturn };
+            return { ngnReturn: ngnToUser };
         });
 
         revalidatePath('/betting');
