@@ -66,9 +66,9 @@ export async function buyMarketSharesAction(
             const currentPrice = market.outcomes[outcome].price;
             
             /**
-             * IMPROVED PRICING MATH:
+             * IMPROVED PRICING MATH (Linear Slippage):
              * 1. Calculate price impact proportional to amount.
-             * 2. Calculate execution price as the mid-point (Slippage).
+             * 2. Execution price is the mid-point between start and end prices.
              */
             const priceImpact = (ngnAmount / MARKET_LIQUIDITY_FACTOR) * 100;
             const newPrice = Math.min(99, Math.max(1, currentPrice + priceImpact));
@@ -138,14 +138,18 @@ export async function sellMarketSharesAction(
     userId: string,
     marketId: string,
     outcome: 'yes' | 'no',
-    sharesToSell: number
+    sharesToSell: number,
+    positionId?: string // Preferred lookup method
 ) {
     const firestore = getFirestoreInstance();
     try {
         const result = await runTransaction(firestore, async (transaction) => {
             const marketRef = doc(firestore, 'markets', marketId);
             const userRef = doc(firestore, 'users', userId);
-            const posRef = doc(firestore, `users/${userId}/marketPositions`, `${marketId}_${outcome}`);
+            
+            // Try to find the position by ID or composite key
+            const posId = positionId || `${marketId}_${outcome}`;
+            const posRef = doc(firestore, `users/${userId}/marketPositions`, posId);
 
             const [marketSnap, userSnap, posSnap] = await Promise.all([
                 transaction.get(marketRef),
@@ -159,20 +163,20 @@ export async function sellMarketSharesAction(
 
             if (!posSnap.exists()) throw new Error("You don't have any shares to sell.");
             const pos = posSnap.data() as MarketPosition;
-            if (pos.shares < sharesToSell) throw new Error("Insufficient shares.");
+            if (pos.shares < sharesToSell - 0.000001) throw new Error("Insufficient shares.");
 
             const currentPrice = market.outcomes[outcome].price;
             
             /**
              * SELL MATH:
-             * Calculate how much the price drops and pay the average.
+             * Solve for Investment (I) where:
+             * Shares = I / ( (P_start + (P_start + (I/Liq)*100)) / 2 )
+             * Yields: I = (Shares * P_start) / (1 + (50 * Shares / Liquidity))
+             * (Where I is negative since we are taking money OUT)
              */
-            const estimatedNgnValue = sharesToSell * (currentPrice / 100) * (MARKET_LIQUIDITY_FACTOR / 10); // Rough estimate for impact calc
-            const priceImpact = (estimatedNgnValue / MARKET_LIQUIDITY_FACTOR) * 100;
+            const ngnReturn = (sharesToSell * currentPrice) / (1 + (50 * sharesToSell / MARKET_LIQUIDITY_FACTOR));
+            const priceImpact = (ngnReturn / MARKET_LIQUIDITY_FACTOR) * 100;
             const newPrice = Math.max(1, currentPrice - priceImpact);
-            const executionPrice = (currentPrice + newPrice) / 2;
-            const ngnReturn = sharesToSell * executionPrice;
-
             const oppOutcome = outcome === 'yes' ? 'no' : 'yes';
             const oppPrice = 100 - newPrice;
 
@@ -187,11 +191,12 @@ export async function sellMarketSharesAction(
                 volume: increment(ngnReturn)
             });
 
-            if (pos.shares === sharesToSell) {
+            const remainingShares = pos.shares - sharesToSell;
+            if (remainingShares < 0.000001) {
                 transaction.delete(posRef);
             } else {
                 transaction.update(posRef, {
-                    shares: increment(-sharesToSell)
+                    shares: remainingShares
                 });
             }
 

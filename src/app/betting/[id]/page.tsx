@@ -61,13 +61,14 @@ export default function MarketDetailsPage() {
         } else {
             toast({ variant: 'destructive', title: "Order Failed", description: result.error });
         }
-        setIsSubmitting(false);
+        setIsSubmitting(true);
+        setTimeout(() => setIsSubmitting(false), 500);
     };
 
     const handleSell = async (pos: MarketPosition) => {
         if (!user || !market) return;
         setSellingId(pos.id);
-        const result = await sellMarketSharesAction(user.uid, market.id, pos.outcome, pos.shares);
+        const result = await sellMarketSharesAction(user.uid, market.id, pos.outcome, pos.shares, pos.id);
         if (result.success) {
             toast({ title: "Shares Sold", description: `You received ₦${result.ngnReturn?.toLocaleString()}.` });
         } else {
@@ -144,15 +145,12 @@ export default function MarketDetailsPage() {
                                         const mPrice = market.outcomes[pos.outcome].price;
                                         
                                         /**
-                                         * Display a more realistic "Slippage-Adjusted" PnL
-                                         * This prevents users from thinking they are in instant profit.
+                                         * REALISTIC PnL CALCULATION:
+                                         * What you WOULD get if you sold right now (adjusted for slippage).
                                          */
-                                        const priceImpact = ( (pos.shares * mPrice) / MARKET_LIQUIDITY_FACTOR ) * 100;
-                                        const estExitPrice = Math.max(1, mPrice - (priceImpact / 2));
-                                        
-                                        const currentValue = pos.shares * mPrice;
+                                        const estNgnReturn = (pos.shares * mPrice) / (1 + (50 * pos.shares / MARKET_LIQUIDITY_FACTOR));
                                         const costBasis = pos.shares * pos.avgPrice;
-                                        const pnl = currentValue - costBasis;
+                                        const pnl = estNgnReturn - costBasis;
                                         const pnlPercent = (pnl / costBasis) * 100;
 
                                         return (
@@ -171,7 +169,7 @@ export default function MarketDetailsPage() {
                                                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Unrealized P/L</p>
                                                         <div className={cn("flex items-center justify-end font-bold text-lg", pnl >= 0 ? "text-accent" : "text-destructive")}>
                                                             {pnl >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
-                                                            ₦{Math.abs(pnl).toLocaleString()} ({pnlPercent.toFixed(1)}%)
+                                                            ₦{Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })} ({pnlPercent.toFixed(1)}%)
                                                         </div>
                                                     </div>
                                                     {market.status === 'open' && (
@@ -221,7 +219,7 @@ export default function MarketDetailsPage() {
                             </h3>
                             <div className="text-right">
                                 <p className="text-[8px] uppercase font-bold text-muted-foreground">My Balance</p>
-                                <p className="text-xs font-bold text-primary">₦{profile?.balance?.toLocaleString()}</p>
+                                <p className="text-xs font-bold text-primary">₦{(profile?.balance || 0).toLocaleString()}</p>
                             </div>
                         </div>
                         <CardContent className="p-4 space-y-6">
