@@ -3,13 +3,13 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Sword } from 'lucide-react';
+import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Vote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { ReactNode, useMemo, useState, useEffect } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { doc } from 'firebase/firestore';
 import type { UserProfile, PlatformSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -34,7 +34,6 @@ function UserBalance() {
     return <Skeleton className="h-6 w-24" />;
   }
 
-  // Display the sum of both Main and Bonus wallets in the header
   const totalBalance = (userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0);
 
   return (
@@ -77,7 +76,7 @@ export function Header() {
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
-    { href: '/betting', label: 'Betting', icon: <Sword className="h-5 w-5" /> },
+    { href: '/betting', label: 'Predictions', icon: <Vote className="h-5 w-5" /> },
     { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-5 w-5" /> },
     { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-5 w-5" /> },
     { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
@@ -102,7 +101,7 @@ export function Header() {
                 href={item.href}
                 className={cn(
                   "transition-colors hover:text-foreground/80 flex items-center gap-2",
-                  pathname === item.href ? "text-foreground font-bold" : "text-foreground/60"
+                  (pathname === item.href || (item.href === '/betting' && pathname.startsWith('/betting'))) ? "text-foreground font-bold" : "text-foreground/60"
                 )}
               >
                 {item.icon}

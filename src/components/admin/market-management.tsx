@@ -1,0 +1,192 @@
+
+'use client';
+
+import { useState } from 'react';
+import { useCollection, useFirestore } from '@/firebase';
+import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { PredictionMarket } from '@/lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { createMarketAction, resolveMarketAction } from '@/app/actions/market-actions';
+import { format } from 'date-fns';
+import Link from 'next/link';
+
+export function MarketManagement() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    
+    const marketsQuery = firestore ? query(collection(firestore, 'markets'), orderBy('createdAt', 'desc')) : null;
+    const { data: markets, loading } = useCollection<PredictionMarket>(marketsQuery);
+
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isResolvingId, setIsResolvingId] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Form State
+    const [question, setQuestion] = useState('');
+    const [description, setDescription] = useState('');
+    const [category, setCategory] = useState('Politics');
+    const [endsAt, setEndsAt] = useState('');
+    const [image, setImage] = useState('');
+
+    const handleCreateMarket = async () => {
+        if (!question || !endsAt) return;
+        setIsSubmitting(true);
+        const result = await createMarketAction({
+            question,
+            description,
+            image,
+            category,
+            endsAt: new Date(endsAt)
+        });
+        if (result.success) {
+            toast({ title: "Market Launched" });
+            setIsCreateOpen(false);
+            // Reset
+            setQuestion(''); setDescription(''); setEndsAt(''); setImage('');
+        } else {
+            toast({ variant: 'destructive', title: "Failed", description: result.error });
+        }
+        setIsSubmitting(false);
+    };
+
+    const handleResolve = async (id: string, outcome: 'yes' | 'no') => {
+        if (!confirm(`Are you sure? This will resolve the market as ${outcome.toUpperCase()} and pay out winners.`)) return;
+        setIsResolvingId(id);
+        const result = await resolveMarketAction(id, outcome);
+        if (result.success) toast({ title: "Market Resolved" });
+        setIsResolvingId(null);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Delete market permanently?")) return;
+        await deleteDoc(doc(firestore!, 'markets', id));
+        toast({ title: "Market Deleted" });
+    };
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Vote className="h-5 w-5 text-primary" /> Prediction Markets
+                            </CardTitle>
+                            <CardDescription>Launch and resolve outcome-based markets.</CardDescription>
+                        </div>
+                        <Button onClick={() => setIsCreateOpen(true)}><PlusCircle className="mr-2" /> New Market</Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="border rounded-lg overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Question</TableHead>
+                                    <TableHead>Ends</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center py-12"><Loader2 className="animate-spin mx-auto h-8 w-8" /></TableCell></TableRow>
+                                ) : markets?.map(m => (
+                                    <TableRow key={m.id}>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm line-clamp-1">{m.question}</span>
+                                                <span className="text-[10px] text-muted-foreground uppercase">{m.category}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{format(m.endsAt.toDate(), 'PP')}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={m.status === 'open' ? 'default' : 'secondary'}>{m.status.toUpperCase()}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" asChild><Link href={`/betting/${m.id}`}><ExternalLink className="h-4 w-4"/></Link></Button>
+                                                {m.status === 'open' && (
+                                                    <>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline" 
+                                                            className="text-accent border-accent/20"
+                                                            onClick={() => handleResolve(m.id, 'yes')}
+                                                            disabled={!!isResolvingId}
+                                                        >
+                                                            {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'Yes'}
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline" 
+                                                            className="text-destructive border-destructive/20"
+                                                            onClick={() => handleResolve(m.id, 'no')}
+                                                            disabled={!!isResolvingId}
+                                                        >
+                                                            {isResolvingId === m.id ? <Loader2 className="animate-spin h-3 w-3" /> : 'No'}
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Launch New Market</DialogTitle>
+                        <DialogDescription>Create a binary (Yes/No) prediction market.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Question</Label>
+                            <Input placeholder="e.g. Will BTC hit $100k by end of year?" value={question} onChange={e => setQuestion(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea placeholder="Details and resolution criteria..." value={description} onChange={e => setDescription(e.target.value)} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Category</Label>
+                                <Input placeholder="e.g. Crypto" value={category} onChange={e => setCategory(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>End Date</Label>
+                                <Input type="date" value={endsAt} onChange={e => setEndsAt(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Header Image URL</Label>
+                            <Input placeholder="Direct link to image..." value={image} onChange={e => setImage(e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateMarket} disabled={isSubmitting || !question || !endsAt}>
+                            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Vote className="mr-2" />}
+                            Launch Market
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}

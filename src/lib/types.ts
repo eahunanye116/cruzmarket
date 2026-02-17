@@ -12,8 +12,8 @@ export type Ticker = {
   videoUrl?: string;
   price: number;
   supply: number;
-  initialSupply: number; // Added to calculate actual Market Cap (Price * Total)
-  marketCap: number; // This represents the Reserve Balance (Liquidity)
+  initialSupply: number; 
+  marketCap: number; 
   chartData: { time: string; price: number, volume: number, marketCap: number }[];
   recentActivity?: string;
   createdAt: Timestamp;
@@ -31,21 +31,14 @@ export type PortfolioHolding = {
   userId: string; 
 };
 
-export type EnrichedPortfolioHolding = PortfolioHolding & {
-  ticker: Ticker;
-  currentValue: number;
-  profitOrLoss: number;
-  profitOrLossPercentage: number;
-};
-
 export type Activity = {
   id: string;
-  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'TRANSFER_SENT_BONUS' | 'TRANSFER_RECEIVED_BONUS' | 'COPY_BUY' | 'COPY_SELL' | 'PERP_OPEN' | 'PERP_CLOSE' | 'PERP_LIQUIDATE';
+  type: 'BUY' | 'SELL' | 'CREATE' | 'DEPOSIT' | 'WITHDRAWAL' | 'BURN' | 'TRANSFER_SENT' | 'TRANSFER_RECEIVED' | 'TRANSFER_SENT_BONUS' | 'TRANSFER_RECEIVED_BONUS' | 'COPY_BUY' | 'COPY_SELL' | 'MARKET_BUY' | 'MARKET_PAYOUT';
   tickerId?: string;
   tickerName?: string;
   tickerIcon?: string;
-  value: number; // Gross NGN value
-  fee?: number; // Platform fee collected
+  value: number; 
+  fee?: number; 
   tokenAmount?: number;
   pricePerToken?: number;
   realizedPnl?: number;
@@ -55,72 +48,44 @@ export type Activity = {
   senderId?: string;
   senderName?: string;
   createdAt: Timestamp;
-  // Perps extra
-  leverage?: number;
-  direction?: 'LONG' | 'SHORT';
-  lots?: number;
+  // Market extra
+  marketId?: string;
+  outcome?: 'yes' | 'no';
 };
 
-export type PerpMarket = {
-    id: string; // The Symbol (e.g. BTCUSDT)
-    name: string;
-    symbol: string;
-    icon: string;
-    isActive: boolean;
-    createdAt: Timestamp;
+export type MarketOutcome = {
+  id: 'yes' | 'no';
+  label: string;
+  price: number; // 1-99 range
+  totalShares: number;
 };
 
-export type PerpPosition = {
-    id: string;
-    userId: string;
-    tickerId: string;
-    tickerName: string;
-    tickerIcon?: string;
-    direction: 'LONG' | 'SHORT';
-    leverage: number;
-    lots: number; // Standardized Sizing
-    collateral: number; // The ₦ margin amount locked
-    entryPrice: number;
-    entryValue: number; // Position value at entry (lots * multiplier * price)
-    liquidationPrice: number;
-    status: 'open' | 'closed' | 'liquidated';
-    createdAt: Timestamp;
-    closedAt?: Timestamp;
-    exitPrice?: number;
-    realizedPnL?: number;
-}
-
-export type BotSession = {
-  type: 'CREATE_TICKER' | 'WITHDRAW_FUNDS';
-  step: string;
-  data: Record<string, any>;
-}
-
-export type CopyTarget = {
-  id: string; // The target's UID
-  targetUid: string;
-  targetDisplayName: string;
-  amountPerBuyNgn: number;
-  isActive: boolean;
+export type PredictionMarket = {
+  id: string;
+  question: string;
+  description: string;
+  image: string;
+  category: string;
+  endsAt: Timestamp;
+  status: 'open' | 'resolved' | 'cancelled';
+  winningOutcome?: 'yes' | 'no';
+  outcomes: {
+    yes: MarketOutcome;
+    no: MarketOutcome;
+  };
   createdAt: Timestamp;
+  volume: number;
 };
 
-export type CopyTradeAudit = {
+export type MarketPosition = {
     id: string;
-    sourceUid: string;
-    tickerId: string;
-    type: 'BUY' | 'SELL';
-    timestamp: Timestamp;
-    followerCount: number;
-    status?: 'critical_failure' | 'complete';
-    error?: string;
-    results?: {
-        followerId: string;
-        status: 'success' | 'failed' | 'skipped' | 'error';
-        reason?: string;
-        message?: string;
-    }[];
-};
+    marketId: string;
+    userId: string;
+    outcome: 'yes' | 'no';
+    shares: number;
+    avgPrice: number;
+    status: 'active' | 'paid_out';
+}
 
 export type UserProfile = {
   id?: string;
@@ -128,7 +93,7 @@ export type UserProfile = {
   displayName: string;
   photoURL?: string;
   balance: number;
-  bonusBalance?: number; // Trading-only funds
+  bonusBalance?: number;
   totalRealizedPnl?: number;
   totalTradingVolume?: number;
   telegramChatId?: string;
@@ -136,7 +101,7 @@ export type UserProfile = {
     code: string;
     expiresAt: Timestamp;
   };
-  botSession?: BotSession | null;
+  botSession?: any | null;
   lastIP?: string;
 };
 
@@ -155,7 +120,7 @@ export type BlogPost = {
   id: string;
   slug: string;
   title: string;
-  content: string; // Markdown content
+  content: string; 
   excerpt: string;
   coverImage: string;
   authorId: string;
@@ -171,33 +136,23 @@ export type AIToneTrainingData = {
     userId: string;
 };
 
-export type Deposit = {
-  userId: string;
-  amount: number;
-  processedAt: Timestamp;
-}
-
 export type WithdrawalRequest = {
   id: string;
   userId: string;
-  amount: number; // Equivalent NGN amount
-  usdAmount?: number; // Original USD amount for crypto
+  amount: number; 
+  usdAmount?: number; 
   exchangeRateAtRequest?: number;
   withdrawalType: 'ngn' | 'crypto';
   status: 'pending' | 'completed' | 'rejected';
-  // NGN Fields
   bankName?: string;
   accountNumber?: string;
   accountName?: string;
-  // Crypto Fields
   cryptoCoin?: string;
   cryptoNetwork?: string;
   cryptoAddress?: string;
-  
   createdAt: Timestamp;
   processedAt?: Timestamp;
   rejectionReason?: string;
-  user?: UserProfile; // Only used for client-side enrichment
 };
 
 export type PlatformStats = {
@@ -206,7 +161,6 @@ export type PlatformStats = {
   totalUserFees: number;
   totalAdminFees: number;
   totalTokensBurned: number;
-  lastPerpSweepAt?: Timestamp;
 };
 
 export type AppNotification = {
@@ -245,30 +199,4 @@ export type ChatMessage = {
   senderId: string;
   content: string;
   createdAt: Timestamp;
-};
-
-// --- Betting Types ---
-
-export type MatchOdds = {
-  home: number;
-  draw: number;
-  away: number;
-};
-
-export type BetMatch = {
-  id: string;
-  homeTeam: string;
-  awayTeam: string;
-  league: string;
-  startTime: any; // Using any to support both Timestamp and number for serializability
-  odds: MatchOdds;
-  sport: 'football' | 'basketball';
-};
-
-export type BetSelection = {
-  matchId: string;
-  homeTeam: string;
-  awayTeam: string;
-  outcome: '1' | 'X' | '2';
-  odds: number;
 };

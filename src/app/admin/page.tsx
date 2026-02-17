@@ -17,6 +17,7 @@ import { CopyAuditManagement } from '@/components/admin/copy-audit-management';
 import { PaymentManagement } from '@/components/admin/payment-management';
 import { FraudManagement } from '@/components/admin/fraud-management';
 import { DiagnosticsManagement } from '@/components/admin/diagnostics-management';
+import { MarketManagement } from '@/components/admin/market-management';
 import { useState } from 'react';
 import {
   Select,
@@ -68,9 +69,9 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col items-center text-center mb-8">
-        <h1 className="text-4xl font-bold font-headline">Admin Control Panel</h1>
+        <h1 className="text-4xl font-bold font-headline uppercase">Control Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Manage tickers, users, and platform settings.
+          Manage tickers, users, and arena markets.
         </p>
       </div>
 
@@ -79,17 +80,15 @@ export default function AdminPage() {
         <div className="hidden xl:block">
           <TabsList className="flex flex-wrap w-full h-auto bg-transparent border-b-2 rounded-none p-0 mb-6 gap-2">
             <TabsTrigger value="tickers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Tickers</TabsTrigger>
+            <TabsTrigger value="markets" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground border-2 border-transparent px-4 py-2 font-bold">Prediction Markets</TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Users</TabsTrigger>
             <TabsTrigger value="diagnostics" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground border-2 border-transparent px-4 py-2 font-bold">Diagnostics</TabsTrigger>
             <TabsTrigger value="fraud" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground border-2 border-transparent px-4 py-2">Fraud</TabsTrigger>
-            <TabsTrigger value="copy-audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Copy Audit</TabsTrigger>
             <TabsTrigger value="withdrawals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Withdrawals</TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Payments</TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Support</TabsTrigger>
             <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Notifications</TabsTrigger>
             <TabsTrigger value="blog" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Blog</TabsTrigger>
             <TabsTrigger value="telegram" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Telegram</TabsTrigger>
-            <TabsTrigger value="privacy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">Privacy</TabsTrigger>
             <TabsTrigger value="x" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border-2 border-transparent px-4 py-2">X</TabsTrigger>
           </TabsList>
         </div>
@@ -102,17 +101,15 @@ export default function AdminPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="tickers">Tickers</SelectItem>
+              <SelectItem value="markets">Prediction Markets</SelectItem>
               <SelectItem value="users">Users</SelectItem>
               <SelectItem value="diagnostics">Diagnostics</SelectItem>
               <SelectItem value="fraud">Fraud Detection</SelectItem>
-              <SelectItem value="copy-audit">Copy Audit</SelectItem>
               <SelectItem value="withdrawals">Withdrawals</SelectItem>
-              <SelectItem value="payments">Payments</SelectItem>
               <SelectItem value="support">Support</SelectItem>
               <SelectItem value="notifications">Notifications</SelectItem>
               <SelectItem value="blog">Blog</SelectItem>
               <SelectItem value="telegram">Telegram</SelectItem>
-              <SelectItem value="privacy">Privacy</SelectItem>
               <SelectItem value="x">X</SelectItem>
             </SelectContent>
           </Select>
@@ -120,6 +117,9 @@ export default function AdminPage() {
 
         <TabsContent value="tickers" className="mt-6">
           <TickerManagement />
+        </TabsContent>
+        <TabsContent value="markets" className="mt-6">
+          <MarketManagement />
         </TabsContent>
         <TabsContent value="users" className="mt-6">
           <UserManagement />
@@ -130,14 +130,8 @@ export default function AdminPage() {
         <TabsContent value="fraud" className="mt-6">
           <FraudManagement />
         </TabsContent>
-        <TabsContent value="copy-audit" className="mt-6">
-          <CopyAuditManagement />
-        </TabsContent>
          <TabsContent value="withdrawals" className="mt-6">
           <WithdrawalManagement />
-        </TabsContent>
-        <TabsContent value="payments" className="mt-6">
-          <PaymentManagement />
         </TabsContent>
          <TabsContent value="support" className="mt-6">
           <SupportManagement />
@@ -150,9 +144,6 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="telegram" className="mt-6">
           <TelegramManagement />
-        </TabsContent>
-        <TabsContent value="privacy" className="mt-6">
-          <PrivacyManagement />
         </TabsContent>
         <TabsContent value="x" className="mt-6">
           <XManagement />

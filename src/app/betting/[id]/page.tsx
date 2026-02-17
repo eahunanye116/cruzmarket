@@ -1,0 +1,225 @@
+
+'use client';
+
+import { useDoc, useFirestore, useUser } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useParams, notFound } from 'next/navigation';
+import { PredictionMarket, UserProfile } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { buyMarketSharesAction } from '@/app/actions/market-actions';
+import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+
+export default function MarketDetailsPage() {
+    const params = useParams();
+    const marketId = params.id as string;
+    const firestore = useFirestore();
+    const user = useUser();
+    const { toast } = useToast();
+
+    const marketRef = firestore ? doc(firestore, 'markets', marketId) : null;
+    const { data: market, loading } = useDoc<PredictionMarket>(marketRef);
+
+    const userRef = user && firestore ? doc(firestore, 'users', user.uid) : null;
+    const { data: profile } = useDoc<UserProfile>(userRef);
+
+    const [buyOutcome, setBuyOutcome] = useState<'yes' | 'no' | null>(null);
+    const [amountInput, setAmountInput] = useState<string>('1000');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleBuy = async () => {
+        if (!user || !buyOutcome || !market) return;
+        
+        const amount = parseFloat(amountInput);
+        if (isNaN(amount) || amount <= 0) {
+            toast({ variant: 'destructive', title: "Invalid amount." });
+            return;
+        }
+
+        setIsSubmitting(true);
+        const result = await buyMarketSharesAction(user.uid, market.id, buyOutcome, amount);
+        
+        if (result.success) {
+            toast({ title: "Shares Purchased!", description: `You bought ${result.shares?.toFixed(2)} ${buyOutcome.toUpperCase()} shares.` });
+            setBuyOutcome(null);
+        } else {
+            toast({ variant: 'destructive', title: "Order Failed", description: result.error });
+        }
+        setIsSubmitting(false);
+    };
+
+    if (loading) return <div className="container mx-auto py-12 p-4"><Skeleton className="h-96 w-full" /></div>;
+    if (!market) return notFound();
+
+    const currentPrice = buyOutcome ? market.outcomes[buyOutcome].price : 0;
+    const estimatedShares = buyOutcome ? parseFloat(amountInput) / currentPrice : 0;
+
+    return (
+        <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-4xl pb-24">
+            <Button asChild variant="ghost" className="mb-6">
+                <Link href="/betting"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Arena</Link>
+            </Button>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-8 space-y-8">
+                    <Card className="overflow-hidden border-2">
+                        <div className="relative h-48 sm:h-64">
+                            <img 
+                                src={market.image || 'https://picsum.photos/seed/market/1200/600'} 
+                                alt={market.question}
+                                className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                            <div className="absolute bottom-4 left-4 right-4">
+                                <Badge className="mb-2 uppercase font-bold">{market.category}</Badge>
+                                <h1 className="text-2xl sm:text-3xl font-bold font-headline leading-tight">{market.question}</h1>
+                            </div>
+                        </div>
+                        <CardContent className="p-6">
+                            <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{market.description}</p>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-8">
+                                <div className="p-3 rounded-lg border-2 bg-muted/30">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                        <TrendingUp className="h-3 w-3" /> Volume
+                                    </p>
+                                    <p className="text-lg font-bold">₦{market.volume?.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 rounded-lg border-2 bg-muted/30">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                        <Clock className="h-3 w-3" /> Ends At
+                                    </p>
+                                    <p className="text-sm font-bold">{format(market.endsAt.toDate(), 'PPP')}</p>
+                                </div>
+                                <div className="p-3 rounded-lg border-2 bg-muted/30 col-span-2 sm:col-span-1">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                        <Info className="h-3 w-3" /> Status
+                                    </p>
+                                    <Badge variant={market.status === 'open' ? 'default' : 'secondary'} className="uppercase">
+                                        {market.status}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {market.status === 'resolved' && (
+                        <Card className="border-accent/50 bg-accent/5">
+                            <CardHeader>
+                                <CardTitle className="text-accent flex items-center gap-2">
+                                    <CheckCircle2 className="h-5 w-5" /> Outcome Resolved
+                                </CardTitle>
+                                <CardDescription>This market was resolved by the administration.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center p-6 border-2 border-dashed border-accent/20 rounded-lg">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Winning Outcome</p>
+                                    <p className="text-4xl font-bold text-accent uppercase font-headline">{market.winningOutcome}</p>
+                                    <p className="text-xs text-muted-foreground mt-4">Winning shares were automatically paid out at ₦100 each.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
+                <div className="lg:col-span-4 space-y-6">
+                    <Card className="sticky top-20 border-2 shadow-hard-lg overflow-hidden">
+                        <div className="bg-primary/10 p-4 border-b-2 flex justify-between items-center">
+                            <h3 className="font-bold text-sm uppercase flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4" /> Trade Shares
+                            </h3>
+                            <div className="text-right">
+                                <p className="text-[8px] uppercase font-bold text-muted-foreground">My Balance</p>
+                                <p className="text-xs font-bold text-primary">₦{profile?.balance?.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <CardContent className="p-4 space-y-6">
+                            {market.status !== 'open' ? (
+                                <div className="py-12 text-center text-muted-foreground">
+                                    <ShieldAlert className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                                    <p className="text-xs font-bold">Trading is closed for this market.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onClick={() => setBuyOutcome('yes')}
+                                            className={cn(
+                                                "py-3 rounded border-2 transition-all font-bold",
+                                                buyOutcome === 'yes' ? "bg-primary border-primary text-primary-foreground shadow-hard-sm" : "bg-muted/30 border-transparent hover:border-primary/30"
+                                            )}
+                                        >
+                                            YES ₦{Math.round(market.outcomes.yes.price)}
+                                        </button>
+                                        <button 
+                                            onClick={() => setBuyOutcome('no')}
+                                            className={cn(
+                                                "py-3 rounded border-2 transition-all font-bold",
+                                                buyOutcome === 'no' ? "bg-destructive border-destructive text-destructive-foreground shadow-hard-sm" : "bg-muted/30 border-transparent hover:border-destructive/30"
+                                            )}
+                                        >
+                                            NO ₦{Math.round(market.outcomes.no.price)}
+                                        </button>
+                                    </div>
+
+                                    {buyOutcome && (
+                                        <div className="space-y-4 animate-in slide-in-from-top-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] uppercase font-bold">Investment (₦)</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    value={amountInput} 
+                                                    onChange={e => setAmountInput(e.target.value)} 
+                                                    className="font-bold border-2"
+                                                />
+                                            </div>
+
+                                            <div className="p-3 rounded bg-accent/5 border border-accent/20 space-y-2">
+                                                <div className="flex justify-between items-center text-[10px]">
+                                                    <span className="text-muted-foreground font-bold uppercase">Estimated Shares</span>
+                                                    <span className="font-bold text-accent">{estimatedShares.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px]">
+                                                    <span className="text-muted-foreground font-bold uppercase">Profit if Correct</span>
+                                                    <span className="font-bold text-accent">₦{(estimatedShares * 100).toLocaleString()} (+{(((estimatedShares * 100) / parseFloat(amountInput) * 100) - 100).toFixed(0)}%)</span>
+                                                </div>
+                                            </div>
+
+                                            <Button 
+                                                className={cn("w-full h-12 text-lg font-headline uppercase", buyOutcome === 'yes' ? "bg-primary" : "bg-destructive")}
+                                                onClick={handleBuy}
+                                                disabled={isSubmitting}
+                                            >
+                                                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : `Buy ${buyOutcome.toUpperCase()}`}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <div className="p-4 rounded-lg bg-accent/5 border-2 border-accent/20 flex gap-4 items-start">
+                        <div className="bg-accent/10 p-2 rounded-full">
+                            <Info className="h-5 w-5 text-accent" />
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="font-bold text-sm">How it works</h4>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                Share prices range from ₦1 to ₦99. Each share pays out <b>₦100</b> if the outcome occurs. Think of price as probability.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

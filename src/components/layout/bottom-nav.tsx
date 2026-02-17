@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, TrendingUp, Sword } from 'lucide-react';
+import { Repeat, Wallet, Sparkles, History, Trophy, MoreVertical, TrendingUp, Vote } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import {
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
-  { href: '/betting', label: 'Betting', icon: <Sword className="h-6 w-6" /> },
+  { href: '/betting', label: 'Predictions', icon: <Vote className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
 ];
@@ -27,7 +27,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
       <div className="relative grid h-16 grid-cols-5 border-t-2 bg-background/80 backdrop-blur-sm">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href === '/betting' && pathname.startsWith('/betting'));
           const isCenterButton = item.href === '/create';
 
           if (isCenterButton) {
