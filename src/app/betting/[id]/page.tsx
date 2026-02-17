@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { buyMarketSharesAction } from '@/app/actions/market-actions';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
