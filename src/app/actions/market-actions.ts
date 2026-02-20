@@ -59,13 +59,31 @@ export async function createMarketAction(payload: {
  */
 export async function fetchPolymarketBtcMarkets() {
     try {
-        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&tag=Bitcoin&limit=10', {
+        // Querying for active, non-closed markets sorted by volume to get relevant price markets
+        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=50', {
             next: { revalidate: 60 }
         });
         const data = await response.json();
         
-        // Filter for binary price markets (Up/Down or specific price targets)
-        return data.filter((m: any) => m.outcomes && JSON.parse(m.outcomes).length === 2);
+        if (!Array.isArray(data)) return [];
+
+        // Filter for binary price markets (Up/Down or specific price targets) for Bitcoin
+        return data.filter((m: any) => {
+            const title = (m.question || '').toLowerCase();
+            const description = (m.description || '').toLowerCase();
+            
+            // Check if it's about Bitcoin/BTC
+            const isBtc = title.includes('bitcoin') || title.includes('btc') || description.includes('bitcoin');
+            
+            // Parse outcomes safely
+            let outcomeList = [];
+            try {
+                outcomeList = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes;
+            } catch (e) {}
+
+            // Must be active, binary, and relevant to Bitcoin
+            return isBtc && outcomeList && outcomeList.length === 2 && m.active === true && m.closed === false;
+        });
     } catch (error) {
         console.error("POLYMARKET_FETCH_ERROR:", error);
         return [];
