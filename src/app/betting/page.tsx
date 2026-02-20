@@ -8,11 +8,78 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Vote, Filter, Clock, CheckCircle2 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { TrendingUp, Vote, Filter, Clock, CheckCircle2, Bitcoin, ArrowUp, ArrowDown, Network } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+/**
+ * Featured Bitcoin Oracle Section
+ */
+function BitcoinPriceOracle() {
+    const [price, setPrice] = useState<number | null>(null);
+    const [prevPrice, setPrevPrice] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchPrice = async () => {
+            try {
+                const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+                const data = await res.json();
+                if (data.price) {
+                    const currentPrice = parseFloat(data.price);
+                    setPrice(prev => {
+                        setPrevPrice(prev);
+                        return currentPrice;
+                    });
+                }
+            } catch (e) {}
+        };
+
+        fetchPrice();
+        const interval = setInterval(fetchPrice, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const isUp = price && prevPrice ? price >= prevPrice : true;
+
+    return (
+        <Card className="mb-10 border-2 border-primary/30 bg-primary/5 overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Bitcoin className="h-24 w-24" />
+            </div>
+            <CardContent className="p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <Badge className="bg-primary text-primary-foreground font-bold uppercase tracking-widest text-[10px]">
+                            Live Oracle
+                        </Badge>
+                        <div className="flex items-center gap-1 text-accent font-bold text-[10px] uppercase">
+                            <Network className="h-3 w-3" /> PolyMarket Bridged
+                        </div>
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-bold font-headline uppercase tracking-tighter">Bitcoin 5m Oracle</h2>
+                    <p className="text-muted-foreground text-sm max-w-md">
+                        Predict if Bitcoin will be higher or lower in the next window. Automated settlement via decentralized price feeds.
+                    </p>
+                </div>
+
+                <div className="flex flex-col items-end gap-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">BTC / USD Price</p>
+                    <div className={cn(
+                        "text-4xl sm:text-5xl font-mono font-bold transition-colors flex items-center gap-3",
+                        isUp ? "text-accent" : "text-destructive"
+                    )}>
+                        {price ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '...'}
+                        {price && prevPrice && (
+                            isUp ? <ArrowUp className="h-8 w-8 animate-bounce" /> : <ArrowDown className="h-8 w-8 animate-bounce" />
+                        )}
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function PredictionsPage() {
     const firestore = useFirestore();
@@ -48,6 +115,8 @@ export default function PredictionsPage() {
                 </p>
             </div>
 
+            <BitcoinPriceOracle />
+
             {/* Category Filter */}
             <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
                 <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -76,10 +145,15 @@ export default function PredictionsPage() {
                                     alt={market.question}
                                     className="w-full h-full object-cover transition-transform group-hover:scale-105"
                                 />
-                                <div className="absolute top-2 left-2">
+                                <div className="absolute top-2 left-2 flex gap-2">
                                     <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-[10px] uppercase font-bold">
                                         {market.category}
                                     </Badge>
+                                    {market.polymarketId && (
+                                        <Badge className="bg-accent/90 text-accent-foreground backdrop-blur-sm text-[10px] uppercase font-bold flex items-center gap-1">
+                                            <Network className="h-3 w-3" /> Oracle Verified
+                                        </Badge>
+                                    )}
                                 </div>
                                 {market.status === 'resolved' && (
                                     <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center">
