@@ -28,8 +28,13 @@ export async function createMarketAction(payload: {
     image: string;
     category: string;
     endsAt: Date;
+    polymarketId?: string;
+    initialPrice?: number;
 }) {
     const firestore = getFirestoreInstance();
+    const yesPrice = payload.initialPrice || 50;
+    const noPrice = 100 - yesPrice;
+
     try {
         await addDoc(collection(firestore, 'markets'), {
             ...payload,
@@ -37,13 +42,59 @@ export async function createMarketAction(payload: {
             createdAt: serverTimestamp(),
             volume: 0,
             outcomes: {
-                yes: { id: 'yes', label: 'Yes', price: 50, totalShares: 0 },
-                no: { id: 'no', label: 'No', price: 50, totalShares: 0 }
+                yes: { id: 'yes', label: 'Yes', price: yesPrice, totalShares: 0 },
+                no: { id: 'no', label: 'No', price: noPrice, totalShares: 0 }
             }
         });
         revalidatePath('/admin');
         revalidatePath('/betting');
         return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * POLYMARKET INTEGRATION: Fetch active Bitcoin markets
+ */
+export async function fetchPolymarketBtcMarkets() {
+    try {
+        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&tag=Bitcoin&limit=10', {
+            next: { revalidate: 60 }
+        });
+        const data = await response.json();
+        
+        // Filter for binary price markets (Up/Down or specific price targets)
+        return data.filter((m: any) => m.outcomes && JSON.parse(m.outcomes).length === 2);
+    } catch (error) {
+        console.error("POLYMARKET_FETCH_ERROR:", error);
+        return [];
+    }
+}
+
+/**
+ * Automated resolution check via PolyMarket API
+ */
+export async function syncMarketOutcomeFromPolymarket(marketId: string, polymarketId: string) {
+    try {
+        const response = await fetch(`https://gamma-api.polymarket.com/markets/${polymarketId}`);
+        const data = await response.json();
+
+        if (data.closed && data.tokens && Array.isArray(data.tokens)) {
+            // Polymarket resolution is usually index-based. 
+            // We need to find which token won. 
+            // Usually index 0 is 'Yes' and 1 is 'No'
+            const winnerIndex = data.tokens.findIndex((t: any) => t.winner === true);
+            
+            if (winnerIndex === 0) return await resolveMarketAction(marketId, 'yes');
+            if (winnerIndex === 1) return await resolveMarketAction(marketId, 'no');
+            
+            throw new Error("Winner index not determined on external oracle yet.");
+        } else if (!data.closed) {
+            throw new Error("Market is still open on PolyMarket.");
+        }
+        
+        throw new Error("Could not parse PolyMarket resolution data.");
     } catch (e: any) {
         return { success: false, error: e.message };
     }
