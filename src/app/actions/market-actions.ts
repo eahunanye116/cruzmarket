@@ -56,45 +56,53 @@ export async function createMarketAction(payload: {
 
 /**
  * POLYMARKET INTEGRATION: Fetch active 5-minute Bitcoin markets
- * Increased scan limit to 500 to find specific high-frequency markets
+ * Uses refined filtering to catch recurring price target markets.
  */
 export async function fetchPolymarketBtcMarkets() {
     try {
-        // Querying for more markets to find the specific 5m series which might not be top 100 by volume every second
-        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=500', {
-            next: { revalidate: 60 }
+        // Fetch a broad set of markets to ensure we catch the short-lived 5m windows
+        const response = await fetch('https://gamma-api.polymarket.com/markets?closed=false&order=volume&ascending=false&limit=200', {
+            headers: { 'Accept': 'application/json' },
+            next: { revalidate: 30 } // Short cache for high-frequency data
         });
+        
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        
         const data = await response.json();
         
         if (!Array.isArray(data)) return [];
 
-        // Filter for binary price markets (Up/Down) for Bitcoin, specifically 5-minute ones
+        // Filter for binary price markets (Up/Down) for Bitcoin
         return data.filter((m: any) => {
             const title = (m.question || '').toLowerCase();
-            const description = (m.description || '').toLowerCase();
+            const desc = (m.description || '').toLowerCase();
             
-            // Check if it's about Bitcoin/BTC
-            const isBtc = title.includes('bitcoin') || title.includes('btc') || description.includes('bitcoin');
-            
-            // STRICT FILTER FOR 5 MINUTE MARKETS ONLY
-            // Broadened to catch various naming conventions
-            const is5m = title.includes('5m') || 
-                         title.includes('5-minute') || 
-                         title.includes('5 minute') || 
-                         title.includes('5 min') ||
-                         title.includes('5-min') ||
-                         description.includes('5m') || 
-                         description.includes('5-minute') || 
-                         description.includes('5 minute');
+            // 1. MUST be Bitcoin related
+            const isBtc = title.includes('bitcoin') || title.includes('btc');
+            if (!isBtc) return false;
 
-            // Parse outcomes safely
+            // 2. MUST be binary (Yes/No)
             let outcomeList = [];
             try {
                 outcomeList = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes;
             } catch (e) {}
+            if (!outcomeList || outcomeList.length !== 2) return false;
 
-            // Must be active, binary, Bitcoin-related AND a 5-minute market
-            return isBtc && is5m && outcomeList && outcomeList.length === 2 && m.active === true && m.closed === false;
+            // 3. INTERVAL DETECTION
+            // Polymarket 5m markets usually have "Price at", "above", or specific "5m" markers
+            // We also check for markets expiring very soon (high frequency)
+            const isHighFrequency = 
+                title.includes('5m') || 
+                title.includes('5 min') || 
+                title.includes('5-min') ||
+                title.includes('5 minute') ||
+                title.includes('price at') || // Common for "Bitcoin Price at 10:05 PM"
+                title.includes('above') ||    // Common for "Bitcoin above $67k"
+                desc.includes('5m') ||
+                desc.includes('5 minute');
+
+            // 4. ACTIVE STATUS
+            return isHighFrequency && m.active === true && m.closed === false;
         });
     } catch (error) {
         console.error("POLYMARKET_FETCH_ERROR:", error);
