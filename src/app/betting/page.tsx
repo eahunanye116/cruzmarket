@@ -34,11 +34,17 @@ function MarketCountdown({ endsAt }: { endsAt: any }) {
                 return;
             }
 
-            const mins = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
             const secs = Math.floor((diff % 60000) / 1000);
             
-            setIsUrgent(mins < 5);
-            setTimeLeft(`${mins}m ${secs.toString().padStart(2, '0')}s`);
+            setIsUrgent(hours === 0 && mins < 5);
+            
+            if (hours > 0) {
+                setTimeLeft(`${hours}h ${mins}m ${secs}s`);
+            } else {
+                setTimeLeft(`${mins}m ${secs.toString().padStart(2, '0')}s`);
+            }
         };
 
         calculateTime();

@@ -57,9 +57,15 @@ export default function MarketDetailsPage() {
                 setTimeLeft('WINDOW CLOSED');
                 clearInterval(interval);
             } else {
-                const m = Math.floor(diff / 60000);
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
                 const s = Math.floor((diff % 60000) / 1000);
-                setTimeLeft(`${m}m ${s}s remaining`);
+                
+                if (h > 0) {
+                    setTimeLeft(`${h}h ${m}m ${s}s remaining`);
+                } else {
+                    setTimeLeft(`${m}m ${s}s remaining`);
+                }
             }
         }, 1000);
         return () => clearInterval(interval);
