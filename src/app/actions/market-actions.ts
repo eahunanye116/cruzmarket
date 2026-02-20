@@ -56,11 +56,12 @@ export async function createMarketAction(payload: {
 
 /**
  * POLYMARKET INTEGRATION: Fetch active 5-minute Bitcoin markets
+ * Increased scan limit to 500 to find specific high-frequency markets
  */
 export async function fetchPolymarketBtcMarkets() {
     try {
-        // Querying for active, non-closed markets sorted by volume to get relevant price markets
-        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=100', {
+        // Querying for more markets to find the specific 5m series which might not be top 100 by volume every second
+        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=500', {
             next: { revalidate: 60 }
         });
         const data = await response.json();
@@ -76,8 +77,15 @@ export async function fetchPolymarketBtcMarkets() {
             const isBtc = title.includes('bitcoin') || title.includes('btc') || description.includes('bitcoin');
             
             // STRICT FILTER FOR 5 MINUTE MARKETS ONLY
-            const is5m = title.includes('5m') || title.includes('5-minute') || title.includes('5 minute') || 
-                         description.includes('5m') || description.includes('5-minute') || description.includes('5 minute');
+            // Broadened to catch various naming conventions
+            const is5m = title.includes('5m') || 
+                         title.includes('5-minute') || 
+                         title.includes('5 minute') || 
+                         title.includes('5 min') ||
+                         title.includes('5-min') ||
+                         description.includes('5m') || 
+                         description.includes('5-minute') || 
+                         description.includes('5 minute');
 
             // Parse outcomes safely
             let outcomeList = [];
