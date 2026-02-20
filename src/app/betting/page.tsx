@@ -60,7 +60,7 @@ function MarketCountdown({ endsAt }: { endsAt: any }) {
 /**
  * Featured Bitcoin Oracle Section
  */
-function BitcoinPriceOracle() {
+function BitcoinPriceOracle({ market }: { market?: PredictionMarket }) {
     const [price, setPrice] = useState<number | null>(null);
     const [prevPrice, setPrevPrice] = useState<number | null>(null);
 
@@ -87,35 +87,54 @@ function BitcoinPriceOracle() {
     const isUp = price && prevPrice ? price >= prevPrice : true;
 
     return (
-        <Card className="mb-10 border-2 border-primary/30 bg-primary/5 overflow-hidden relative">
+        <Card className="mb-10 border-2 border-primary/30 bg-primary/5 overflow-hidden relative shadow-hard-md">
             <div className="absolute top-0 right-0 p-4 opacity-10">
                 <Bitcoin className="h-24 w-24" />
             </div>
             <CardContent className="p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2">
+                <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Badge className="bg-primary text-primary-foreground font-bold uppercase tracking-widest text-[10px]">
                             Live Oracle
                         </Badge>
                         <div className="flex items-center gap-1 text-accent font-bold text-[10px] uppercase">
-                            <Network className="h-3 w-3" /> PolyMarket Bridged
+                            <Network className="h-3 w-3 mr-1" /> PolyMarket Bridged
                         </div>
+                        {market && <MarketCountdown endsAt={market.endsAt} />}
                     </div>
-                    <h2 className="text-3xl sm:text-4xl font-bold font-headline uppercase tracking-tighter">Bitcoin 5m Oracle</h2>
-                    <p className="text-muted-foreground text-sm max-w-md">
-                        Standard high-frequency prediction markets. Choose Up or Down based on target prices. Settled via decentralized feeds.
-                    </p>
+                    
+                    <div className="space-y-1">
+                        <h2 className="text-3xl sm:text-4xl font-bold font-headline uppercase tracking-tighter">Bitcoin 5m Oracle</h2>
+                        <p className="text-muted-foreground text-sm max-w-md">
+                            Standard high-frequency prediction markets. Choose Up or Down based on target prices. Settled via decentralized feeds.
+                        </p>
+                    </div>
+
+                    {market && (
+                        <div className="flex gap-3 pt-2">
+                            <Button asChild className="bg-accent hover:bg-accent/90 shadow-hard-sm h-12 px-6 font-headline flex-1 sm:flex-initial">
+                                <Link href={`/betting/${market.id}`}>
+                                    <ArrowUp className="mr-2 h-5 w-5" /> BUY UP
+                                </Link>
+                            </Button>
+                            <Button asChild className="bg-destructive hover:bg-destructive/90 shadow-hard-sm h-12 px-6 font-headline flex-1 sm:flex-initial">
+                                <Link href={`/betting/${market.id}`}>
+                                    <ArrowDown className="mr-2 h-5 w-5" /> BUY DOWN
+                                </Link>
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col items-end gap-1">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase">BTC / USD Price</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">BTC / USD Price</p>
                     <div className={cn(
                         "text-4xl sm:text-5xl font-mono font-bold transition-colors flex items-center gap-3",
                         isUp ? "text-accent" : "text-destructive"
                     )}>
                         {price ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '...'}
                         {price && prevPrice && (
-                            isUp ? <ArrowUp className="h-8 w-8 animate-bounce" /> : <ArrowDown className="h-8 w-8 animate-bounce" />
+                            isUp ? <ArrowUp className="h-8 w-8 animate-bounce text-accent" /> : <ArrowDown className="h-8 w-8 animate-bounce text-destructive" />
                         )}
                     </div>
                 </div>
@@ -146,6 +165,12 @@ export default function PredictionsPage() {
         return markets.filter(m => selectedCategory === 'All' || m.category === selectedCategory);
     }, [markets, selectedCategory]);
 
+    const featuredBtcMarket = useMemo(() => {
+        if (!markets) return undefined;
+        // Find the first active Bitcoin oracle market
+        return markets.find(m => m.status === 'open' && (m.category === 'Crypto' || m.question.toLowerCase().includes('bitcoin')));
+    }, [markets]);
+
     return (
         <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-7xl pb-24">
             <div className="flex flex-col items-center text-center mb-10">
@@ -158,7 +183,7 @@ export default function PredictionsPage() {
                 </p>
             </div>
 
-            <BitcoinPriceOracle />
+            <BitcoinPriceOracle market={featuredBtcMarket} />
 
             {/* Category Filter */}
             <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar border-b pb-4">
