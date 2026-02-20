@@ -174,7 +174,17 @@ export default function PredictionsPage() {
     const featuredBtcMarket = useMemo(() => {
         if (!markets) return undefined;
         // Find the first active Bitcoin oracle market
-        return markets.find(m => m.status === 'open' && (m.category === 'Crypto' || m.question.toLowerCase().includes('bitcoin')));
+        const activeBtcMarkets = markets.filter(m => m.status === 'open' && (m.category === 'Crypto' || m.question.toLowerCase().includes('bitcoin')));
+        
+        // Prioritize markets that are specifically 5-minute targets
+        const fiveMinMarket = activeBtcMarkets.find(m => 
+            m.question.toLowerCase().includes('5m') || 
+            m.question.toLowerCase().includes('5 minute') ||
+            m.description.toLowerCase().includes('5m') ||
+            m.description.toLowerCase().includes('5 minute')
+        );
+
+        return fiveMinMarket || activeBtcMarkets[0];
     }, [markets]);
 
     return (

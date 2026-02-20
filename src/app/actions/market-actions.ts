@@ -55,19 +55,19 @@ export async function createMarketAction(payload: {
 }
 
 /**
- * POLYMARKET INTEGRATION: Fetch active Bitcoin markets
+ * POLYMARKET INTEGRATION: Fetch active 5-minute Bitcoin markets
  */
 export async function fetchPolymarketBtcMarkets() {
     try {
         // Querying for active, non-closed markets sorted by volume to get relevant price markets
-        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=50', {
+        const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume&ascending=false&limit=100', {
             next: { revalidate: 60 }
         });
         const data = await response.json();
         
         if (!Array.isArray(data)) return [];
 
-        // Filter for binary price markets (Up/Down or specific price targets) for Bitcoin
+        // Filter for binary price markets (Up/Down) for Bitcoin, specifically 5-minute ones
         return data.filter((m: any) => {
             const title = (m.question || '').toLowerCase();
             const description = (m.description || '').toLowerCase();
@@ -75,14 +75,18 @@ export async function fetchPolymarketBtcMarkets() {
             // Check if it's about Bitcoin/BTC
             const isBtc = title.includes('bitcoin') || title.includes('btc') || description.includes('bitcoin');
             
+            // STRICT FILTER FOR 5 MINUTE MARKETS ONLY
+            const is5m = title.includes('5m') || title.includes('5-minute') || title.includes('5 minute') || 
+                         description.includes('5m') || description.includes('5-minute') || description.includes('5 minute');
+
             // Parse outcomes safely
             let outcomeList = [];
             try {
                 outcomeList = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes;
             } catch (e) {}
 
-            // Must be active, binary, and relevant to Bitcoin
-            return isBtc && outcomeList && outcomeList.length === 2 && m.active === true && m.closed === false;
+            // Must be active, binary, Bitcoin-related AND a 5-minute market
+            return isBtc && is5m && outcomeList && outcomeList.length === 2 && m.active === true && m.closed === false;
         });
     } catch (error) {
         console.error("POLYMARKET_FETCH_ERROR:", error);
