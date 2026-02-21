@@ -57,7 +57,25 @@ export function TradeForm({ ticker }: { ticker: Ticker }) {
     setHoldingLoading(true);
     const q = query(collection(firestore, `users/${user.uid}/portfolio`), where('tickerId', '==', ticker.id));
     return onSnapshot(q, (snap) => {
-      setUserHolding(!snap.empty ? (snap.docs[0].data() as PortfolioHolding) : null);
+      if (snap.empty) {
+        setUserHolding(null);
+      } else {
+        // AGGREGATE ALL HOLDINGS (Handles "old tickers" with fragmented docs)
+        let totalAmount = 0;
+        let totalCost = 0;
+        snap.docs.forEach(doc => {
+            const data = doc.data() as PortfolioHolding;
+            totalAmount += (data.amount || 0);
+            totalCost += (data.amount || 0) * (data.avgBuyPrice || 0);
+        });
+        
+        setUserHolding({
+            tickerId: ticker.id,
+            userId: user.uid,
+            amount: totalAmount,
+            avgBuyPrice: totalAmount > 0 ? totalCost / totalAmount : 0
+        });
+      }
       setHoldingLoading(false);
     });
   }, [user, firestore, ticker.id]);

@@ -1,8 +1,7 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
-import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit, collectionGroup, addDoc } from 'firebase/firestore';
+import { doc, collection, runTransaction, serverTimestamp, arrayUnion, DocumentReference, increment, getDocs, query, where, getDoc, limit, collectionGroup, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Ticker, UserProfile, PortfolioHolding, PlatformStats, CopyTarget } from '@/lib/types';
 import { sub } from 'date-fns';
 import { broadcastNewTickerNotification } from './telegram-actions';
@@ -69,8 +68,9 @@ async function triggerCopyTrades(sourceUid: string, tickerId: string, type: 'BUY
                     const holdingSnap = await getDocs(holdingQ);
                     
                     if (!holdingSnap.empty) {
-                        const followerHolding = holdingSnap.docs[0].data() as PortfolioHolding;
-                        const amountToSell = followerHolding.amount * sellPercentage;
+                        // Aggregate total held by follower to handle fragmented docs
+                        const followerTotalHeld = holdingSnap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
+                        const amountToSell = followerTotalHeld * sellPercentage;
                         if (amountToSell > 0.000001) {
                             await executeSellAction(followerId, tickerId, amountToSell, true);
                         }
@@ -91,16 +91,27 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
     const firestore = getFirestoreInstance();
     const resolvedId = await resolveTickerId(firestore, tickerId);
     
+    // FETCH ALL POTENTIAL HOLDINGS TO AGGREGATE/MIGRATE
+    const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
+    const q = query(portfolioRef, where('tickerId', '==', resolvedId));
+    const holdingsSnapshot = await getDocs(q);
+    const holdingDocRefs = holdingsSnapshot.docs.map(d => d.ref);
+    const standardHoldingRef = doc(portfolioRef, `holding_${resolvedId}`);
+    
+    // Ensure the standard doc is in the list to be read in the transaction
+    if (!holdingDocRefs.some(r => r.id === standardHoldingRef.id)) {
+        holdingDocRefs.push(standardHoldingRef);
+    }
+
     try {
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
             const tickerRef = doc(firestore, 'tickers', resolvedId);
-            const holdingRef = doc(firestore, `users/${userId}/portfolio`, `holding_${resolvedId}`);
             
-            const [userDoc, tickerDoc, holdingDoc] = await Promise.all([
+            const [userDoc, tickerDoc, ...holdingDocs] = await Promise.all([
                 transaction.get(userRef as DocumentReference<UserProfile>),
                 transaction.get(tickerRef as DocumentReference<Ticker>),
-                transaction.get(holdingRef)
+                ...holdingDocRefs.map(r => transaction.get(r))
             ]);
             
             if (!userDoc.exists()) throw new Error('User not found.');
@@ -113,28 +124,37 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
 
             if (totalAvailable < ngnAmount) throw new Error('Insufficient balance.');
             
+            // AGGREGATE EXISTING HOLDINGS
+            let existingAmount = 0;
+            let existingTotalCost = 0;
+            
+            holdingDocs.forEach(h => {
+                if (h.exists()) {
+                    const data = h.data() as PortfolioHolding;
+                    existingAmount += (data.amount || 0);
+                    existingTotalCost += (data.amount || 0) * (data.avgBuyPrice || 0);
+                    // Mark non-standard docs for deletion (Self-healing)
+                    if (h.id !== standardHoldingRef.id) {
+                        transaction.delete(h.ref);
+                    }
+                }
+            });
+
             const tickerData = tickerDoc.data();
             const fee = ngnAmount * TRANSACTION_FEE_PERCENTAGE;
             const ngnForCurve = ngnAmount - fee;
             
-            /**
-             * NEW EXPONENTIAL CURVE MATH:
-             * R = R0 * e^(s / S_init)
-             * s = S_init * ln(R / R0)
-             */
             const R0 = tickerData.initialMarketCap || 100000;
             const S_init = tickerData.initialSupply || 1000000000;
             
             const currentR = tickerData.marketCap;
             const newR = currentR + ngnForCurve;
             
-            // Calculate current tokens out (circulating)
             const currentS = S_init * Math.log(currentR / R0);
             const newS = S_init * Math.log(newR / R0);
             const tokensOut = newS - currentS;
             
             const finalPrice = newR / S_init;
-            const avgBuyPrice = ngnAmount / tokensOut;
 
             if (tokensOut <= 0) throw new Error("Trade resulted in 0 tokens.");
 
@@ -147,26 +167,22 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 totalTradingVolume: increment(ngnAmount)
             });
 
-            if (holdingDoc.exists()) {
-                const currentHolding = holdingDoc.data() as PortfolioHolding;
-                const totalAmount = currentHolding.amount + tokensOut;
-                const totalCost = (currentHolding.avgBuyPrice * currentHolding.amount) + ngnAmount;
-                const newAvgBuyPrice = totalAmount > 0 ? totalCost / totalAmount : 0;
-                transaction.update(holdingRef, { amount: totalAmount, avgBuyPrice: newAvgBuyPrice });
-            } else {
-                transaction.set(holdingRef, { 
-                    tickerId: resolvedId, 
-                    amount: tokensOut, 
-                    avgBuyPrice: avgBuyPrice, 
-                    userId: userId 
-                });
-            }
+            // Update standard doc with merged and new values
+            const totalAmount = existingAmount + tokensOut;
+            const totalCost = existingTotalCost + ngnAmount;
+            const newAvgBuyPrice = totalAmount > 0 ? totalCost / totalAmount : 0;
+            
+            transaction.set(standardHoldingRef, { 
+                tickerId: resolvedId, 
+                amount: totalAmount, 
+                avgBuyPrice: newAvgBuyPrice, 
+                userId: userId 
+            });
 
             const now = new Date();
             const twentyFourHoursAgo = sub(now, { hours: 24 });
             const chartData = tickerData.chartData || [];
             
-            // Calculate change based on Market Cap (Reserve) now, as it's linear with Price
             const pastDataPoint = [...chartData].reverse().find(d => new Date(d.time) <= twentyFourHoursAgo) || chartData[0];
             const pastMC = pastDataPoint?.marketCap || tickerData.initialMarketCap;
             const priceChange24h = pastMC > 0 ? ((newR - pastMC) / pastMC) * 100 : 0;
@@ -184,7 +200,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
             transaction.update(tickerRef, { 
                 price: finalPrice,
                 marketCap: newR,
-                supply: tickerData.supply - tokensOut, // Track remaining supply if needed
+                supply: tickerData.supply - tokensOut,
                 volume24h,
                 priceChange24h,
                 trendingScore,
@@ -200,7 +216,7 @@ export async function executeBuyAction(userId: string, tickerId: string, ngnAmou
                 value: ngnAmount,
                 fee: fee, 
                 tokenAmount: tokensOut,
-                pricePerToken: avgBuyPrice,
+                pricePerToken: ngnAmount / tokensOut,
                 userId: userId,
                 createdAt: serverTimestamp(),
             });
@@ -223,28 +239,51 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
     const firestore = getFirestoreInstance();
     const resolvedId = await resolveTickerId(firestore, tickerId);
 
+    // FETCH ALL POTENTIAL HOLDINGS TO AGGREGATE (FIXES FRAGMENTED PORTFOLIO ERROR)
+    const portfolioRef = collection(firestore, `users/${userId}/portfolio`);
+    const q = query(portfolioRef, where('tickerId', '==', resolvedId));
+    const holdingsSnapshot = await getDocs(q);
+    const holdingDocRefs = holdingsSnapshot.docs.map(d => d.ref);
+    const standardHoldingRef = doc(portfolioRef, `holding_${resolvedId}`);
+    
+    if (!holdingDocRefs.some(r => r.id === standardHoldingRef.id)) {
+        holdingDocRefs.push(standardHoldingRef);
+    }
+
     try {
         const result = await runTransaction(firestore, async (transaction) => {
             const userRef = doc(firestore, 'users', userId);
             const tickerRef = doc(firestore, 'tickers', resolvedId);
-            const holdingRef = doc(firestore, `users/${userId}/portfolio`, `holding_${resolvedId}`);
             
-            const [userDoc, tickerDoc, holdingDoc] = await Promise.all([
+            const [userDoc, tickerDoc, ...holdingDocs] = await Promise.all([
                 transaction.get(userRef as DocumentReference<UserProfile>),
                 transaction.get(tickerRef as DocumentReference<Ticker>),
-                transaction.get(holdingRef)
+                ...holdingDocRefs.map(r => transaction.get(r))
             ]);
 
             if (!userDoc.exists()) throw new Error('User not found.');
             if (!tickerDoc.exists()) throw new Error('Ticker not found.');
-            if (!holdingDoc.exists()) throw new Error('You do not own this ticker.');
+            
+            // AGGREGATE TOTAL HOLDINGS
+            let totalHeldAmountBefore = 0;
+            let totalCostBefore = 0;
+            
+            holdingDocs.forEach(h => {
+                if (h.exists()) {
+                    const data = h.data() as PortfolioHolding;
+                    totalHeldAmountBefore += (data.amount || 0);
+                    totalCostBefore += (data.amount || 0) * (data.avgBuyPrice || 0);
+                    // Mark non-standard ones for deletion during merge
+                    if (h.id !== standardHoldingRef.id) {
+                        transaction.delete(h.ref);
+                    }
+                }
+            });
 
-            const currentHolding = holdingDoc.data() as PortfolioHolding;
-            const totalHeldAmountBefore = currentHolding.amount;
-
-            if (tokenAmountToSell <= 0) throw new Error("Invalid sell amount.");
+            if (totalHeldAmountBefore <= 0) throw new Error('You do not own this ticker.');
             if (tokenAmountToSell > totalHeldAmountBefore + 0.000001) throw new Error("Insufficient tokens in portfolio.");
 
+            const aggregatedAvgBuyPrice = totalCostBefore / totalHeldAmountBefore;
             const tickerData = tickerDoc.data();
             const R0 = tickerData.initialMarketCap || 100000;
             const S_init = tickerData.initialSupply || 1000000000;
@@ -259,10 +298,9 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
             const fee = ngnToGetBeforeFee * TRANSACTION_FEE_PERCENTAGE;
             const ngnToUser = ngnToGetBeforeFee - fee;
 
-            const costBasis = tokenAmountToSell * currentHolding.avgBuyPrice;
+            const costBasis = tokenAmountToSell * aggregatedAvgBuyPrice;
             const realizedPnl = ngnToUser - costBasis;
             const finalPrice = newR / S_init;
-            const pricePerToken = ngnToGetBeforeFee / tokenAmountToSell;
 
             transaction.update(userRef, { 
                 balance: (userDoc.data().balance || 0) + ngnToUser,
@@ -272,9 +310,16 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
 
             const newAmount = totalHeldAmountBefore - tokenAmountToSell;
             if (newAmount > 0.000001) {
-                transaction.update(holdingRef, { amount: newAmount });
+                // Update or Create standard doc with remainder
+                transaction.set(standardHoldingRef, { 
+                    tickerId: resolvedId, 
+                    amount: newAmount, 
+                    avgBuyPrice: aggregatedAvgBuyPrice, 
+                    userId: userId 
+                });
             } else {
-                transaction.delete(holdingRef);
+                // Delete the standard doc too if empty
+                transaction.delete(standardHoldingRef);
             }
 
             const now = new Date();
@@ -314,7 +359,7 @@ export async function executeSellAction(userId: string, tickerId: string, tokenA
                 value: ngnToGetBeforeFee,
                 fee: fee, 
                 tokenAmount: tokenAmountToSell,
-                pricePerToken: pricePerToken,
+                pricePerToken: ngnToGetBeforeFee / tokenAmountToSell,
                 realizedPnl: realizedPnl,
                 userId: userId,
                 createdAt: serverTimestamp(),
