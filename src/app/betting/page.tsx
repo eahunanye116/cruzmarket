@@ -1,17 +1,15 @@
-
 'use client';
 
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { PredictionMarket } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Vote, Filter, Clock, CheckCircle2, Bitcoin, ArrowUp, ArrowDown, Network, Timer } from 'lucide-react';
+import { TrendingUp, Vote, Filter, Clock, ArrowUp, ArrowDown, Timer } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 /**
@@ -63,92 +61,6 @@ function MarketCountdown({ endsAt }: { endsAt: any }) {
     );
 }
 
-/**
- * Featured Bitcoin Oracle Section
- */
-function BitcoinPriceOracle({ market }: { market?: PredictionMarket }) {
-    const [price, setPrice] = useState<number | null>(null);
-    const [prevPrice, setPrevPrice] = useState<number | null>(null);
-
-    useEffect(() => {
-        const fetchPrice = async () => {
-            try {
-                const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-                const data = await res.json();
-                if (data.price) {
-                    const currentPrice = parseFloat(data.price);
-                    setPrice(prev => {
-                        setPrevPrice(prev);
-                        return currentPrice;
-                    });
-                }
-            } catch (e) {}
-        };
-
-        fetchPrice();
-        const interval = setInterval(fetchPrice, 5000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const isUp = price && prevPrice ? price >= prevPrice : true;
-
-    return (
-        <Card className="mb-10 border-2 border-primary/30 bg-primary/5 overflow-hidden relative shadow-hard-md">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Bitcoin className="h-24 w-24" />
-            </div>
-            <CardContent className="p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="bg-primary text-primary-foreground font-bold uppercase tracking-widest text-[10px]">
-                            Live Oracle
-                        </Badge>
-                        <div className="flex items-center gap-1 text-accent font-bold text-[10px] uppercase">
-                            <Network className="h-3 w-3 mr-1" /> PolyMarket Bridged
-                        </div>
-                        {market && <MarketCountdown endsAt={market.endsAt} />}
-                    </div>
-                    
-                    <div className="space-y-1">
-                        <h2 className="text-3xl sm:text-4xl font-bold font-headline uppercase tracking-tighter">Bitcoin 5m Oracle</h2>
-                        <p className="text-muted-foreground text-sm max-w-md">
-                            Standard high-frequency prediction markets. Choose Up or Down based on target prices. Settled via decentralized feeds.
-                        </p>
-                    </div>
-
-                    {market && (
-                        <div className="flex gap-3 pt-2">
-                            <Button asChild className="bg-accent hover:bg-accent/90 shadow-hard-sm h-12 px-6 font-headline flex-1 sm:flex-initial">
-                                <Link href={`/betting/${market.id}`}>
-                                    <ArrowUp className="mr-2 h-5 w-5" /> BUY UP
-                                </Link>
-                            </Button>
-                            <Button asChild className="bg-destructive hover:bg-destructive/90 shadow-hard-sm h-12 px-6 font-headline flex-1 sm:flex-initial">
-                                <Link href={`/betting/${market.id}`}>
-                                    <ArrowDown className="mr-2 h-5 w-5" /> BUY DOWN
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex flex-col items-end gap-1">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">BTC / USD Price</p>
-                    <div className={cn(
-                        "text-4xl sm:text-5xl font-mono font-bold transition-colors flex items-center gap-3",
-                        isUp ? "text-accent" : "text-destructive"
-                    )}>
-                        {price ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '...'}
-                        {price && prevPrice && (
-                            isUp ? <ArrowUp className="h-8 w-8 animate-bounce text-accent" /> : <ArrowDown className="h-8 w-8 animate-bounce text-destructive" />
-                        )}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
 export default function PredictionsPage() {
     const firestore = useFirestore();
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -171,22 +83,6 @@ export default function PredictionsPage() {
         return markets.filter(m => selectedCategory === 'All' || m.category === selectedCategory);
     }, [markets, selectedCategory]);
 
-    const featuredBtcMarket = useMemo(() => {
-        if (!markets) return undefined;
-        // Find the first active Bitcoin oracle market
-        const activeBtcMarkets = markets.filter(m => m.status === 'open' && (m.category === 'Crypto' || m.question.toLowerCase().includes('bitcoin')));
-        
-        // Prioritize markets that are specifically 5-minute targets
-        const fiveMinMarket = activeBtcMarkets.find(m => 
-            m.question.toLowerCase().includes('5m') || 
-            m.question.toLowerCase().includes('5 minute') ||
-            m.description.toLowerCase().includes('5m') ||
-            m.description.toLowerCase().includes('5 minute')
-        );
-
-        return fiveMinMarket || activeBtcMarkets[0];
-    }, [markets]);
-
     return (
         <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-7xl pb-24">
             <div className="flex flex-col items-center text-center mb-10">
@@ -198,8 +94,6 @@ export default function PredictionsPage() {
                     The market for world events. Trade on truth.
                 </p>
             </div>
-
-            <BitcoinPriceOracle market={featuredBtcMarket} />
 
             {/* Category Filter */}
             <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar border-b pb-4">
@@ -238,11 +132,6 @@ export default function PredictionsPage() {
                                     <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-[10px] uppercase font-bold border shadow-sm w-fit">
                                         {market.category}
                                     </Badge>
-                                    {market.polymarketId && (
-                                        <Badge className="bg-accent/90 text-accent-foreground backdrop-blur-sm text-[10px] uppercase font-bold flex items-center gap-1 shadow-sm w-fit">
-                                            <Network className="h-3 w-3" /> Oracle
-                                        </Badge>
-                                    )}
                                 </div>
 
                                 {market.status === 'open' && (
@@ -266,13 +155,13 @@ export default function PredictionsPage() {
                                     <div className="flex gap-2">
                                         <div className="flex-1 bg-accent/5 border-2 border-accent/20 rounded p-2 text-center group-hover:bg-accent/10 transition-colors">
                                             <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
-                                                <ArrowUp className="h-2.5 w-2.5 text-accent" /> Up
+                                                <ArrowUp className="h-2.5 w-2.5 text-accent" /> Yes
                                             </p>
                                             <p className="text-xl font-bold text-accent">₦{Math.round(market.outcomes.yes.price)}</p>
                                         </div>
                                         <div className="flex-1 bg-destructive/5 border-2 border-destructive/20 rounded p-2 text-center group-hover:bg-destructive/10 transition-colors">
                                             <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
-                                                <ArrowDown className="h-2.5 w-2.5 text-destructive" /> Down
+                                                <ArrowDown className="h-2.5 w-2.5 text-destructive" /> No
                                             </p>
                                             <p className="text-xl font-bold text-destructive">₦{Math.round(market.outcomes.no.price)}</p>
                                         </div>

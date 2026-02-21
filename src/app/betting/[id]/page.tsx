@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
@@ -9,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet, CircleDollarSign, TrendingDown, Network, Timer, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet, CircleDollarSign, TrendingDown, Timer, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { buyMarketSharesAction, sellMarketSharesAction } from '@/app/actions/market-actions';
@@ -107,7 +106,6 @@ export default function MarketDetailsPage() {
     if (loading) return <div className="container mx-auto py-12 p-4"><Skeleton className="h-96 w-full" /></div>;
     if (!market) return notFound();
 
-    const isCryptoOracle = market.category === 'Crypto' || !!market.polymarketId;
     const currentPrice = buyOutcome ? market.outcomes[buyOutcome].price : 0;
     const estimatedShares = buyOutcome ? parseFloat(amountInput) / currentPrice : 0;
 
@@ -130,7 +128,6 @@ export default function MarketDetailsPage() {
                             <div className="absolute bottom-4 left-4 right-4">
                                 <div className="flex gap-2 mb-2">
                                     <Badge className="uppercase font-bold text-[10px]">{market.category}</Badge>
-                                    {market.polymarketId && <Badge variant="secondary" className="text-[10px] font-bold bg-accent/20 text-accent border-accent/30"><Network className="h-3 w-3 mr-1" /> ORACLE VERIFIED</Badge>}
                                 </div>
                                 <h1 className="text-2xl sm:text-3xl font-bold font-headline leading-tight uppercase tracking-tight">{market.question}</h1>
                             </div>
@@ -183,7 +180,7 @@ export default function MarketDetailsPage() {
                                             <div key={pos.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                 <div className="flex items-center gap-4">
                                                     <Badge variant={pos.outcome === 'yes' ? 'default' : 'destructive'} className="h-8 px-3 text-[10px] font-bold uppercase shadow-sm">
-                                                        {isCryptoOracle ? (pos.outcome === 'yes' ? 'UP' : 'DOWN') : pos.outcome}
+                                                        {pos.outcome}
                                                     </Badge>
                                                     <div>
                                                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Equity</p>
@@ -224,13 +221,13 @@ export default function MarketDetailsPage() {
                                 <CardTitle className="text-accent flex items-center gap-2 font-headline uppercase">
                                     <CheckCircle2 className="h-5 w-5" /> Outcome Verified
                                 </CardTitle>
-                                <CardDescription className="text-xs font-bold">Automatic settlement complete via Oracle.</CardDescription>
+                                <CardDescription className="text-xs font-bold">Automatic settlement complete.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-center p-8 border-2 border-dashed border-accent/20 rounded bg-background/50">
                                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Final Result</p>
                                     <p className="text-5xl font-bold text-accent uppercase font-headline">
-                                        {isCryptoOracle ? (market.winningOutcome === 'yes' ? 'UP' : 'DOWN') : market.winningOutcome}
+                                        {market.winningOutcome}
                                     </p>
                                     <p className="text-[10px] text-muted-foreground mt-6 uppercase font-bold tracking-widest">Payout: ₦100 per winning share</p>
                                 </div>
@@ -268,8 +265,7 @@ export default function MarketDetailsPage() {
                                         >
                                             <span className="text-[10px] uppercase opacity-70">Buy</span>
                                             <span className="text-lg uppercase flex items-center gap-1">
-                                                {isCryptoOracle && <ArrowUp className="h-4 w-4" />}
-                                                {isCryptoOracle ? 'UP' : 'YES'}
+                                                YES
                                             </span>
                                             <span className="text-[10px] font-mono">₦{Math.round(market.outcomes.yes.price)}</span>
                                         </button>
@@ -282,8 +278,7 @@ export default function MarketDetailsPage() {
                                         >
                                             <span className="text-[10px] uppercase opacity-70">Buy</span>
                                             <span className="text-lg uppercase flex items-center gap-1">
-                                                {isCryptoOracle && <ArrowDown className="h-4 w-4" />}
-                                                {isCryptoOracle ? 'DOWN' : 'NO'}
+                                                NO
                                             </span>
                                             <span className="text-[10px] font-mono">₦{Math.round(market.outcomes.no.price)}</span>
                                         </button>
@@ -317,7 +312,7 @@ export default function MarketDetailsPage() {
                                                 onClick={handleBuy}
                                                 disabled={isSubmitting}
                                             >
-                                                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : `CONFIRM ${isCryptoOracle ? (buyOutcome === 'yes' ? 'UP' : 'DOWN') : buyOutcome.toUpperCase()}`}
+                                                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : `CONFIRM ${buyOutcome.toUpperCase()}`}
                                             </Button>
                                         </div>
                                     )}

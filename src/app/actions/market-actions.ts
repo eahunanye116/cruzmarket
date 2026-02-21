@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirestoreInstance } from '@/firebase/server';
@@ -28,7 +27,6 @@ export async function createMarketAction(payload: {
     image: string;
     category: string;
     endsAt: Date;
-    polymarketId?: string;
     initialPrice?: number;
 }) {
     const firestore = getFirestoreInstance();
@@ -49,90 +47,6 @@ export async function createMarketAction(payload: {
         revalidatePath('/admin');
         revalidatePath('/betting');
         return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
-}
-
-/**
- * POLYMARKET INTEGRATION: Fetch active 5-minute Bitcoin markets
- * Uses refined filtering to catch recurring price target markets.
- */
-export async function fetchPolymarketBtcMarkets() {
-    try {
-        // Fetch a broad set of markets to ensure we catch the short-lived 5m windows
-        const response = await fetch('https://gamma-api.polymarket.com/markets?closed=false&order=volume&ascending=false&limit=200', {
-            headers: { 'Accept': 'application/json' },
-            next: { revalidate: 30 } // Short cache for high-frequency data
-        });
-        
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (!Array.isArray(data)) return [];
-
-        // Filter for binary price markets (Up/Down) for Bitcoin
-        return data.filter((m: any) => {
-            const title = (m.question || '').toLowerCase();
-            const desc = (m.description || '').toLowerCase();
-            
-            // 1. MUST be Bitcoin related
-            const isBtc = title.includes('bitcoin') || title.includes('btc');
-            if (!isBtc) return false;
-
-            // 2. MUST be binary (Yes/No)
-            let outcomeList = [];
-            try {
-                outcomeList = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes;
-            } catch (e) {}
-            if (!outcomeList || outcomeList.length !== 2) return false;
-
-            // 3. INTERVAL DETECTION
-            // Polymarket 5m markets usually have "Price at", "above", or specific "5m" markers
-            // We also check for markets expiring very soon (high frequency)
-            const isHighFrequency = 
-                title.includes('5m') || 
-                title.includes('5 min') || 
-                title.includes('5-min') ||
-                title.includes('5 minute') ||
-                title.includes('price at') || // Common for "Bitcoin Price at 10:05 PM"
-                title.includes('above') ||    // Common for "Bitcoin above $67k"
-                desc.includes('5m') ||
-                desc.includes('5 minute');
-
-            // 4. ACTIVE STATUS
-            return isHighFrequency && m.active === true && m.closed === false;
-        });
-    } catch (error) {
-        console.error("POLYMARKET_FETCH_ERROR:", error);
-        return [];
-    }
-}
-
-/**
- * Automated resolution check via PolyMarket API
- */
-export async function syncMarketOutcomeFromPolymarket(marketId: string, polymarketId: string) {
-    try {
-        const response = await fetch(`https://gamma-api.polymarket.com/markets/${polymarketId}`);
-        const data = await response.json();
-
-        if (data.closed && data.tokens && Array.isArray(data.tokens)) {
-            // Polymarket resolution is usually index-based. 
-            // We need to find which token won. 
-            // Usually index 0 is 'Yes' and 1 is 'No'
-            const winnerIndex = data.tokens.findIndex((t: any) => t.winner === true);
-            
-            if (winnerIndex === 0) return await resolveMarketAction(marketId, 'yes');
-            if (winnerIndex === 1) return await resolveMarketAction(marketId, 'no');
-            
-            throw new Error("Winner index not determined on external oracle yet.");
-        } else if (!data.closed) {
-            throw new Error("Market is still open on PolyMarket.");
-        }
-        
-        throw new Error("Could not parse PolyMarket resolution data.");
     } catch (e: any) {
         return { success: false, error: e.message };
     }

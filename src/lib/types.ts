@@ -1,4 +1,3 @@
-
 import { Timestamp } from "firebase/firestore";
 
 export type Ticker = {
@@ -75,7 +74,6 @@ export type PredictionMarket = {
   };
   createdAt: Timestamp;
   volume: number;
-  polymarketId?: string; // Reference to external source
 };
 
 export type MarketPosition = {
