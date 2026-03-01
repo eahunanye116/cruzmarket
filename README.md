@@ -16,7 +16,7 @@ If specific periodic tasks are needed, use a scheduler to trigger designated end
 
 ---
 
-## 🚀 C add .ritical Production Deployment (Vercel)
+## 🚀 C add .sh origin mainritical Production Deployment (Vercel)
 
 Ensure your environment variables are correctly set in Vercel for full functionality:
 
