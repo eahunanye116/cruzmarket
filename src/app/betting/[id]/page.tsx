@@ -117,19 +117,19 @@ export default function MarketDetailsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 space-y-8">
-                    <Card className="overflow-hidden border-2 shadow-hard-md">
-                        <div className="relative h-48 sm:h-64">
+                    <Card className="overflow-hidden border-2 shadow-hard-md bg-black/20">
+                        <div className="relative h-48 sm:h-80 bg-black/40">
                             <img 
                                 src={market.image || 'https://picsum.photos/seed/market/1200/600'} 
                                 alt={market.question}
-                                className="w-full h-full object-cover opacity-60"
+                                className="w-full h-full object-contain"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-60" />
                             <div className="absolute bottom-4 left-4 right-4">
                                 <div className="flex gap-2 mb-2">
                                     <Badge className="uppercase font-bold text-[10px]">{market.category}</Badge>
                                 </div>
-                                <h1 className="text-2xl sm:text-3xl font-bold font-headline leading-tight uppercase tracking-tight">{market.question}</h1>
+                                <h1 className="text-2xl sm:text-3xl font-bold font-headline leading-tight uppercase tracking-tight shadow-text">{market.question}</h1>
                             </div>
                         </div>
                         <CardContent className="p-6">

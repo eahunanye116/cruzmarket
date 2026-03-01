@@ -120,14 +120,14 @@ export default function PredictionsPage() {
                 ) : filteredMarkets.length > 0 ? filteredMarkets.map((market) => (
                     <Link href={`/betting/${market.id}`} key={market.id}>
                         <Card className="h-full overflow-hidden border-2 hover:border-primary/50 transition-all group flex flex-col shadow-hard-sm hover:shadow-hard-md bg-card/50">
-                            <div className="relative aspect-[16/9] w-full overflow-hidden border-b-2">
+                            <div className="relative aspect-[16/9] w-full overflow-hidden border-b-2 bg-black/40">
                                 <img 
                                     src={market.image || 'https://picsum.photos/seed/market/800/450'} 
                                     alt={market.question}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                    className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
                                 />
                                 {/* Overlay for legibility */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-40" />
                                 
                                 <div className="absolute top-3 left-3">
                                     <Badge className="bg-primary text-primary-foreground border-none font-bold text-[9px] uppercase tracking-wider px-2 py-1 shadow-sm">
