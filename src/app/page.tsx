@@ -208,7 +208,7 @@ export default function Home() {
                 </Popover>
               </div>
               {tickersLoading ? (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                     {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-64 bg-primary/5" />)}
                 </div>
               ) : (
