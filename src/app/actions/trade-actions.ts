@@ -8,7 +8,7 @@ import { broadcastNewTickerNotification } from './telegram-actions';
 import { createSystemNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 
-const TRANSACTION_FEE_PERCENTAGE = 0.002;
+const TRANSACTION_FEE_PERCENTAGE = 0.02; // Updated to 2%
 const ADMIN_UID = 'xhYlmnOqQtUNYLgCK6XXm8unKJy1';
 
 const calculateTrendingScore = (priceChange24h: number, volume24h: number) => {

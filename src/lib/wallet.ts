@@ -35,17 +35,22 @@ export async function processDeposit(reference: string, userId: string, amountIn
             throw new Error(`User profile with ID ${userId} does not exist.`);
         }
 
-        const currentBalance = userDoc.data().balance || 0;
-        const newBalance = currentBalance + amountInNaira;
+        // Apply 3% deposit fee
+        const fee = amountInNaira * 0.03;
+        const netAmount = amountInNaira - fee;
 
-        // Update user's balance
+        const currentBalance = userDoc.data().balance || 0;
+        const newBalance = currentBalance + netAmount;
+
+        // Update user's balance with the net amount
         transaction.update(userDocRef, { balance: newBalance });
 
-        // Log the deposit activity
+        // Log the deposit activity with fee details
         const activityDocRef = doc(collection(firestore, 'activities'));
         transaction.set(activityDocRef, {
             type: 'DEPOSIT',
-            value: amountInNaira,
+            value: amountInNaira, // Gross value
+            fee: fee, // 3% fee
             userId,
             createdAt: serverTimestamp(),
         });
@@ -54,6 +59,8 @@ export async function processDeposit(reference: string, userId: string, amountIn
         transaction.set(depositRef, {
             userId,
             amount: amountInNaira,
+            fee: fee,
+            netAmount: netAmount,
             processedAt: serverTimestamp(),
         });
     });

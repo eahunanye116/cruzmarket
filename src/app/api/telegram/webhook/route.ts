@@ -63,7 +63,7 @@ function formatPortfolioList(mergedHoldings: [string, number][], tickers: Ticker
     page.forEach(([tId, amount], i) => {
         const ticker = tickers.find(t => t.id === tId);
         if (ticker) {
-            const val = calculateReclaimableValue(amount, ticker) * 0.998;
+            const val = calculateReclaimableValue(amount, ticker) * 0.98; // Updated to 2% fee
             msg += `${startIdx + i + 1}. <b>$${escapeHtmlForTelegram(ticker.name)}</b>\n`;
             msg += `Value: ₦${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n`;
             msg += `Address: <code>${ticker.tickerAddress}</code>\n\n`;
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
                 let totalVal = 0;
                 mergedEntries.forEach(([tId, amount]) => {
                     const ticker = tickers.find(t => t.id === tId);
-                    if (ticker) totalVal += calculateReclaimableValue(amount, ticker) * 0.998;
+                    if (ticker) totalVal += calculateReclaimableValue(amount, ticker) * 0.98; // Updated to 2% fee
                 });
 
                 let msg = formatPortfolioList(mergedEntries, tickers, offset, PAGE_SIZE);
@@ -585,7 +585,7 @@ export async function POST(req: NextRequest) {
             mergedEntries.forEach(([tId, amount]) => {
                 const ticker = tickers.find(t => t.id === tId);
                 if (ticker) {
-                    totalVal += calculateReclaimableValue(amount, ticker) * 0.998;
+                    totalVal += calculateReclaimableValue(amount, ticker) * 0.98; // Updated to 2% fee
                 }
             });
 

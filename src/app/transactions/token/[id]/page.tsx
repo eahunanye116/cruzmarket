@@ -72,7 +72,7 @@ export default function TokenTransactionHistoryPage() {
                 
                 if (isBuy || isSell) {
                     acc.tradeCount++;
-                    acc.totalFees += act.fee || (act.value * 0.002);
+                    acc.totalFees += act.fee || (act.value * 0.02); // Updated to 2%
                 }
                 if (isBuy) {
                     acc.totalBuy += act.value;
@@ -217,7 +217,7 @@ export default function TokenTransactionHistoryPage() {
                                             ₦{act.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                                         </TableCell>
                                         <TableCell className="text-xs text-destructive/70">
-                                            ₦{(act.fee ?? (act.value * 0.002)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            ₦{(act.fee ?? (act.value * 0.02)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="text-xs">
                                             {act.tokenAmount?.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' })}

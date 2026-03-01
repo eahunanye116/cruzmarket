@@ -28,7 +28,7 @@ function isValidUrl(url: string | undefined | null): url is string {
     }
 }
 
-const TRANSACTION_FEE_PERCENTAGE = 0.002;
+const TRANSACTION_FEE_PERCENTAGE = 0.02; // Updated to 2%
 
 export default function PortfolioPage() {
   const user = useUser();
