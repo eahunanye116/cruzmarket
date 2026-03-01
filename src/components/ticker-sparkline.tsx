@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
@@ -34,7 +33,7 @@ export function TickerSparkline({ ticker, className }: TickerSparklineProps) {
 
 
   const isUp = change24h === null ? true : change24h >= 0;
-  const color = isUp ? 'hsl(var(--chart-1))' : 'hsl(var(--destructive))';
+  const color = isUp ? 'hsl(var(--primary))' : 'hsl(var(--destructive))';
   const gradientId = `colorSpark-${ticker.id.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   if (dataToRender.length < 2) {
@@ -55,7 +54,7 @@ export function TickerSparkline({ ticker, className }: TickerSparklineProps) {
             type="monotone"
             dataKey="price"
             stroke={color}
-            strokeWidth={2}
+            strokeWidth={3}
             fillOpacity={1}
             fill={`url(#${gradientId})`}
           />

@@ -218,7 +218,7 @@ export default function Home() {
           </div>
 
           <div className="lg:col-span-4">
-            <div className="lg:sticky lg:top-24">
+            <div className="sticky top-24">
               {activityLoading ? (
                 <Skeleton className="h-[600px] bg-primary/5" />
               ) : (
