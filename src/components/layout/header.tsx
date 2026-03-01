@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Vote, Cpu } from 'lucide-react';
+import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Vote, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
@@ -30,15 +30,15 @@ function UserBalance() {
   const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
 
   if (loading || !isHydrated) {
-    return <Skeleton className="h-6 w-24 bg-primary/10" />;
+    return <Skeleton className="h-6 w-24" />;
   }
 
   const totalBalance = (userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0);
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20">
-      <Cpu className="h-3 w-3 text-primary animate-pulse" />
-      <div className="font-mono font-bold text-primary text-sm tracking-tighter">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+      <CreditCard className="h-3 w-3 text-primary" />
+      <div className="font-bold text-primary text-sm">
         {formatAmount(totalBalance)}
       </div>
     </div>
@@ -52,12 +52,12 @@ function CurrencySwitcher() {
 
     return (
         <Button 
-            variant="outline" 
+            variant="ghost" 
             size="sm" 
-            className="h-8 px-2 font-mono font-bold text-[10px] border-primary/20 text-primary/70 hover:text-primary hover:border-primary/50"
+            className="h-8 px-2 font-bold text-xs"
             onClick={() => setCurrency(currency === 'NGN' ? 'USD' : 'NGN')}
         >
-            [{currency}]
+            {currency}
         </Button>
     )
 }
@@ -77,27 +77,24 @@ export function Header() {
   const signupEnabled = settings === null || settings?.signupEnabled !== false;
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
-    { href: '/', label: 'HUB', icon: <Repeat className="h-4 w-4" /> },
-    { href: '/betting', label: 'ARENA', icon: <Vote className="h-4 w-4" /> },
-    { href: '/leaderboard', label: 'LEGENDS', icon: <Trophy className="h-4 w-4" /> },
-    { href: '/blog', label: 'TRENDS', icon: <TrendingUp className="h-4 w-4" /> },
-    { href: '/portfolio', label: 'VAULT', icon: <Wallet className="h-4 w-4" /> },
-    { href: '/transactions', label: 'WALLET', icon: <History className="h-4 w-4" /> },
-    { href: '/create', label: 'DEPLOY', icon: <Sparkles className="h-4 w-4" /> },
+    { href: '/', label: 'Trade', icon: <Repeat className="h-4 w-4" /> },
+    { href: '/betting', label: 'Arena', icon: <Vote className="h-4 w-4" /> },
+    { href: '/leaderboard', label: 'Leaderboard', icon: <Trophy className="h-4 w-4" /> },
+    { href: '/blog', label: 'Blog', icon: <TrendingUp className="h-4 w-4" /> },
+    { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-4 w-4" /> },
+    { href: '/transactions', label: 'Wallet', icon: <History className="h-4 w-4" /> },
+    { href: '/create', label: 'Create', icon: <Sparkles className="h-4 w-4" /> },
   ];
   
   const isAdmin = user?.uid === ADMIN_UID;
 
   return (
-    <header className="sticky top-0 z-50 w-full glass-hud">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-screen-2xl items-center px-4 md:px-8">
         <div className="flex items-center">
-          <Link href="/" className="mr-8 flex items-center space-x-2 group">
-            <div className="relative">
-                <TrendingUp className="h-7 w-7 text-primary relative z-10 transition-transform group-hover:scale-110" />
-                <div className="absolute inset-0 bg-primary blur-md opacity-20 group-hover:opacity-40" />
-            </div>
-            <span className="hidden font-headline font-bold text-xl uppercase tracking-tighter text-foreground sm:inline-block">
+          <Link href="/" className="mr-8 flex items-center space-x-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            <span className="hidden font-bold text-xl uppercase tracking-tighter sm:inline-block">
               CRUZ<span className="text-primary">MARKET</span>
             </span>
           </Link>
@@ -109,10 +106,8 @@ export function Header() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "px-3 py-1.5 rounded-md text-[11px] font-bold tracking-widest transition-all hover:bg-primary/5",
-                    isActive 
-                      ? "text-primary bg-primary/10 border-b-2 border-primary rounded-none" 
-                      : "text-muted-foreground hover:text-foreground"
+                    "px-3 py-2 rounded-md text-sm font-bold transition-colors hover:bg-accent hover:text-accent-foreground",
+                    isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
                   )}
                 >
                   {item.label}
@@ -130,28 +125,33 @@ export function Header() {
               <NotificationBell user={user} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="relative outline-none group">
-                    <Avatar className="h-9 w-9 border-2 border-primary/20 group-hover:border-primary transition-colors">
+                  <button className="relative outline-none">
+                    <Avatar className="h-9 w-9 border-2 border-primary/20">
                       <AvatarImage src={user.photoURL ?? ''} />
                       <AvatarFallback className="bg-muted text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56 mt-2 bg-card/90 backdrop-blur-xl border-primary/20" align="end" forceMount>
-                  <DropdownMenuLabel className="font-mono text-[10px] text-muted-foreground uppercase">{user.displayName || user.email}</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-primary/10" />
-                  <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs"><Link href="/settings"><Settings className="mr-2 h-4 w-4" /> SETTINGS</Link></DropdownMenuItem>
-                  {isAdmin && <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs text-primary"><Link href="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> ADMIN HUD</Link></DropdownMenuItem>}
-                  <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs"><Link href="/support"><History className="mr-2 h-4 w-4" /> SUPPORT TICKET</Link></DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-primary/10" />
-                  <DropdownMenuItem onClick={signOut} className="cursor-pointer font-bold text-xs text-destructive">LOGOUT_SESSION</DropdownMenuItem>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild className="cursor-pointer font-bold"><Link href="/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link></DropdownMenuItem>
+                  {isAdmin && <DropdownMenuItem asChild className="cursor-pointer font-bold text-primary"><Link href="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel</Link></DropdownMenuItem>}
+                  <DropdownMenuItem asChild className="cursor-pointer font-bold"><Link href="/support"><History className="mr-2 h-4 w-4" /> Support Tickets</Link></DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer font-bold text-destructive">Logout Session</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild className="text-[11px]"><Link href="/login">SIGN_IN</Link></Button>
-              {signupEnabled && <Button size="sm" asChild className="text-[11px]"><Link href="/signup">CREATE_CORE</Link></Button>}
+              <Button variant="ghost" size="sm" asChild><Link href="/login">Sign In</Link></Button>
+              {signupEnabled && <Button size="sm" asChild><Link href="/signup">Sign Up</Link></Button>}
             </div>
           )}
         </div>
