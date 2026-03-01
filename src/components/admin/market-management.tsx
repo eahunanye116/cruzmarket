@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink, Settings2, Info, Save, TrendingUp, Landmark, RefreshCcw } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, CheckCircle2, XCircle, Vote, ExternalLink, Settings2, Info, Save, TrendingUp, Landmark, RefreshCcw, Image as ImageIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { useCurrency } from '@/hooks/use-currency';
+import { ImageUpload } from '../image-upload';
 
 export function MarketManagement() {
     const firestore = useFirestore();
@@ -56,7 +57,10 @@ export function MarketManagement() {
     }, [settings]);
 
     const handleCreateMarket = async () => {
-        if (!question || !endsAt) return;
+        if (!question || !endsAt) {
+            toast({ variant: 'destructive', title: "Missing Fields", description: "Question and End Date are required." });
+            return;
+        }
         setIsSubmitting(true);
         const result = await createMarketAction({
             question,
@@ -66,7 +70,7 @@ export function MarketManagement() {
             endsAt: new Date(endsAt)
         });
         if (result.success) {
-            toast({ title: "Market Launched" });
+            toast({ title: "Market Launched", description: "Prediction market is now live in the Arena." });
             setIsCreateOpen(false);
             setQuestion(''); setDescription(''); setEndsAt(''); setImage('');
         } else {
@@ -264,12 +268,22 @@ export function MarketManagement() {
             </div>
 
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Launch New Market</DialogTitle>
-                        <DialogDescription>Create a binary (Yes/No) prediction market.</DialogDescription>
+                        <DialogDescription>Create a binary (Yes/No) prediction market with a high-impact banner.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-6 py-4">
+                        <div className="space-y-2">
+                            <Label>Header Image</Label>
+                            <ImageUpload 
+                                value={image} 
+                                onChange={setImage} 
+                                folder="markets/banners" 
+                                label="Market Image" 
+                            />
+                        </div>
+
                         <div className="space-y-2">
                             <Label>Question</Label>
                             <Input placeholder="e.g. Will BTC hit $100k by end of year?" value={question} onChange={e => setQuestion(e.target.value)} />
@@ -288,12 +302,8 @@ export function MarketManagement() {
                                 <Input type="date" value={endsAt} onChange={e => setEndsAt(e.target.value)} />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Header Image URL</Label>
-                            <Input placeholder="Direct link to image..." value={image} onChange={e => setImage(e.target.value)} />
-                        </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
                         <Button variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
                         <Button onClick={handleCreateMarket} disabled={isSubmitting || !question || !endsAt}>
                             {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Vote className="mr-2" />}

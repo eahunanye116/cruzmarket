@@ -52,8 +52,8 @@ function MarketCountdown({ endsAt }: { endsAt: any }) {
 
     return (
         <div className={cn(
-            "flex items-center gap-1.5 px-2 py-1 rounded font-mono text-[10px] font-bold border",
-            isUrgent ? "bg-destructive/10 text-destructive border-destructive/20 animate-pulse" : "bg-primary/10 text-primary border-primary/20"
+            "flex items-center gap-1.5 px-2 py-1 rounded font-mono text-[10px] font-bold border shadow-sm",
+            isUrgent ? "bg-destructive text-destructive-foreground border-transparent animate-pulse" : "bg-primary text-primary-foreground border-transparent"
         )}>
             <Timer className="h-3 w-3" />
             {timeLeft}
@@ -114,64 +114,65 @@ export default function PredictionsPage() {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {loading ? (
-                    [...Array(6)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)
+                    [...Array(6)].map((_, i) => <Skeleton key={i} className="h-80 w-full" />)
                 ) : filteredMarkets.length > 0 ? filteredMarkets.map((market) => (
                     <Link href={`/betting/${market.id}`} key={market.id}>
-                        <Card className="h-full overflow-hidden border-2 hover:border-primary/50 transition-all group flex flex-col shadow-hard-sm hover:shadow-hard-md">
-                            <div className="relative h-32 overflow-hidden">
+                        <Card className="h-full overflow-hidden border-2 hover:border-primary/50 transition-all group flex flex-col shadow-hard-sm hover:shadow-hard-md bg-card/50">
+                            <div className="relative aspect-[16/9] w-full overflow-hidden border-b-2">
                                 <img 
-                                    src={market.image || 'https://picsum.photos/seed/market/600/400'} 
+                                    src={market.image || 'https://picsum.photos/seed/market/800/450'} 
                                     alt={market.question}
-                                    className="w-full h-full object-cover transition-transform group-hover:scale-105 opacity-80"
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                                {/* Overlay for legibility */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
                                 
-                                <div className="absolute top-2 left-2 flex flex-col gap-2">
-                                    <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-[10px] uppercase font-bold border shadow-sm w-fit">
+                                <div className="absolute top-3 left-3">
+                                    <Badge className="bg-primary text-primary-foreground border-none font-bold text-[9px] uppercase tracking-wider px-2 py-1 shadow-sm">
                                         {market.category}
                                     </Badge>
                                 </div>
 
                                 {market.status === 'open' && (
-                                    <div className="absolute top-2 right-2">
+                                    <div className="absolute top-3 right-3">
                                         <MarketCountdown endsAt={market.endsAt} />
                                     </div>
                                 )}
 
                                 {market.status === 'resolved' && (
                                     <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center">
-                                        <Badge className="bg-accent text-accent-foreground font-headline text-lg px-4 py-1 shadow-hard-sm">RESOLVED</Badge>
+                                        <Badge className="bg-accent text-accent-foreground font-headline text-lg px-6 py-2 shadow-hard-sm border-2">RESOLVED</Badge>
                                     </div>
                                 )}
                             </div>
-                            <CardContent className="p-4 flex-1 flex flex-col">
-                                <CardTitle className="text-sm font-bold font-headline mb-4 leading-tight line-clamp-2 uppercase tracking-tight">
+                            <CardContent className="p-5 flex-1 flex flex-col justify-between">
+                                <CardTitle className="text-base font-bold font-headline mb-6 leading-tight line-clamp-2 uppercase tracking-tight min-h-[3rem]">
                                     {market.question}
                                 </CardTitle>
                                 
-                                <div className="mt-auto space-y-4">
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-accent/5 border-2 border-accent/20 rounded p-2 text-center group-hover:bg-accent/10 transition-colors">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-accent/10 border-2 border-accent/20 rounded-md p-2.5 text-center group-hover:bg-accent/20 transition-colors">
+                                            <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
                                                 <ArrowUp className="h-2.5 w-2.5 text-accent" /> Yes
                                             </p>
                                             <p className="text-xl font-bold text-accent">₦{Math.round(market.outcomes.yes.price)}</p>
                                         </div>
-                                        <div className="flex-1 bg-destructive/5 border-2 border-destructive/20 rounded p-2 text-center group-hover:bg-destructive/10 transition-colors">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
+                                        <div className="bg-destructive/10 border-2 border-destructive/20 rounded-md p-2.5 text-center group-hover:bg-destructive/20 transition-colors">
+                                            <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1">
                                                 <ArrowDown className="h-2.5 w-2.5 text-destructive" /> No
                                             </p>
                                             <p className="text-xl font-bold text-destructive">₦{Math.round(market.outcomes.no.price)}</p>
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-t pt-3">
-                                        <span className="flex items-center gap-1">
-                                            <TrendingUp className="h-3 w-3 text-primary" /> ₦{market.volume?.toLocaleString()} Volume
+                                    <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-t pt-4">
+                                        <span className="flex items-center gap-1.5">
+                                            <TrendingUp className="h-3 w-3 text-primary" /> ₦{market.volume?.toLocaleString()} Vol
                                         </span>
-                                        <span className="flex items-center gap-1">
+                                        <span className="flex items-center gap-1.5">
                                             <Clock className="h-3 w-3" /> {market.status === 'open' ? 'Ends Soon' : 'Settled'}
                                         </span>
                                     </div>
@@ -180,9 +181,9 @@ export default function PredictionsPage() {
                         </Card>
                     </Link>
                 )) : (
-                    <div className="col-span-full py-20 text-center border-2 border-dashed rounded-lg bg-muted/10">
-                        <Vote className="h-12 w-12 mx-auto mb-4 opacity-20 text-muted-foreground" />
-                        <p className="text-muted-foreground font-bold uppercase tracking-widest">No active markets in this arena</p>
+                    <div className="col-span-full py-24 text-center border-2 border-dashed rounded-lg bg-muted/10 border-muted">
+                        <Vote className="h-16 w-16 mx-auto mb-4 opacity-20 text-muted-foreground" />
+                        <p className="text-muted-foreground font-bold uppercase tracking-widest">No active markets in the arena</p>
                     </div>
                 )}
             </div>
