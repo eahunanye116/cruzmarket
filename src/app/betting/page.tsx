@@ -89,7 +89,7 @@ export default function PredictionsPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-none bg-primary/10 border-2 mb-4">
                     <Vote className="h-6 w-6 text-primary" />
                 </div>
-                <h1 className="text-4xl font-bold font-headline uppercase tracking-tighter">Prediction Arena</h1>
+                <h1 className="text-4xl font-bold font-headline uppercase tracking-tighter">Prediction Hub</h1>
                 <p className="mt-2 text-lg text-muted-foreground">
                     The market for world events. Trade on truth.
                 </p>

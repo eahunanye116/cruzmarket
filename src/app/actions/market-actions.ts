@@ -114,12 +114,12 @@ export async function buyMarketSharesAction(
                 volume: increment(ngnForCurve)
             });
 
-            // Update Global Stats
-            transaction.update(statsRef, {
+            // Update Global Stats - Using set with merge to ensure it exists
+            transaction.set(statsRef, {
                 totalFeesGenerated: increment(fee),
                 totalMarketFees: increment(fee),
                 totalMarketVolume: increment(ngnForCurve)
-            });
+            }, { merge: true });
 
             if (posSnap.exists()) {
                 const existingPos = posSnap.data() as MarketPosition;
@@ -219,12 +219,12 @@ export async function sellMarketSharesAction(
                 volume: increment(ngnReturnBeforeFee)
             });
 
-            // Update Global Stats
-            transaction.update(statsRef, {
+            // Update Global Stats - Using set with merge
+            transaction.set(statsRef, {
                 totalFeesGenerated: increment(fee),
                 totalMarketFees: increment(fee),
                 totalMarketVolume: increment(ngnReturnBeforeFee)
-            });
+            }, { merge: true });
 
             const remainingShares = pos.shares - sharesToSell;
             if (remainingShares < 0.000001) {

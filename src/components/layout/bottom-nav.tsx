@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -15,7 +14,7 @@ import {
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: '/', label: 'Trade', icon: <Repeat className="h-6 w-6" /> },
-  { href: '/betting', label: 'Predictions', icon: <Vote className="h-6 w-6" /> },
+  { href: '/betting', label: 'Prediction', icon: <Vote className="h-6 w-6" /> },
   { href: '/create', label: 'Create', icon: <Sparkles className="h-6 w-6" /> },
   { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-6 w-6" /> },
 ];

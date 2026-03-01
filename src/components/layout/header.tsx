@@ -78,7 +78,7 @@ export function Header() {
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
     { href: '/', label: 'Trade', icon: <Repeat className="h-4 w-4" /> },
-    { href: '/betting', label: 'Arena', icon: <Vote className="h-4 w-4" /> },
+    { href: '/betting', label: 'Prediction', icon: <Vote className="h-4 w-4" /> },
     { href: '/leaderboard', label: 'Leaderboard', icon: <Trophy className="h-4 w-4" /> },
     { href: '/blog', label: 'Blog', icon: <TrendingUp className="h-4 w-4" /> },
     { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-4 w-4" /> },
