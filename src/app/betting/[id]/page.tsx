@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet, CircleDollarSign, TrendingDown, Timer, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, Clock, Info, CheckCircle2, ShieldAlert, ArrowLeft, Loader2, Wallet, CircleDollarSign, TrendingDown, Timer, ArrowUp, ArrowDown, History } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { buyMarketSharesAction, sellMarketSharesAction } from '@/app/actions/market-actions';
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { MarketTransactions } from '@/components/market-transactions';
 
 export default function MarketDetailsPage() {
     const params = useParams();
@@ -234,6 +235,17 @@ export default function MarketDetailsPage() {
                             </CardContent>
                         </Card>
                     )}
+
+                    <Card className="border-2">
+                        <CardHeader className="py-4 border-b-2">
+                            <CardTitle className="text-sm uppercase font-bold flex items-center gap-2 tracking-widest">
+                                <History className="h-4 w-4 text-primary" /> Arena Activity
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            <MarketTransactions marketId={market.id} />
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <div className="lg:col-span-4 space-y-6">
