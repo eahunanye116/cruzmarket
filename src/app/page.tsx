@@ -9,7 +9,7 @@ import { useCollection, useFirestore, useUser } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Ticker, Activity } from '@/lib/types';
 import { CruzMode } from '@/components/cruz-mode';
-import { Info } from 'lucide-react';
+import { Info, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Walkthrough, type WalkthroughStep } from '@/components/walkthrough';
@@ -26,7 +26,7 @@ export default function Home() {
   // Walkthrough State
   const [showWalkthrough, setShowWalkthrough] = useState(false);
 
-  // OPTIMIZATION: Limit ticker fetch to top 100 most recent to save read quota
+  // OPTIMIZATION: Limit ticker fetch to top 100 most recent
   const tickersQuery = firestore ? query(
     collection(firestore, 'tickers'), 
     orderBy('createdAt', 'desc'),
@@ -40,26 +40,26 @@ export default function Home() {
   // Walkthrough logic
   const guestSteps: WalkthroughStep[] = useMemo(() => [
     {
-        title: 'Welcome to CruzMarket!',
+        title: 'System Access Granted',
         description: (
         <p>
-            This is a high-octane battleground for meme tickers where hype is the ultimate asset. Explore the market and watch the chaos unfold.
+            Welcome to the Cyber Trade Hub. This is a high-performance battleground for meme assets.
         </p>
         ),
     },
     {
-        title: 'Explore The Arena',
+        title: 'HUD Navigation',
         description: (
         <p>
-            You can browse all tickers, see what's trending in <strong>Cruz Mode</strong>, and watch every trade in the <strong>Live Activity</strong> feed.
+            Track real-time dominance in <strong>Cruz Mode</strong> and monitor the <strong>Global Activity</strong> stream.
         </p>
         ),
     },
     {
-        title: 'Join the Fray',
+        title: 'Initialize Trading',
         description: (
         <p>
-            Ready to trade? <strong>Sign up</strong> to deposit funds, start trading, or launch your own legendary meme coin.
+            Create an account to deposit funds and deploy your own tickers to the grid.
         </p>
         ),
     },
@@ -67,44 +67,36 @@ export default function Home() {
 
   const userSteps: WalkthroughStep[] = useMemo(() => [
     {
-        title: `Welcome, ${user?.displayName || 'Trader'}!`,
+        title: `Welcome, Agent ${user?.displayName || 'Trader'}!`,
         description: (
         <p>
-            You're all set to start your trading journey. Deposit funds to your wallet to get started.
+            HUD operational. Deposit credits to your secure vault to begin market execution.
         </p>
         ),
     },
     {
-        title: 'Find Your Moonshot',
+        title: 'Asset Scan',
         description: (
         <p>
-            Browse the list of tickers on the homepage. Click on any token to view its detailed chart, see recent trades, and analyze its holders.
+            Filter the ticker list to find high-growth moonshots. Every token is powered by an automated bonding curve.
         </p>
         ),
     },
     {
-        title: 'Master the Trade',
+        title: 'Curve Execution',
         description: (
         <p>
-            Use the <strong>Buy</strong> and <strong>Sell</strong> tabs on a token's page to trade. The price is determined by a bonding curve, so it moves with every transaction. A 0.2% fee applies to all trades.
+            Prices fluctuate based on supply and demand. Buy high-momentum trends early for maximum yield.
         </p>
         ),
     },
     {
-        title: 'Launch a Legend',
+        title: 'Asset Deployment',
         description: (
             <p>
-                Got an idea for the next big meme? Go to the <strong>Create</strong> page to launch your own ticker on the market instantly.
+                Got a viral concept? Navigate to <strong>Deploy</strong> to launch your own token to the arena instantly.
             </p>
         )
-    },
-    {
-        title: "You're Ready to Go!",
-        description: (
-        <p>
-            That's all you need to know. Go forth and conquer the meme markets. Welcome to CruzMarket.
-        </p>
-        ),
     }
   ], [user]);
 
@@ -181,34 +173,57 @@ export default function Home() {
         onFinish={handleFinishWalkthrough}
         steps={user ? userSteps : guestSteps}
       />
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {isLoading || !kingTicker ? null : <CruzMode ticker={kingTicker} />}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
-          <div className="lg:col-span-2">
-            {isLoading ? <Skeleton className="h-24" /> : <TrendingSection trendingTickers={trendingTickers} />}
-            <div className="mt-12">
-              <div className="flex items-center gap-2 mb-6">
-                <h2 className="text-3xl font-bold tracking-tight font-headline">All Meme Tickers</h2>
+      <div className="container mx-auto px-4 md:px-8 max-w-screen-2xl">
+        {isLoading ? (
+            <Skeleton className="h-[400px] w-full rounded-xl bg-primary/5" />
+        ) : kingTicker ? (
+            <CruzMode ticker={kingTicker} />
+        ) : null}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-12">
+          <div className="lg:col-span-8 space-y-12">
+            <div className="relative">
+                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary/20 rounded-full" />
+                {isLoading ? <Skeleton className="h-48" /> : <TrendingSection trendingTickers={trendingTickers} />}
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                <div className="flex items-center gap-3">
+                    <LayoutDashboard className="h-6 w-6 text-primary" />
+                    <h2 className="text-3xl font-bold tracking-tight font-headline uppercase tracking-tighter">Market_Index</h2>
+                </div>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-primary/80 hover:text-primary">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary/60 hover:text-primary">
                       <Info className="h-5 w-5" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-w-xs">
-                    <h4 className="font-bold mb-2">What is a Bonding Curve?</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Instead of a traditional order book, prices are determined by a mathematical formula. When you buy, the price goes up. When you sell, the price goes down. This creates a liquid and dynamic market for every token from the moment it's created.
+                  <PopoverContent className="max-w-xs bg-card/95 border-primary/20 text-sm">
+                    <h4 className="font-bold mb-2 text-primary uppercase tracking-widest">Bonding Matrix</h4>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Instant liquidity. Algorithmic pricing. The more agents purchase, the higher the valuation trace.
                     </p>
                   </PopoverContent>
                 </Popover>
               </div>
-              {tickersLoading ? <Skeleton className="h-96" /> : <TickerList tickers={tickers || []} />}
+              {tickersLoading ? (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-64 bg-primary/5" />)}
+                </div>
+              ) : (
+                <TickerList tickers={tickers || []} />
+              )}
             </div>
           </div>
-          <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-20">
-              {activityLoading ? <Skeleton className="h-96" /> : <ActivityFeed activities={recentActivity || []} />}
+
+          <div className="lg:col-span-4">
+            <div className="lg:sticky lg:top-24">
+              {activityLoading ? (
+                <Skeleton className="h-[600px] bg-primary/5" />
+              ) : (
+                <ActivityFeed activities={recentActivity || []} />
+              )}
             </div>
           </div>
         </div>

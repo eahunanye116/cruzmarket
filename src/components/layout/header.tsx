@@ -1,9 +1,8 @@
-
 'use client'
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Vote } from 'lucide-react';
+import { TrendingUp, Repeat, Wallet, Sparkles, History, ShieldCheck, Settings, Trophy, Vote, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
@@ -31,14 +30,17 @@ function UserBalance() {
   const { data: userProfile, loading } = useDoc<UserProfile>(userProfileRef);
 
   if (loading || !isHydrated) {
-    return <Skeleton className="h-6 w-24" />;
+    return <Skeleton className="h-6 w-24 bg-primary/10" />;
   }
 
   const totalBalance = (userProfile?.balance ?? 0) + (userProfile?.bonusBalance ?? 0);
 
   return (
-    <div className="font-semibold text-primary">
-      {formatAmount(totalBalance)}
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20">
+      <Cpu className="h-3 w-3 text-primary animate-pulse" />
+      <div className="font-mono font-bold text-primary text-sm tracking-tighter">
+        {formatAmount(totalBalance)}
+      </div>
     </div>
   )
 }
@@ -52,10 +54,10 @@ function CurrencySwitcher() {
         <Button 
             variant="outline" 
             size="sm" 
-            className="h-8 px-2 font-bold text-[10px] sm:text-xs"
+            className="h-8 px-2 font-mono font-bold text-[10px] border-primary/20 text-primary/70 hover:text-primary hover:border-primary/50"
             onClick={() => setCurrency(currency === 'NGN' ? 'USD' : 'NGN')}
         >
-            {currency}
+            [{currency}]
         </Button>
     )
 }
@@ -75,65 +77,82 @@ export function Header() {
   const signupEnabled = settings === null || settings?.signupEnabled !== false;
 
   const navItems: { href: string; label: string, icon: ReactNode }[] = [
-    { href: '/', label: 'Trade', icon: <Repeat className="h-5 w-5" /> },
-    { href: '/betting', label: 'Predictions', icon: <Vote className="h-5 w-5" /> },
-    { href: '/leaderboard', label: 'Legends', icon: <Trophy className="h-5 w-5" /> },
-    { href: '/blog', label: 'Trend', icon: <TrendingUp className="h-5 w-5" /> },
-    { href: '/portfolio', label: 'Portfolio', icon: <Wallet className="h-5 w-5" /> },
-    { href: '/transactions', label: 'Wallet', icon: <History className="h-5 w-5" /> },
-    { href: '/create', label: 'Create', icon: <Sparkles className="h-5 w-5" /> },
+    { href: '/', label: 'HUB', icon: <Repeat className="h-4 w-4" /> },
+    { href: '/betting', label: 'ARENA', icon: <Vote className="h-4 w-4" /> },
+    { href: '/leaderboard', label: 'LEGENDS', icon: <Trophy className="h-4 w-4" /> },
+    { href: '/blog', label: 'TRENDS', icon: <TrendingUp className="h-4 w-4" /> },
+    { href: '/portfolio', label: 'VAULT', icon: <Wallet className="h-4 w-4" /> },
+    { href: '/transactions', label: 'WALLET', icon: <History className="h-4 w-4" /> },
+    { href: '/create', label: 'DEPLOY', icon: <Sparkles className="h-4 w-4" /> },
   ];
   
   const isAdmin = user?.uid === ADMIN_UID;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b-2 border-border/40 bg-background/80 backdrop-blur-sm">
-      <div className="container flex h-14 max-w-screen-2xl items-center">
+    <header className="sticky top-0 z-50 w-full glass-hud">
+      <div className="container flex h-16 max-w-screen-2xl items-center px-4 md:px-8">
         <div className="flex items-center">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="hidden font-bold sm:inline-block font-headline text-lg">CruzMarket</span>
+          <Link href="/" className="mr-8 flex items-center space-x-2 group">
+            <div className="relative">
+                <TrendingUp className="h-7 w-7 text-primary relative z-10 transition-transform group-hover:scale-110" />
+                <div className="absolute inset-0 bg-primary blur-md opacity-20 group-hover:opacity-40" />
+            </div>
+            <span className="hidden font-headline font-bold text-xl uppercase tracking-tighter text-foreground sm:inline-block">
+              CRUZ<span className="text-primary">MARKET</span>
+            </span>
           </Link>
-          <nav className="hidden items-center gap-6 text-base md:flex">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "transition-colors hover:text-foreground/80 flex items-center gap-2",
-                  (pathname === item.href || (item.href === '/betting' && pathname.startsWith('/betting'))) ? "text-foreground font-bold" : "text-foreground/60"
-                )}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
+          <nav className="hidden items-center gap-1 md:flex">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || (item.href === '/betting' && pathname.startsWith('/betting'));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-[11px] font-bold tracking-widest transition-all hover:bg-primary/5",
+                    isActive 
+                      ? "text-primary bg-primary/10 border-b-2 border-primary rounded-none" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
         
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <CurrencySwitcher />
+        <div className="flex flex-1 items-center justify-end space-x-3">
+          <div className="hidden sm:block"><CurrencySwitcher /></div>
           {user ? (
-            <>
-            <UserBalance />
-            <NotificationBell user={user} />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="ghost" className="relative h-8 w-8 rounded-full"><Avatar className="h-8 w-8"><AvatarImage src={user.photoURL ?? ''} /><AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback></Avatar></Button></DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel><p className="text-sm font-medium">{user.displayName || user.email}</p></DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link></DropdownMenuItem>
-                {isAdmin && <DropdownMenuItem asChild><Link href="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin</Link></DropdownMenuItem>}
-                <DropdownMenuItem asChild><Link href="/support"><History className="mr-2 h-4 w-4" /> Support</Link></DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            </>
+            <div className="flex items-center gap-3">
+              <UserBalance />
+              <NotificationBell user={user} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative outline-none group">
+                    <Avatar className="h-9 w-9 border-2 border-primary/20 group-hover:border-primary transition-colors">
+                      <AvatarImage src={user.photoURL ?? ''} />
+                      <AvatarFallback className="bg-muted text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 mt-2 bg-card/90 backdrop-blur-xl border-primary/20" align="end" forceMount>
+                  <DropdownMenuLabel className="font-mono text-[10px] text-muted-foreground uppercase">{user.displayName || user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-primary/10" />
+                  <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs"><Link href="/settings"><Settings className="mr-2 h-4 w-4" /> SETTINGS</Link></DropdownMenuItem>
+                  {isAdmin && <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs text-primary"><Link href="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> ADMIN HUD</Link></DropdownMenuItem>}
+                  <DropdownMenuItem asChild className="cursor-pointer font-bold text-xs"><Link href="/support"><History className="mr-2 h-4 w-4" /> SUPPORT TICKET</Link></DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-primary/10" />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer font-bold text-xs text-destructive">LOGOUT_SESSION</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
-            <>
-              <Button variant="ghost" asChild><Link href="/login">Sign In</Link></Button>
-              {signupEnabled && <Button asChild><Link href="/signup">Sign Up</Link></Button>}
-            </>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild className="text-[11px]"><Link href="/login">SIGN_IN</Link></Button>
+              {signupEnabled && <Button size="sm" asChild className="text-[11px]"><Link href="/signup">CREATE_CORE</Link></Button>}
+            </div>
           )}
         </div>
       </div>

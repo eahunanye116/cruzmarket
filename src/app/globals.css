@@ -1,61 +1,29 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 20% 90%;
-    --foreground: 0 0% 10%;
-    --card: 210 20% 98%;
-    --card-foreground: 0 0% 10%;
-    --popover: 210 20% 98%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 180 85% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 15% 85%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 210 15% 85%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 210 80% 60%;
-    --accent-foreground: 0 0% 100%;
+    --background: 220 20% 2%;
+    --foreground: 210 20% 98%;
+    --card: 220 20% 4%;
+    --card-foreground: 210 20% 98%;
+    --popover: 220 20% 3%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 180 100% 50%; /* Neon Cyan */
+    --primary-foreground: 220 20% 2%;
+    --secondary: 220 15% 10%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 220 15% 8%;
+    --muted-foreground: 210 10% 60%;
+    --accent: 280 100% 60%; /* Electric Purple */
+    --accent-foreground: 210 20% 98%;
     --destructive: 0 100% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 10% 60%;
-    --input: 210 10% 60%;
-    --ring: 180 85% 40%;
-    --chart-1: 180 85% 40%;
-    --chart-2: 210 80% 60%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.25rem;
-  }
-  .dark {
-    --background: 220 15% 5%; /* Deep Charcoal Blue */
-    --foreground: 210 20% 90%;
-    --card: 220 15% 10%; /* Slightly lighter charcoal */
-    --card-foreground: 210 20% 90%;
-    --popover: 220 15% 5%;
-    --popover-foreground: 210 20% 90%;
-    --primary: 45 90% 55%; /* Bat-signal Yellow */
-    --primary-foreground: 220 15% 5%;
-    --secondary: 220 10% 15%;
-    --secondary-foreground: 210 20% 90%;
-    --muted: 220 10% 15%;
-    --muted-foreground: 210 20% 70%;
-    --accent: 210 80% 60%; /* Steel Blue */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 80% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 45 90% 55%;
-    --chart-1: 45 90% 55%;
-    --chart-2: 210 80% 60%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 180 100% 50% / 0.15;
+    --input: 180 100% 50% / 0.1;
+    --ring: 180 100% 50%;
+    --radius: 0.5rem;
   }
 }
 
@@ -65,77 +33,42 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-smooth: never;
-    -webkit-font-smoothing: none;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-@keyframes gradient-move {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 10px hsla(var(--primary), 0.2); }
+  50% { opacity: 1; box-shadow: 0 0 20px hsla(var(--primary), 0.4); }
 }
 
 @layer components {
+  .futuristic-card {
+    @apply bg-card/40 backdrop-blur-xl border border-primary/10 shadow-lg transition-all duration-300;
+  }
+  .futuristic-card:hover {
+    @apply border-primary/30 bg-card/60 shadow-[0_0_20px_rgba(0,255,255,0.1)];
+  }
+  .neon-text {
+    @apply text-primary drop-shadow-[0_0_8px_hsla(var(--primary),0.6)];
+  }
+  .cyber-grid {
+    background-size: 40px 40px;
+    background-image: 
+      linear-gradient(to right, hsla(var(--primary), 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, hsla(var(--primary), 0.05) 1px, transparent 1px);
+  }
   .animated-gradient {
-    background: linear-gradient(-45deg, hsl(var(--background)), hsl(var(--secondary)), hsl(var(--background)), hsl(var(--primary) / 0.1));
-    background-size: 400% 400%;
-    animation: gradient-move 30s ease infinite;
+    background: radial-gradient(circle at 50% 50%, hsla(var(--primary), 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, hsla(var(--accent), 0.05) 0%, transparent 40%);
+    @apply fixed inset-0 -z-20;
   }
-  .abstract-bg {
-    background-color: hsl(var(--background));
-    background-image: linear-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px), linear-gradient(to right, hsl(var(--foreground) / 0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
-  }
-  .prose {
-    @apply text-foreground text-base max-w-none;
-  }
-  .prose h1 {
-    @apply text-4xl font-bold mb-4 mt-8;
-  }
-  .prose h2 {
-    @apply text-3xl font-bold mb-4 mt-8 border-b pb-2;
-  }
-  .prose h3 {
-    @apply text-2xl font-bold mb-4 mt-6;
-  }
-  .prose p {
-    @apply leading-relaxed mb-4;
-  }
-  .prose a {
-    @apply text-primary hover:underline;
-  }
-  .prose blockquote {
-    @apply border-l-4 border-primary pl-4 italic text-muted-foreground my-6;
-  }
-  .prose ul {
-    @apply list-disc list-inside mb-4;
-  }
-  .prose ol {
-    @apply list-decimal list-inside mb-4;
-  }
-  .prose li {
-    @apply mb-2;
-  }
-  .prose code {
-    @apply bg-muted text-muted-foreground rounded-sm px-1 py-0.5 font-mono text-sm;
-  }
-  .prose pre {
-    @apply bg-muted p-4 rounded-md overflow-x-auto;
-  }
-  .prose pre code {
-    @apply bg-transparent p-0;
-  }
-  .prose img {
-    @apply rounded-lg border;
-  }
-  .prose hr {
-    @apply my-8;
+  .glass-hud {
+    @apply bg-black/40 backdrop-blur-md border-b border-primary/10;
   }
 }
